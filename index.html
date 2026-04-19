@@ -6,10 +6,12 @@
   <title>陳媽媽肉粽訂單系統</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- 使用更穩定的 Supabase 載入方式 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
     body { font-family: 'Noto Sans TC', system-ui, sans-serif; }
+    .tab-active { border-bottom: 4px solid #d97706; color: #d97706; font-weight: 700; }
   </style>
 </head>
 <body class="bg-amber-50 min-h-screen">
@@ -19,8 +21,8 @@
         <i class="fas fa-leaf"></i> 陳媽媽肉粽訂單系統
       </h1>
       <div class="flex gap-6 text-sm">
-        <button onclick="switchTab(0)" class="tab-active px-5 py-2">前台下單</button>
-        <button onclick="switchTab(1)" class="px-5 py-2 hover:text-amber-200">後台管理</button>
+        <button onclick="switchTab(0)" id="tab-0" class="tab-active px-5 py-2">前台下單</button>
+        <button onclick="switchTab(1)" id="tab-1" class="px-5 py-2 hover:text-amber-200">後台管理</button>
       </div>
     </div>
 
@@ -37,7 +39,7 @@
     async function initApp() {
       const app = document.getElementById('app');
       try {
-        const supabase = Supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         const { data, error } = await supabase.from('products').select('id').limit(1);
 
         if (error) throw error;
@@ -45,9 +47,9 @@
         app.innerHTML = `
           <div class="text-center py-32">
             <h2 class="text-5xl font-bold text-green-600 mb-8">✅ 連接成功！</h2>
-            <p class="text-2xl">你的資料庫已經連接正常</p>
-            <p class="mt-10 text-lg text-gray-600">完整前台下單與後台管理功能正在開發中...</p>
-            <p class="mt-16 text-sm text-gray-500">目前測試版已確認可正常使用 Supabase</p>
+            <p class="text-2xl">你的陳媽媽肉粽訂單系統已經成功上線</p>
+            <p class="mt-10 text-lg text-gray-600">前台下單與後台管理功能正在開發中...</p>
+            <p class="mt-16 text-sm text-gray-500">目前測試版已確認資料庫連接正常</p>
           </div>
         `;
       } catch (err) {
