@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>陳媽媽肉粽訂單系統</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
+    body { font-family: 'Noto Sans TC', system-ui, sans-serif; }
+  </style>
+</head>
+<body class="bg-amber-50 min-h-screen">
+  <div class="max-w-7xl mx-auto bg-white shadow-2xl min-h-screen">
+    <div class="bg-amber-800 text-white p-6 flex justify-between items-center">
+      <h1 class="text-2xl font-bold flex items-center gap-3">
+        <i class="fas fa-leaf"></i> 陳媽媽肉粽訂單系統
+      </h1>
+      <div class="flex gap-6 text-sm">
+        <button onclick="switchTab(0)" class="tab-active px-5 py-2">前台下單</button>
+        <button onclick="switchTab(1)" class="px-5 py-2 hover:text-amber-200">後台管理</button>
+      </div>
+    </div>
+
+    <div id="app" class="p-12 text-center">
+      <h2 class="text-4xl font-bold text-amber-700">系統載入中...</h2>
+      <p class="mt-8 text-gray-600">正在連接資料庫，請稍候</p>
+    </div>
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'https://rlflaetztuvggnqzea.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJsZmxhZXR6aHR1dmdnZ25xemVhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1OTI3NDgsImV4cCI6MjA5MjE2ODc0OH0.1Bl8SE9KAQ68krOJz_1ThlN2tYYl9pwgE8XQghponn8';
+
+    async function initApp() {
+      const app = document.getElementById('app');
+      try {
+        const supabase = Supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const { data, error } = await supabase.from('products').select('id').limit(1);
+
+        if (error) throw error;
+
+        app.innerHTML = `
+          <div class="text-center py-32">
+            <h2 class="text-5xl font-bold text-green-600 mb-8">✅ 連接成功！</h2>
+            <p class="text-2xl">你的資料庫已經連接正常</p>
+            <p class="mt-10 text-lg text-gray-600">完整前台下單與後台管理功能正在開發中...</p>
+            <p class="mt-16 text-sm text-gray-500">目前測試版已確認可正常使用 Supabase</p>
+          </div>
+        `;
+      } catch (err) {
+        app.innerHTML = `
+          <div class="text-center py-32">
+            <h2 class="text-5xl font-bold text-red-600 mb-8">❌ 連接失敗</h2>
+            <p class="text-xl">錯誤: ${err.message || '未知錯誤'}</p>
+          </div>
+        `;
+      }
+    }
+
+    function switchTab(tab) {
+      alert('完整功能開發中，敬請期待！');
+    }
+
+    window.onload = initApp;
+  </script>
+</body>
+</html>
