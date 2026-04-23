@@ -7,22 +7,26 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
     body { font-family: 'Noto Sans TC', system-ui, sans-serif; }
   </style>
 </head>
-<body class="bg-amber-50">
-  <div class="max-w-6xl mx-auto bg-white min-h-screen shadow-xl">
-    <header class="bg-amber-800 text-white p-6 flex justify-between">
-      <h1 class="text-3xl font-bold">陳媽媽肉粽訂單系統</h1>
-      <div class="space-x-8">
-        <button onclick="switchTab(0)" class="font-medium">前台下單</button>
-        <button onclick="switchTab(1)" class="font-medium">後台管理</button>
+<body class="bg-amber-50 min-h-screen">
+  <div class="max-w-6xl mx-auto bg-white shadow-2xl min-h-screen">
+    <header class="bg-amber-800 text-white p-6 flex justify-between items-center">
+      <h1 class="text-3xl font-bold flex items-center gap-3">
+        🍙 陳媽媽肉粽訂單系統
+      </h1>
+      <div class="flex gap-8 text-sm font-medium">
+        <button onclick="switchTab(0)" class="hover:text-amber-200">前台下單</button>
+        <button onclick="switchTab(1)" class="hover:text-amber-200">後台管理</button>
       </div>
     </header>
 
-    <div id="main" class="p-12 text-center">
-      <h2 class="text-4xl font-bold text-amber-700 mb-6">系統載入中...</h2>
-      <p id="status" class="text-lg text-gray-600">正在連接資料庫...</p>
+    <div id="main" class="p-16 text-center">
+      <div class="text-6xl mb-6">🔄</div>
+      <h2 class="text-4xl font-bold text-amber-700 mb-4">系統載入中...</h2>
+      <p id="status" class="text-xl text-gray-600">正在連接 Supabase 資料庫</p>
     </div>
   </div>
 
@@ -30,39 +34,47 @@
     const SUPABASE_URL = 'https://rlflaetztuvggnqzea.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJsZmxhZXR6aHR1dmdnZ25xemVhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1OTI3NDgsImV4cCI6MjA5MjE2ODc0OH0.1Bl8SE9KAQ68krOJz_1ThlN2tYYl9pwgE8XQghponn8';
 
-    async function init() {
-      const status = document.getElementById('status');
+    async function initApp() {
+      const statusEl = document.getElementById('status');
       try {
+        console.log('開始連接 Supabase...');
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        
+
         const { data, error } = await supabase
           .from('products')
-          .select('id, name, price')
-          .limit(3);
+          .select('*')
+          .limit(5);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Supabase 錯誤:', error);
+          throw error;
+        }
 
-        status.innerHTML = `
-          <span class="text-green-600 text-5xl">✅</span><br>
-          <span class="text-3xl font-bold text-green-600">連接成功！</span><br>
-          <span class="text-xl mt-4 block">已成功讀取 ${data.length} 筆商品資料</span>
-          <p class="mt-10 text-gray-500">你的肉粽訂單系統已正式上線</p>
+        console.log('成功讀取資料:', data);
+
+        statusEl.innerHTML = `
+          <span class="text-7xl mb-6 block">✅</span>
+          <span class="text-4xl font-bold text-green-600 block">連接成功！</span>
+          <p class="text-2xl mt-6">已成功讀取 ${data.length} 筆商品資料</p>
+          <p class="mt-10 text-green-700">你的陳媽媽肉粽訂單系統已正式上線 🎉</p>
         `;
+
       } catch (err) {
-        console.error(err);
-        status.innerHTML = `
-          <span class="text-red-600 text-5xl">❌</span><br>
-          <span class="text-2xl font-bold">連接失敗</span><br>
-          <span class="text-red-500">錯誤: ${err.message || 'Failed to fetch'}</span>
+        console.error('完整錯誤:', err);
+        statusEl.innerHTML = `
+          <span class="text-7xl mb-6 block">❌</span>
+          <span class="text-3xl font-bold text-red-600 block">連接失敗</span>
+          <p class="text-red-500 mt-4">${err.message || 'Failed to fetch'}</p>
+          <p class="text-sm mt-8 text-gray-500">請告訴我錯誤訊息，我會繼續幫你修正</p>
         `;
       }
     }
 
     function switchTab(n) {
-      alert('完整功能開發中，敬請期待！目前先測試資料庫連接。');
+      alert('完整前後台功能開發中\n目前先測試資料庫連接是否正常');
     }
 
-    window.onload = init;
+    window.onload = initApp;
   </script>
 </body>
 </html>
