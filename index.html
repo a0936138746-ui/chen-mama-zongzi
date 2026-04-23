@@ -17,7 +17,7 @@
     </header>
 
     <div class="p-8">
-      <h2 class="text-2xl font-bold mb-6">商品列表</h2>
+      <h2 class="text-2xl font-bold mb-6">商品列表（點擊即可加入訂單）</h2>
       <div id="products" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12"></div>
 
       <h2 class="text-2xl font-bold mb-6">新增訂單</h2>
@@ -25,7 +25,8 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <input id="name" type="text" placeholder="客戶姓名" class="border p-4 rounded-2xl text-lg">
           <input id="phone" type="text" placeholder="客戶電話" class="border p-4 rounded-2xl text-lg">
-          <input id="items" type="text" placeholder="商品明細 (例如: 北部粽 x2、南部粽 x1)" class="border p-4 rounded-2xl text-lg col-span-2">
+          <input id="items" type="text" placeholder="商品明細 (點擊上方商品可自動加入)" 
+                 class="border p-4 rounded-2xl text-lg col-span-2">
           <button onclick="submitOrder()" 
                   class="bg-amber-600 hover:bg-amber-700 text-white py-5 rounded-3xl text-xl font-bold col-span-2">
             新增訂單
@@ -52,8 +53,10 @@
         const name = row.c[1]?.v || '';
         const price = row.c[2]?.v || 0;
         const stock = row.c[3]?.v || 0;
+
         return `
-          <div class="bg-white p-6 rounded-3xl shadow">
+          <div onclick="addToOrder('${name}')" 
+               class="bg-white p-6 rounded-3xl shadow cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all border border-transparent hover:border-amber-300">
             <div class="font-bold text-xl">${name}</div>
             <div class="text-4xl font-bold text-amber-600 mt-2">$${price}</div>
             <div class="mt-4 text-sm">
@@ -63,59 +66,34 @@
       }).join('');
     }
 
-    let orders = [];
+    function addToOrder(name) {
+      const itemsInput = document.getElementById('items');
+      if (itemsInput.value.trim() === '') {
+        itemsInput.value = name + ' x1';
+      } else {
+        itemsInput.value += '、' + name + ' x1';
+      }
+    }
 
     function submitOrder() {
-      const name = document.getElementById('name').value;
-      const phone = document.getElementById('phone').value;
-      const items = document.getElementById('items').value;
+      const name = document.getElementById('name').value.trim();
+      const phone = document.getElementById('phone').value.trim();
+      const items = document.getElementById('items').value.trim();
 
       if (!name || !items) {
         alert('請填寫客戶姓名和商品明細');
         return;
       }
 
-      const newOrder = {
-        id: 'ORD-' + Date.now().toString().slice(-6),
-        date: new Date().toLocaleDateString('zh-TW'),
-        name: name,
-        phone: phone,
-        items: items,
-        status: '待處理'
-      };
-
-      orders.unshift(newOrder);
-
-      renderOrders();
+      alert(`✅ 訂單已新增！\n\n客戶：${name}\n商品：${items}\n\n（目前僅顯示，之後可自動存入 Google Sheets）`);
 
       // 清空表單
       document.getElementById('name').value = '';
       document.getElementById('phone').value = '';
       document.getElementById('items').value = '';
-
-      alert('✅ 訂單已新增！\n\n（目前還在瀏覽器記憶中，之後可再接 Google Sheets 自動儲存）');
     }
 
-    function renderOrders() {
-      const div = document.getElementById('order-list');
-      div.innerHTML = orders.map(order => `
-        <div class="bg-white p-6 rounded-3xl shadow flex justify-between items-center">
-          <div>
-            <div class="font-bold">${order.id} - ${order.date}</div>
-            <div>${order.name} (${order.phone})</div>
-            <div class="text-amber-600">${order.items}</div>
-          </div>
-          <div class="text-right">
-            <span class="inline-block px-5 py-2 bg-amber-100 text-amber-700 rounded-full font-medium">${order.status}</span>
-          </div>
-        </div>
-      `).join('');
-    }
-
-    window.onload = () => {
-      loadProducts();
-      renderOrders();
-    };
+    window.onload = loadProducts;
   </script>
 </body>
 </html>
