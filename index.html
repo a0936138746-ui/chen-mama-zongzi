@@ -25,7 +25,7 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <input id="name" type="text" placeholder="客戶姓名" class="border p-4 rounded-2xl text-lg">
           <input id="phone" type="text" placeholder="客戶電話" class="border p-4 rounded-2xl text-lg">
-          <input id="items" type="text" placeholder="商品明細 (點擊上方商品可自動加入)" 
+          <input id="items" type="text" placeholder="商品明細" 
                  class="border p-4 rounded-2xl text-lg col-span-2">
           <button onclick="submitOrder()" 
                   class="bg-amber-600 hover:bg-amber-700 text-white py-5 rounded-3xl text-xl font-bold col-span-2">
@@ -48,22 +48,26 @@
       const text = await res.text();
       const json = JSON.parse(text.substring(47).slice(0, -2));
 
-      const div = document.getElementById('products');
-      div.innerHTML = json.table.rows.slice(1).map(row => {
+      const container = document.getElementById('products');
+      container.innerHTML = '';
+
+      json.table.rows.slice(1).forEach(row => {
         const name = row.c[1]?.v || '';
         const price = row.c[2]?.v || 0;
         const stock = row.c[3]?.v || 0;
 
-        return `
-          <div onclick="addToOrder('${name}')" 
-               class="bg-white p-6 rounded-3xl shadow cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all border border-transparent hover:border-amber-300">
-            <div class="font-bold text-xl">${name}</div>
-            <div class="text-4xl font-bold text-amber-600 mt-2">$${price}</div>
-            <div class="mt-4 text-sm">
-              庫存: <span class="font-bold ${stock <= 10 ? 'text-red-500' : 'text-emerald-600'}">${stock}</span>
-            </div>
-          </div>`;
-      }).join('');
+        const card = document.createElement('div');
+        card.className = `bg-white p-6 rounded-3xl shadow cursor-pointer hover:shadow-2xl hover:-translate-y-1 transition-all border border-transparent hover:border-amber-300`;
+        card.innerHTML = `
+          <div class="font-bold text-xl">${name}</div>
+          <div class="text-4xl font-bold text-amber-600 mt-2">$${price}</div>
+          <div class="mt-4 text-sm">
+            庫存: <span class="font-bold ${stock <= 10 ? 'text-red-500' : 'text-emerald-600'}">${stock}</span>
+          </div>
+        `;
+        card.addEventListener('click', () => addToOrder(name));
+        container.appendChild(card);
+      });
     }
 
     function addToOrder(name) {
@@ -73,6 +77,7 @@
       } else {
         itemsInput.value += '、' + name + ' x1';
       }
+      itemsInput.focus();
     }
 
     function submitOrder() {
@@ -85,7 +90,7 @@
         return;
       }
 
-      alert(`✅ 訂單已新增！\n\n客戶：${name}\n商品：${items}\n\n（目前僅顯示，之後可自動存入 Google Sheets）`);
+      alert(`✅ 訂單已新增！\n\n客戶：${name}\n商品：${items}`);
 
       // 清空表單
       document.getElementById('name').value = '';
