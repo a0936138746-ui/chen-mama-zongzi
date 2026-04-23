@@ -12,57 +12,73 @@
 </head>
 <body class="bg-gray-100">
   <div class="max-w-7xl mx-auto bg-white min-h-screen shadow-xl">
-    <header class="bg-amber-800 text-white p-6">
+    <header class="bg-amber-800 text-white p-6 flex justify-between items-center">
       <h1 class="text-3xl font-bold">🍙 陳媽媽肉粽後台管理</h1>
+      <div class="text-sm">資料來源：Google Sheets</div>
     </header>
 
     <div class="p-8">
       <h2 class="text-2xl font-bold mb-6">商品列表</h2>
-      <div id="products" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-12"></div>
+      <div id="products" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12"></div>
 
       <h2 class="text-2xl font-bold mb-6">新增訂單</h2>
-      <div class="bg-gray-50 p-6 rounded-xl mb-12">
-        <!-- 新增訂單表單會在程式動態產生 -->
-        <div id="order-form"></div>
-      </div>
+      <div id="order-form" class="bg-amber-50 p-8 rounded-2xl mb-12"></div>
 
       <h2 class="text-2xl font-bold mb-6">訂單列表</h2>
-      <div id="orders" class="overflow-x-auto"></div>
+      <div id="orders" class="overflow-x-auto bg-white rounded-2xl shadow"></div>
     </div>
   </div>
 
   <script>
     const SHEET_ID = '1m9K_fcsoMYMOA_CvHYypXlWOOUU8RAArD4R5MikV-qw';
-    const API_KEY = 'AIzaSyD9z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5'; // 暫時用公開方式，之後可優化
 
     async function loadProducts() {
       const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=商品列表`;
       const res = await fetch(url);
       const text = await res.text();
       const json = JSON.parse(text.substring(47).slice(0, -2));
-      
-      const productsDiv = document.getElementById('products');
-      productsDiv.innerHTML = json.table.rows.map(row => {
+
+      const div = document.getElementById('products');
+      div.innerHTML = json.table.rows.slice(1).map(row => {
+        const id = row.c[0]?.v || '';
         const name = row.c[1]?.v || '';
         const price = row.c[2]?.v || 0;
         const stock = row.c[3]?.v || 0;
+        const type = row.c[4]?.v || '單品';
+
         return `
-          <div class="bg-white p-5 rounded-2xl shadow border">
-            <div class="font-bold text-lg">${name}</div>
-            <div class="text-2xl font-bold text-amber-600">$${price}</div>
-            <div class="text-sm text-gray-500">庫存: ${stock}</div>
+          <div class="bg-white p-6 rounded-2xl shadow border border-amber-100 hover:shadow-lg transition">
+            <div class="font-bold text-xl mb-1">${name}</div>
+            <div class="text-3xl font-bold text-amber-600">$${price}</div>
+            <div class="text-sm mt-3">
+              庫存: <span class="font-semibold ${stock < 10 ? 'text-red-500' : 'text-green-600'}">${stock}</span>
+            </div>
+            <div class="text-xs text-gray-500 mt-1">${type}</div>
           </div>`;
       }).join('');
     }
 
-    async function loadOrders() {
-      // 後續會實作
-      document.getElementById('orders').innerHTML = `<p class="text-gray-500">訂單列表開發中...（可從 Google Sheets 直接查看）</p>`;
+    function createOrderForm() {
+      // 簡單新增訂單表單（可後續加強）
+      document.getElementById('order-form').innerHTML = `
+        <div class="grid grid-cols-2 gap-4">
+          <input id="customer-name" type="text" placeholder="客戶姓名" class="border p-4 rounded-xl">
+          <input id="customer-phone" type="text" placeholder="客戶電話" class="border p-4 rounded-xl">
+          <input id="items" type="text" placeholder="商品明細 (例如: 北部粽 x2)" class="border p-4 rounded-xl col-span-2">
+          <button onclick="addOrder()" class="bg-amber-600 text-white py-4 rounded-2xl font-bold col-span-2 hover:bg-amber-700">
+            新增訂單
+          </button>
+        </div>
+      `;
+    }
+
+    async function addOrder() {
+      alert('✅ 訂單新增功能開發中！\n\n目前你可以直接在 Google Sheets 的「訂單列表」分頁手動新增。\n\n之後會自動同步。');
     }
 
     window.onload = () => {
       loadProducts();
-      loadOrders();
+      createOrderForm();
     };
   </script>
 </body>
