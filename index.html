@@ -20,9 +20,11 @@
     </header>
 
     <div class="p-8">
+      <!-- 商品列表 -->
       <h2 class="text-2xl font-bold mb-6">商品列表（點擊加入訂單）</h2>
       <div id="products" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12"></div>
 
+      <!-- 新增訂單 -->
       <h2 class="text-2xl font-bold mb-6">新增訂單</h2>
       <div class="bg-amber-50 p-8 rounded-3xl mb-12">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -35,6 +37,7 @@
         </div>
       </div>
 
+      <!-- 訂單列表 -->
       <h2 class="text-2xl font-bold mb-6">最新訂單列表</h2>
       <div id="order-list" class="space-y-4"></div>
     </div>
@@ -42,6 +45,71 @@
 
   <script>
     const SHEET_ID = '1m9K_fcsoMYMOA_CvHYypXlWOOUU8RAArD4R5MikV-qw';
+    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzvaoqEoXmzwRAhMrsGE4wIY3Z8ha3QV2NDME3MGzL80j5slPAqRbZN7G_Vt6gE_A4/exec';
+
+    async function loadProducts() {
+      try {
+        const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=商品列表`;
+        const res = await fetch(url);
+        const text = await res.text();
+        const json = JSON.parse(text.substring(47).slice(0, -2));
+
+        const container = document.getElementById('products');
+        container.innerHTML = '';
+
+        json.table.rows.slice(1).forEach(row => {
+          const name = row.c[1]?.v || '未知';
+          const price = row.c[2]?.v || 0;
+          const stock = row.c[3]?.v || 0;
+
+          const card = document.createElement('div');
+          card.className = `bg-white p-6 rounded-3xl shadow cursor-pointer hover:shadow-2xl hover:-translate-y-1 transition-all`;
+          card.innerHTML = `
+            <div class="font-bold text-xl">${name}</div>
+            <div class="text-4xl font-bold text-amber-600 mt-2">$${price}</div>
+            <div class="mt-4 text-sm">庫存: <span class="font-bold ${stock <= 10 ? 'text-red-500' : 'text-emerald-600'}">${stock}</span></div>
+          `;
+          card.addEventListener('click', () => addToOrder(name));
+          container.appendChild(card);
+        });
+      } catch(e) { console.error(e); }
+    }
+
+    function addToOrder(name) {
+      const items = document.getElementById('items');
+      items.value = items.value ? items.value + '、' + name + ' x1' : name + ' x1';
+    }
+
+    async function submitOrder() {
+      const name = document.getElementById('name').value.trim();
+      const phone = document.getElementById('phone').value.trim();
+      const items = document.getElementById('items').value.trim();
+
+      if (!name || !items) return alert('請填寫姓名和商品明細');
+
+      const orderData = [
+        `ORD-${Date.now().toString().slice(-6)}`,
+        new Date().toLocaleDateString('zh-TW'),
+        name,
+        phone || '',
+        items,
+        '',
+        '待處理',
+        ''
+      ];
+
+      try {
+        await fetch(WEB_APP_URL, { method: 'POST', body: JSON.stringify({ action: 'addOrder', data: orderData }) });
+        alert('✅ 訂單已成功存入 Google Sheets！');
+        loadOrders();
+      } catch (e) {
+        alert('訂單已新增，但 Google Sheets 連線異常');
+      }
+
+      document.getElementById('name').value = '';
+      document.getElementById('phone').value = '';
+      document.getElementById('items').value = '';
+    }
 
     async function loadOrders() {
       try {
@@ -60,4 +128,43 @@
           return;
         }
 
-       
+        rows.forEach(row => {
+          const c = row.c || [];
+          const orderId = c[0] ? (c[0].v || c[0].f || '無ID') : '無ID';
+          const date = c[1] ? c[1].v : '';
+          const customer = c[2] ? c[2].v : '';
+          const phone = c[3] ? c[3].v : '';
+          const items = c[4] ? c[4].v : '';
+          const status = c[6] ? c[6].v : '待處理';
+
+          const statusColor = status.includes('已取貨') ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700';
+
+          const card = document.createElement('div');
+          card.className = `bg-white border border-gray-200 rounded-3xl p-6 shadow`;
+          card.innerHTML = `
+            <div class="flex justify-between">
+              <div class="font-bold">${orderId}</div>
+              <span class="px-4 py-1 rounded-full text-sm ${statusColor}">${status}</span>
+            </div>
+            <div class="text-sm text-gray-500 mt-1">${date}　${customer}</div>
+            <div class="mt-3">${items}</div>
+          `;
+          container.appendChild(card);
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function refreshAll() {
+      loadProducts();
+      loadOrders();
+    }
+
+    window.onload = () => {
+      loadProducts();
+      loadOrders();
+    };
+  </script>
+</body>
+</html>
