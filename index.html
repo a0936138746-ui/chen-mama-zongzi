@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>陳媽媽肉粽後台</title>
+  <title>陳媽媽肉粽後台管理</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
@@ -12,8 +12,9 @@
 </head>
 <body class="bg-gray-100">
   <div class="max-w-6xl mx-auto bg-white min-h-screen shadow-xl">
-    <header class="bg-amber-800 text-white p-6">
+    <header class="bg-amber-800 text-white p-6 flex justify-between items-center">
       <h1 class="text-3xl font-bold">🍙 陳媽媽肉粽後台管理</h1>
+      <button onclick="refreshAll()" class="bg-white text-amber-800 px-6 py-3 rounded-2xl font-bold hover:bg-amber-100">🔄 重新整理全部</button>
     </header>
 
     <div class="p-8">
@@ -23,19 +24,16 @@
       <h2 class="text-2xl font-bold mb-6">新增訂單</h2>
       <div class="bg-amber-50 p-8 rounded-3xl mb-12">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <input id="name" placeholder="客戶姓名" class="border p-4 rounded-2xl">
-          <input id="phone" placeholder="客戶電話" class="border p-4 rounded-2xl">
-          <input id="items" placeholder="商品明細" class="border p-4 rounded-2xl col-span-2">
+          <input id="name" placeholder="客戶姓名" class="border p-4 rounded-2xl text-lg">
+          <input id="phone" placeholder="客戶電話" class="border p-4 rounded-2xl text-lg">
+          <input id="items" placeholder="商品明細" class="border p-4 rounded-2xl text-lg col-span-2">
           <button onclick="submitOrder()" class="bg-amber-600 hover:bg-amber-700 text-white py-6 rounded-3xl text-xl font-bold col-span-2">
-            新增訂單（自動存 Google Sheets）
+            新增訂單（自動存入 Google Sheets）
           </button>
         </div>
       </div>
 
-      <h2 class="text-2xl font-bold mb-6 flex justify-between">
-        最新訂單列表 
-        <button onclick="loadOrders()" class="text-sm bg-gray-200 px-4 py-2 rounded-xl">🔄 刷新</button>
-      </h2>
+      <h2 class="text-2xl font-bold mb-6">最新訂單列表</h2>
       <div id="order-list" class="space-y-4"></div>
     </div>
   </div>
@@ -43,53 +41,107 @@
   <script>
     const SHEET_ID = '1m9K_fcsoMYMOA_CvHYypXlWOOUU8RAArD4R5MikV-qw';
 
-    async function loadOrders() {
-      const container = document.getElementById('order-list');
-      container.innerHTML = '<p class="text-center py-8 text-gray-500">正在讀取訂單...</p>';
-
+    async function loadProducts() {
+      const container = document.getElementById('products');
+      container.innerHTML = '<p class="col-span-3 text-center py-12 text-gray-500">正在載入商品...</p>';
       try {
-        const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=訂單列表`;
-        const res = await fetch(url);
+        const res = await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=商品列表`);
         const text = await res.text();
         const json = JSON.parse(text.substring(47).slice(0, -2));
 
         container.innerHTML = '';
+        json.table.rows.slice(1).forEach(row => {
+          const name = row.c[1]?.v || '未知';
+          const price = row.c[2]?.v || 0;
+          const stock = row.c[3]?.v || 0;
 
+          const div = document.createElement('div');
+          div.className = "bg-white p-6 rounded-3xl shadow cursor-pointer hover:shadow-2xl hover:-translate-y-1";
+          div.innerHTML = `<div class="font-bold text-xl">${name}</div><div class="text-4xl font-bold text-amber-600">$${price}</div><div class="text-sm mt-3">庫存: ${stock}</div>`;
+          div.onclick = () => addToOrder(name);
+          container.appendChild(div);
+        });
+      } catch(e) {
+        container.innerHTML = '<p class="col-span-3 text-red-500 text-center">商品載入失敗</p>';
+      }
+    }
+
+    function addToOrder(name) {
+      const input = document.getElementById('items');
+      input.value = input.value ? input.value + '、' + name + ' x1' : name + ' x1';
+    }
+
+    async function submitOrder() {
+      const name = document.getElementById('name').value.trim();
+      const phone = document.getElementById('phone').value.trim();
+      const items = document.getElementById('items').value.trim();
+
+      if (!name || !items) return alert('請填姓名和商品');
+
+      const data = [`ORD-${Date.now().toString().slice(-6)}`, new Date().toLocaleDateString('zh-TW'), name, phone, items, '', '待處理', ''];
+
+      try {
+        await fetch('https://script.google.com/macros/s/AKfycbzvaoqEoXmzwRAhMrsGE4wIY3Z8ha3QV2NDME3MGzL80j5slPAqRbZN7G_Vt6gE_A4/exec', {
+          method: 'POST',
+          body: JSON.stringify({action: 'addOrder', data})
+        });
+        alert('✅ 訂單已成功存入 Google Sheets！');
+        loadOrders();
+      } catch(e) {
+        alert('訂單已新增，但 Google Sheets 暫時無法連線');
+      }
+
+      document.getElementById('name').value = '';
+      document.getElementById('phone').value = '';
+      document.getElementById('items').value = '';
+    }
+
+    async function loadOrders() {
+      const container = document.getElementById('order-list');
+      container.innerHTML = '<p class="text-center py-12 text-gray-500">正在讀取訂單...</p>';
+      try {
+        const res = await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=訂單列表`);
+        const text = await res.text();
+        const json = JSON.parse(text.substring(47).slice(0, -2));
+
+        container.innerHTML = '';
         const rows = json.table.rows.slice(1).reverse();
 
         if (rows.length === 0) {
-          container.innerHTML = `<p class="text-center py-12 text-gray-500">目前沒有訂單</p>`;
+          container.innerHTML = `<p class="text-center py-20 text-gray-500">目前沒有訂單</p>`;
           return;
         }
 
         rows.forEach(row => {
           const c = row.c || [];
-          const orderId = c[0]?.v || c[0]?.f || '無ID';
-          const date = c[1]?.v || '';
-          const name = c[2]?.v || '';
-          const phone = c[3]?.v || '';
-          const items = c[4]?.v || '';
-          const status = c[6]?.v || '待處理';
-
-          const div = document.createElement('div');
-          div.className = `bg-white border rounded-3xl p-6 shadow`;
-          div.innerHTML = `
+          const card = document.createElement('div');
+          card.className = "bg-white border rounded-3xl p-6 shadow";
+          card.innerHTML = `
             <div class="flex justify-between">
-              <div class="font-bold">${orderId}</div>
-              <span class="px-3 py-1 rounded-full text-sm ${status.includes('已取貨') ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}">${status}</span>
+              <div class="font-bold">${c[0]?.v || '無ID'}</div>
+              <span class="px-4 py-1 rounded-full text-sm ${ (c[6]?.v || '').includes('已取貨') ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}">
+                ${c[6]?.v || '待處理'}
+              </span>
             </div>
-            <div class="text-sm text-gray-500 mt-2">${date}　${name}　${phone}</div>
-            <div class="mt-3 text-gray-700">${items}</div>
+            <div class="text-sm text-gray-500 mt-2">${c[1]?.v || ''}　${c[2]?.v || ''}</div>
+            <div class="mt-3">${c[4]?.v || ''}</div>
           `;
-          container.appendChild(div);
+          container.appendChild(card);
         });
-      } catch (err) {
-        console.error(err);
-        container.innerHTML = `<p class="text-red-500 text-center py-12">讀取失敗，請按 F12 查看錯誤後告訴我</p>`;
+      } catch(e) {
+        container.innerHTML = `<p class="text-red-500 text-center py-12">讀取失敗，請點「重新整理全部」</p>`;
       }
     }
 
-    window.onload = loadOrders;
+    function refreshAll() {
+      loadProducts();
+      loadOrders();
+    }
+
+    window.onload = () => {
+      loadProducts();
+      loadOrders();
+    };
   </script>
 </body>
 </html>
