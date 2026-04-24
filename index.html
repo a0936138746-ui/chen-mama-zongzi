@@ -104,7 +104,7 @@
           body: JSON.stringify({ action: 'addOrder', data: orderData })
         });
         alert('✅ 訂單已成功存入 Google Sheets！');
-        loadOrders();   // 自動刷新
+        loadOrders();
       } catch (e) {
         alert('訂單已新增，但 Google Sheets 連線異常');
       }
@@ -124,7 +124,7 @@
         const container = document.getElementById('order-list');
         container.innerHTML = '';
 
-        const rows = json.table.rows.slice(1).reverse();  // 最新在上面
+        const rows = json.table.rows.slice(1).reverse();
 
         if (rows.length === 0) {
           container.innerHTML = `<p class="text-gray-500 text-center py-20">目前還沒有訂單</p>`;
@@ -132,33 +132,34 @@
         }
 
         rows.forEach(row => {
-          const orderId = row.c[0]?.v || '無ID';
-          const date = row.c[1]?.v || '';
-          const customer = row.c[2]?.v || '';
-          const phone = row.c[3]?.v || '';
-          const items = row.c[4]?.v || '';
-          const status = row.c[6]?.v || '待處理';
+          const cells = row.c || [];
+          const orderId = cells[0]?.v || '無ID';
+          const date = cells[1]?.v || '';
+          const customer = cells[2]?.v || '';
+          const phone = cells[3]?.v || '';
+          const items = cells[4]?.v || '';
+          const status = cells[6]?.v || '待處理';
 
           const statusColor = status.includes('已取貨') ? 'bg-emerald-100 text-emerald-700' : 
                              status.includes('待處理') ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-700';
 
           const card = document.createElement('div');
-          card.className = `bg-white border border-gray-200 rounded-3xl p-6 shadow hover:shadow-md transition-all`;
+          card.className = `bg-white border border-gray-200 rounded-3xl p-6 shadow hover:shadow-md`;
           card.innerHTML = `
             <div class="flex justify-between items-start">
               <div>
                 <div class="font-bold text-lg">${orderId}</div>
-                <div class="text-sm text-gray-500 mt-1">${date}　${customer} ${phone}</div>
+                <div class="text-sm text-gray-500 mt-1">${date}　${customer}　${phone}</div>
               </div>
               <span class="px-4 py-1 rounded-full text-sm font-medium ${statusColor}">${status}</span>
             </div>
-            <div class="mt-4 text-gray-700 leading-relaxed">${items}</div>
+            <div class="mt-4 text-gray-700 leading-relaxed break-words">${items}</div>
           `;
           container.appendChild(card);
         });
       } catch (e) {
         console.error("讀取訂單失敗", e);
-        document.getElementById('order-list').innerHTML = `<p class="text-red-500 text-center py-12">讀取訂單失敗，請刷新頁面</p>`;
+        document.getElementById('order-list').innerHTML = `<p class="text-red-500 text-center py-12">讀取失敗，請點「重新整理全部」</p>`;
       }
     }
 
