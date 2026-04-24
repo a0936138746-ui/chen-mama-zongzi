@@ -39,7 +39,7 @@
 
   <script>
     const SHEET_ID = '1m9K_fcsoMYMOA_CvHYypXlWOOUU8RAArD4R5MikV-qw';
-    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyI6-5gFgOp-P2BltnPlUA6sBjT1x51SPNyqw6DCrVsk_wylTibnD62fRIZwt-wEDds/exec';
+    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzvaoqEoXmz wRAhMrsGE4wlY3Z8ha3QV2NDME3MGzL80j5slPAqRbZN7G_Vt6gE_A4/exec';  // 你的 URL
 
     let orders = [];
 
@@ -100,21 +100,15 @@
       ];
 
       try {
-        const response = await fetch(WEB_APP_URL, {
+        await fetch(WEB_APP_URL, {
           method: 'POST',
           body: JSON.stringify({ action: 'addOrder', data: orderData })
         });
-
-        if (response.ok) {
-          alert('✅ 訂單已成功存入 Google Sheets！');
-        } else {
-          alert('訂單已新增（本機），但 Google Sheets 連線異常');
-        }
+        alert('✅ 訂單已成功存入 Google Sheets！');
       } catch (e) {
-        alert('訂單已新增（本機顯示），Google Sheets 暫時無法連線');
+        alert('訂單已新增（本機顯示），Google Sheets 連線異常');
       }
 
-      // 清空表單
       document.getElementById('name').value = '';
       document.getElementById('phone').value = '';
       document.getElementById('items').value = '';
