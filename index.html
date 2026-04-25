@@ -12,20 +12,18 @@
 <body class="bg-amber-50">
 
   <div class="max-w-5xl mx-auto p-6">
-
     <h1 class="text-3xl font-bold mb-6 text-amber-800">
       陳媽媽肉粽訂單系統
     </h1>
 
-    <!-- 測試按鈕 -->
     <button onclick="loadProducts()" 
       class="bg-amber-700 text-white px-6 py-3 rounded-xl mb-6">
       讀取商品
     </button>
 
-    <!-- 商品列表 -->
-    <div id="product-list" class="grid grid-cols-2 gap-4"></div>
+    <p id="status" class="mb-4 text-gray-700"></p>
 
+    <div id="product-list" class="grid grid-cols-2 gap-4"></div>
   </div>
 
 <script>
@@ -33,22 +31,28 @@ const SUPABASE_URL = "https://rlflaetztuvggnqzea.supabase.co";
 
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJsZmxhZXR6aHR1dmdnZ25xemVhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1OTI3NDgsImV4cCI6MjA5MjE2ODc0OH0.1Bl8SE9KAQ68krOJz_1ThlN2tYYl9pwgE8XQghponn8";
 
-const supabase = Supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// 載入商品
 async function loadProducts() {
-  const { data, error } = await supabase
+  const status = document.getElementById("status");
+  const container = document.getElementById("product-list");
+
+  status.innerText = "正在讀取商品資料...";
+  container.innerHTML = "";
+
+  const { data, error } = await db
     .from("products")
-    .select("*");
+    .select("*")
+    .order("id", { ascending: true });
 
   if (error) {
+    status.innerText = "資料庫讀取失敗：" + error.message;
     alert("錯誤：" + error.message);
     console.error(error);
     return;
   }
 
-  const container = document.getElementById("product-list");
-  container.innerHTML = "";
+  status.innerText = "成功讀取 " + data.length + " 筆商品";
 
   data.forEach(p => {
     const div = document.createElement("div");
@@ -62,8 +66,6 @@ async function loadProducts() {
 
     container.appendChild(div);
   });
-
-  alert("成功讀取 " + data.length + " 筆商品");
 }
 </script>
 
