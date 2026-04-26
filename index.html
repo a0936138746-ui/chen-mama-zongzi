@@ -561,6 +561,12 @@ loadProducts();
           onchange="updateProduct(${p.id}, 'name', this.value)" 
           class="border p-2 w-full mb-2">
 
+          <div class="grid grid-cols-3 gap-2 text-sm text-gray-600 mb-1">
+  <div>現場價</div>
+  <div>網路價</div>
+  <div>庫存</div>
+</div>
+
         <div class="grid grid-cols-3 gap-2">
           <input type="number" value="${p.price}" 
             onchange="updateProduct(${p.id}, 'price', this.value)" 
