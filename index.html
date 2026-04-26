@@ -635,6 +635,49 @@ async function updateProduct(id, field, value) {
 
   await loadProducts();
 }
+function addNewProduct() {
+  const name = document.getElementById("newName").value.trim();
+  const price = Number(document.getElementById("newPrice").value);
+  const web_price = Number(document.getElementById("newWebPrice").value);
+  const stock = Number(document.getElementById("newStock").value);
+  const type = document.getElementById("newType").value;
+  const compText = document.getElementById("newComponents").value.trim();
+
+  if (!name) return alert("請輸入商品名稱");
+
+  let components = null;
+
+  if (type === "box") {
+    if (!compText) return alert("請輸入禮盒組成");
+
+    try {
+      components = JSON.parse(compText);
+    } catch (e) {
+      return alert("JSON 格式錯誤");
+    }
+  }
+
+  const newProduct = {
+    id: Date.now(),
+    name,
+    price: price || 0,
+    web_price: web_price || price || 0,
+    stock: type === "single" ? (stock || 0) : 0,
+    components: type === "box" ? components : null,
+    active: true
+  };
+
+  db.from("products").insert([newProduct])
+    .then(({ error }) => {
+      if (error) {
+        alert("新增失敗：" + error.message);
+        return;
+      }
+
+      alert("新增成功");
+      loadProducts();
+    });
+}  
 </script>
 
 </body>
