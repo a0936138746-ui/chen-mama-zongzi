@@ -554,6 +554,34 @@ loadProducts();
 
   panel.innerHTML = `
     <h2 class="text-2xl font-bold mb-4">商品管理</h2>
+    <div class="bg-yellow-50 p-4 rounded-xl mb-6">
+  <h3 class="font-bold mb-2">➕ 新增商品</h3>
+
+  <input id="newName" placeholder="商品名稱"
+    class="border p-2 w-full mb-2">
+
+  <div class="grid grid-cols-3 gap-2 mb-2">
+    <input id="newPrice" type="number" placeholder="現場價"
+      class="border p-2">
+    <input id="newWebPrice" type="number" placeholder="網路價"
+      class="border p-2">
+    <input id="newStock" type="number" placeholder="庫存（單品才填）"
+      class="border p-2">
+  </div>
+
+  <select id="newType" class="border p-2 w-full mb-2">
+    <option value="single">單品</option>
+    <option value="box">禮盒</option>
+  </select>
+
+  <textarea id="newComponents" placeholder='禮盒組成（JSON，例如：[{"productId":1,"qty":12}]）'
+    class="border p-2 w-full mb-2"></textarea>
+
+  <button onclick="addNewProduct()"
+    class="bg-green-600 text-white px-4 py-2 rounded-xl">
+    新增商品
+  </button>
+</div>
 
     ${products.map(p => `
       <div class="bg-white p-4 rounded-xl mb-3 shadow">
