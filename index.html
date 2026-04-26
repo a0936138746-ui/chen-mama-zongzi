@@ -74,6 +74,7 @@
       <button onclick="showAdminTab('expenses')" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">成本支出</button>
       <button onclick="showAdminTab('stats')" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">營運統計</button>
       <button onclick="showAdminTab('stock')" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">庫存查看</button>
+      <button onclick="renderProductAdmin()" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">商品管理</button>
     </div>
 
     <div id="adminPanel"></div>
@@ -548,6 +549,58 @@ async function refreshAdmin() {
 }
 
 loadProducts();
+  function renderProductAdmin() {
+  const panel = document.getElementById("adminPanel");
+
+  panel.innerHTML = `
+    <h2 class="text-2xl font-bold mb-4">商品管理</h2>
+
+    ${products.map(p => `
+      <div class="bg-white p-4 rounded-xl mb-3 shadow">
+        <input value="${p.name}" 
+          onchange="updateProduct(${p.id}, 'name', this.value)" 
+          class="border p-2 w-full mb-2">
+
+        <div class="grid grid-cols-3 gap-2">
+          <input type="number" value="${p.price}" 
+            onchange="updateProduct(${p.id}, 'price', this.value)" 
+            class="border p-2">
+
+          <input type="number" value="${p.web_price || p.price}" 
+            onchange="updateProduct(${p.id}, 'web_price', this.value)" 
+            class="border p-2">
+
+          <input type="number" value="${p.stock || 0}" 
+            onchange="updateProduct(${p.id}, 'stock', this.value)" 
+            class="border p-2">
+        </div>
+
+        <label class="flex items-center gap-2 mt-2">
+          <input type="checkbox" ${p.active ? "checked" : ""} 
+            onchange="updateProduct(${p.id}, 'active', this.checked)">
+          啟用
+        </label>
+      </div>
+    `).join("")}
+  `;
+}
+
+async function updateProduct(id, field, value) {
+  const updateData = {};
+  updateData[field] = value;
+
+  const { error } = await db
+    .from("products")
+    .update(updateData)
+    .eq("id", id);
+
+  if (error) {
+    alert("更新失敗：" + error.message);
+    return;
+  }
+
+  await loadProducts();
+}
 </script>
 
 </body>
