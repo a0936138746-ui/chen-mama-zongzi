@@ -123,7 +123,11 @@ async function deleteOrder(id) {
 
   alert("刪除成功");
 
-  await loadOrders();
+  // 🔥 關鍵：重新抓資料 + 覆蓋 orders
+  const { data } = await db.from("orders").select("*").order("time", { ascending: false });
+
+  orders = data || [];
+
   renderOrders();
 }
   
