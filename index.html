@@ -120,8 +120,23 @@ function onSelectProduct(selectEl) {
  const priceInput = selectEl.parentElement.querySelector(".paperPrice");
 
   priceInput.value = getPriceBySource(product);
+  renderPaperTotal();
 }
 
+function renderPaperTotal() {
+  let total = 0;
+
+  document.querySelectorAll("#paperRows > div").forEach(row => {
+    const qty = Number(row.querySelector(".paperQty")?.value || 0);
+    const price = Number(row.querySelector(".paperPrice")?.value || 0);
+
+    total += qty * price;
+  });
+
+  document.getElementById("paperTotal").innerText =
+    total.toLocaleString("zh-TW");
+}
+  
 function refreshPaperPrices() {
   document.querySelectorAll(".paperProduct").forEach(select => {
     onSelectProduct(select);
@@ -386,6 +401,10 @@ function renderPaperOrder() {
       <div id="paperRows" class="space-y-3 mb-4"></div>
       <button onclick="addPaperRow()" class="bg-amber-600 text-white px-4 py-2 rounded-xl mb-4">新增商品列</button>
 
+      <div class="text-2xl font-bold text-amber-700 mb-4">
+  總金額：NT$ <span id="paperTotal">0</span>
+</div>
+      
       <textarea id="paperNote" class="border p-3 rounded-xl w-full mb-4" placeholder="備註"></textarea>
 
       <button onclick="savePaperOrder()" class="bg-green-700 text-white px-6 py-3 rounded-xl font-bold">儲存紙本訂單</button>
@@ -404,8 +423,16 @@ function addPaperRow() {
         <option value="${p.id}">${p.name}</option>
       `).join("")}
     </select>
-    <input class="paperQty border p-3 rounded-xl" type="number" value="1" min="1">
-    <input class="paperPrice border p-3 rounded-xl" type="number" placeholder="單價，可改">
+    <input class="paperQty border p-3 rounded-xl"
+       type="number"
+       value="1"
+       min="1"
+       oninput="renderPaperTotal()">
+
+<input class="paperPrice border p-3 rounded-xl"
+       type="number"
+       placeholder="單價，可改"
+       oninput="renderPaperTotal()">
     <button onclick="this.parentElement.remove()" class="bg-red-600 text-white rounded-xl">刪除</button>
   `;
   document.getElementById("paperRows").appendChild(row);
