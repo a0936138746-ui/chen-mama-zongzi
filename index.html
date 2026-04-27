@@ -379,12 +379,12 @@ function orderCard(o) {
           <div class="text-sm">地址：${o.address || ""}</div>
           <div class="text-sm">備註：${o.note || ""}</div>
           <div class="mt-2 flex gap-2">
-  <button onclick="editOrder(${o.id})"
+  <button onclick="editOrder('${o.id}')"
     class="bg-blue-600 text-white px-3 py-1 rounded-xl">
     修改
   </button>
 
-  <button onclick="deleteOrder(${o.id})"
+  <<button onclick="deleteOrder('${o.id}')"
     class="bg-red-600 text-white px-3 py-1 rounded-xl">
     刪除
   </button>
