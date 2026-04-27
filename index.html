@@ -117,7 +117,7 @@ function onSelectProduct(selectEl) {
 
   if (!product) return;
 
-  const priceInput = selectEl.parentElement.querySelector('input[type="number"]:last-of-type');
+ const priceInput = selectEl.parentElement.querySelector(".paperPrice");
 
   priceInput.value = getPriceBySource(product);
 }
@@ -395,7 +395,7 @@ function addPaperRow() {
   row.innerHTML = `
     <select class="paperProduct border p-3 rounded-xl" onchange="onSelectProduct(this)">
       ${products.filter(p => p.active !== false && p.type !== "fee").map(p => `
-        <option value="${p.id}" data-price="${p.price}">${p.name}</option>
+        <option value="${p.id}">${p.name}</option>
       `).join("")}
     </select>
     <input class="paperQty border p-3 rounded-xl" type="number" value="1" min="1">
@@ -403,6 +403,11 @@ function addPaperRow() {
     <button onclick="this.parentElement.remove()" class="bg-red-600 text-white rounded-xl">刪除</button>
   `;
   document.getElementById("paperRows").appendChild(row);
+  
+setTimeout(() => {
+  const select = row.querySelector("select");
+  onSelectProduct(select);
+}, 0);
 }
 
 async function savePaperOrder() {
