@@ -110,6 +110,17 @@ function getPriceBySource(product) {
 
   return product.price;
 }
+
+function onSelectProduct(selectEl) {
+  const productId = selectEl.value;
+  const product = products.find(p => Number(p.id) === Number(productId));
+
+  if (!product) return;
+
+  const priceInput = selectEl.parentElement.querySelector('input[type="number"]:last-of-type');
+
+  priceInput.value = getPriceBySource(product);
+}
   
 function showPage(page) {
   document.getElementById("frontPage").classList.toggle("hidden", page !== "front");
@@ -382,7 +393,7 @@ function addPaperRow() {
   const row = document.createElement("div");
   row.className = "grid md:grid-cols-4 gap-3";
   row.innerHTML = `
-    <select class="paperProduct border p-3 rounded-xl">
+    <select class="paperProduct border p-3 rounded-xl" onchange="onSelectProduct(this)">
       ${products.filter(p => p.active !== false && p.type !== "fee").map(p => `
         <option value="${p.id}" data-price="${p.price}">${p.name}</option>
       `).join("")}
