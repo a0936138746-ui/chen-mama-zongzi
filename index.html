@@ -101,6 +101,16 @@ function todayStr() {
   return new Date().toISOString().slice(0,10);
 }
 
+function getPriceBySource(product) {
+  const type = document.getElementById("orderSource")?.value || "normal";
+
+  if (type === "web") {
+    return product.web_price || product.price;
+  }
+
+  return product.price;
+}
+  
 function showPage(page) {
   document.getElementById("frontPage").classList.toggle("hidden", page !== "front");
   document.getElementById("adminPage").classList.toggle("hidden", page !== "admin");
@@ -154,7 +164,7 @@ function addToCart(id) {
 
   const existing = cart.find(x => Number(x.id) === Number(id));
   if (existing) existing.qty += qty;
-  else cart.push({ id: p.id, name: p.name, price: p.price, qty });
+  else cart.push({ id: p.id, name: p.name, price: getPriceBySource(p), qty });
 
   renderCart();
 }
@@ -338,6 +348,12 @@ function renderPaperOrder() {
   document.getElementById("adminPanel").innerHTML = `
     <h2 class="text-2xl font-bold mb-4">新增紙本 / 電話訂單</h2>
     <div class="bg-white p-5 rounded-2xl shadow">
+    <div class="mb-4">
+  <select id="orderSource" class="border p-3 rounded-xl w-full">
+    <option value="normal">現場 / 電話訂單</option>
+    <option value="web">網路訂單</option>
+  </select>
+</div>
       <div class="grid md:grid-cols-2 gap-4 mb-4">
         <input id="paperName" class="border p-3 rounded-xl" placeholder="客戶姓名">
         <input id="paperPhone" class="border p-3 rounded-xl" placeholder="電話">
