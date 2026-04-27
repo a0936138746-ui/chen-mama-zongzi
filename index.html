@@ -111,6 +111,22 @@ function getPriceBySource(product) {
   return product.price;
 }
 
+async function deleteOrder(id) {
+  if (!confirm("確定刪除這筆訂單？")) return;
+
+  const { error } = await db.from("orders").delete().eq("id", id);
+
+  if (error) {
+    alert("刪除失敗：" + error.message);
+    return;
+  }
+
+  alert("刪除成功");
+
+  await loadOrders();
+  renderOrders();
+}
+  
 function onSelectProduct(selectEl) {
   const productId = selectEl.value;
   const product = products.find(p => Number(p.id) === Number(productId));
@@ -123,6 +139,18 @@ function onSelectProduct(selectEl) {
   renderPaperTotal();
 }
 
+function editOrder(id) {
+  const o = orders.find(x => x.id === id);
+  if (!o) return;
+
+  const name = prompt("客戶姓名", o.name);
+  const phone = prompt("電話", o.phone);
+
+  if (!name) return;
+
+  updateOrder(id, name, phone);
+}
+  
 function renderPaperTotal() {
   let total = 0;
 
@@ -135,6 +163,22 @@ function renderPaperTotal() {
 
   document.getElementById("paperTotal").innerText =
     total.toLocaleString("zh-TW");
+}
+
+async function updateOrder(id, name, phone) {
+  const { error } = await db.from("orders")
+    .update({ name, phone })
+    .eq("id", id);
+
+  if (error) {
+    alert("更新失敗：" + error.message);
+    return;
+  }
+
+  alert("更新成功");
+
+  await loadOrders();
+  renderOrders();
 }
   
 function refreshPaperPrices() {
@@ -334,6 +378,19 @@ function orderCard(o) {
           <div class="text-sm">方式：${o.delivery || ""}｜日期：${o.pickup_date || o.arrival_date || "未填"}</div>
           <div class="text-sm">地址：${o.address || ""}</div>
           <div class="text-sm">備註：${o.note || ""}</div>
+          <div class="mt-2 flex gap-2">
+  <button onclick="editOrder(${o.id})"
+    class="bg-blue-600 text-white px-3 py-1 rounded-xl">
+    修改
+  </button>
+
+  <button onclick="deleteOrder(${o.id})"
+    class="bg-red-600 text-white px-3 py-1 rounded-xl">
+    刪除
+  </button>
+</div>
+
+</div>
         </div>
         <div class="text-right">
           <div class="text-xl font-bold text-amber-700">NT$ ${money(o.total)}</div>
