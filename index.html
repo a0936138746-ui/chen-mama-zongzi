@@ -178,7 +178,7 @@ async function loadStockHistory(productId) {
 
   list.innerHTML = data.map(x => `
     <div class="border-b py-1">
-      ${new Date(x.time).toLocaleString("zh-TW")}｜
+      ${new Date(x.created_at).toLocaleString("zh-TW")}｜
       ${x.type === "in" ? "入庫" : "出貨"}｜
       ${x.qty}｜
       ${x.note || ""}
