@@ -143,6 +143,49 @@ function onSelectProduct(selectEl) {
   renderPaperTotal();
 }
 
+function toggleStockHistory(id) {
+  const box = document.getElementById("stockHistoryBox-" + id);
+  if (!box) return;
+
+  box.classList.toggle("hidden");
+
+  if (!box.classList.contains("hidden")) {
+    loadStockHistory(id);
+  }
+}
+
+async function loadStockHistory(productId) {
+  const list = document.getElementById("stockHistoryList-" + productId);
+  if (!list) return;
+
+  list.innerHTML = "載入中...";
+
+  const { data, error } = await db
+    .from("stock_history")
+    .select("*")
+    .eq("product_id", productId)
+    .order("time", { ascending: false });
+
+  if (error) {
+    list.innerHTML = "讀取失敗：" + error.message;
+    return;
+  }
+
+  if (!data || data.length === 0) {
+    list.innerHTML = "沒有紀錄";
+    return;
+  }
+
+  list.innerHTML = data.map(x => `
+    <div class="border-b py-1">
+      ${new Date(x.time).toLocaleString("zh-TW")}｜
+      ${x.type === "in" ? "入庫" : "出貨"}｜
+      ${x.qty}｜
+      ${x.note || ""}
+    </div>
+  `).join("");
+}
+  
 function toggleStockIn(id) {
   const box = document.getElementById("stockInBox-" + id);
   if (!box) return;
@@ -815,6 +858,18 @@ loadProducts();
       確認入庫
     </button>
   </div>
+  <div class="mt-2">
+  <button onclick="toggleStockHistory(${p.id})"
+    class="bg-gray-600 text-white px-3 py-1 rounded-xl">
+    查看紀錄
+  </button>
+
+  <div id="stockHistoryBox-${p.id}" class="hidden mt-2 bg-gray-50 p-3 rounded-xl text-sm">
+    <div id="stockHistoryList-${p.id}">
+      載入中...
+    </div>
+  </div>
+</div>
 </div>
         
       </div>
