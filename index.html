@@ -176,14 +176,21 @@ if (!data || data.length === 0) {
   return;
 }
 
-  list.innerHTML = data.map(x => `
-    <div class="border-b py-1">
+list.innerHTML = data.map(x => `
+  <div class="border-b py-1 flex justify-between items-center">
+    <div>
       ${new Date(x.created_at).toLocaleString("zh-TW")}｜
       ${x.type === "in" ? "入庫" : "出貨"}｜
       ${x.qty}｜
       ${x.note || ""}
     </div>
-  `).join("");
+
+    <button onclick="deleteStock(${x.id}, ${productId})"
+      class="bg-red-500 text-white px-2 py-1 rounded">
+      刪除
+    </button>
+  </div>
+`).join("");
 }
   
 function toggleStockIn(id) {
@@ -242,6 +249,24 @@ if (historyError) {
   // 重新載入商品
   await loadProducts();
   renderProductAdmin();
+}
+
+async function deleteStock(id, productId) {
+  if (!confirm("確定刪除這筆紀錄？")) return;
+
+  const { error } = await db
+    .from("stock_history")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    alert("刪除失敗：" + error.message);
+    return;
+  }
+
+  alert("刪除成功");
+
+  loadStockHistory(productId);
 }
   
 function editOrder(id) {
