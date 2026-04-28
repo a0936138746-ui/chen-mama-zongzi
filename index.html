@@ -221,13 +221,17 @@ async function addStock(productId) {
   }
 
   // 記錄入庫歷史（如果你有 stock_history 表）
-  await db.from("stock_history").insert({
-    productid: productId,
-    qty: qty,
-    type: "in",
-    note: note,
-    time: new Date()
-  });
+const { error: historyError } = await db.from("stock_history").insert({
+  productId: productId,
+  qty: qty,
+  type: "in",
+  note: note
+});
+
+if (historyError) {
+  alert("入庫成功，但紀錄寫入失敗：" + historyError.message);
+  return;
+}
 
   alert("入庫成功");
 
