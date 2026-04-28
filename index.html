@@ -160,21 +160,21 @@ async function loadStockHistory(productId) {
 
   list.innerHTML = "載入中...";
 
-  const { data, error } = await db
-    .from("stock_history")
-    .select("*")
-    .eq("productid", productId)
-    .order("time", { ascending: false });
+const { data, error } = await db
+  .from("stock_history")
+  .select("*")
+  .eq("productId", productId)
+  .order("created_at", { ascending: false });
 
-  if (error) {
-    list.innerHTML = "讀取失敗：" + error.message;
-    return;
-  }
+if (error) {
+  list.innerHTML = "讀取失敗：" + error.message;
+  return;
+}
 
-  if (!data || data.length === 0) {
-    list.innerHTML = "沒有紀錄";
-    return;
-  }
+if (!data || data.length === 0) {
+  list.innerHTML = "沒有紀錄";
+  return;
+}
 
   list.innerHTML = data.map(x => `
     <div class="border-b py-1">
