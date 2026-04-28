@@ -163,7 +163,7 @@ async function loadStockHistory(productId) {
   const { data, error } = await db
     .from("stock_history")
     .select("*")
-    .eq("product_id", productId)
+    .eq("productid", productId)
     .order("time", { ascending: false });
 
   if (error) {
@@ -222,7 +222,7 @@ async function addStock(productId) {
 
   // 記錄入庫歷史（如果你有 stock_history 表）
   await db.from("stock_history").insert({
-    product_id: productId,
+    productid: productId,
     qty: qty,
     type: "in",
     note: note,
