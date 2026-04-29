@@ -687,6 +687,9 @@ function renderExpenses() {
     <div class="bg-white p-5 rounded-2xl shadow mb-6">
       <div class="grid md:grid-cols-3 gap-4 mb-4">
         <input id="expenseDate" type="date" class="border p-3 rounded-xl" value="${todayStr()}">
+        <select id="expenseVendor" class="border p-3 rounded-xl">
+  <option value="">選擇商家</option>
+</select>
         <select id="expenseCategory" class="border p-3 rounded-xl">
           <option>食材</option>
           <option>包材</option>
@@ -717,7 +720,36 @@ function renderExpenses() {
       `).join("") || "尚無支出紀錄"}
     </div>
   `;
+   loadVendors();
 }
+
+async function loadVendors() {
+  const { data, error } = await db.from("vendors").select("*").order("name", { ascending: true });
+
+  if (error) {
+    console.log("商家讀取失敗", error.message);
+    return;
+  }
+
+  const select = document.getElementById("expenseVendor");
+  if (!select) return;
+
+  select.innerHTML = `<option value="">選擇商家</option>` +
+    (data || []).map(v => `
+      <option value="${v.id}" data-category="${v.category}">
+        ${v.name}
+      </option>
+    `).join("");
+}
+
+function onVendorChange() {
+  const select = document.getElementById("expenseVendor");
+  const category = select.selectedOptions[0]?.dataset?.category;
+
+  if (category) {
+    document.getElementById("expenseCategory").value = category;
+  }
+}  
 
 async function saveExpense() {
   const item = document.getElementById("expenseItem").value.trim();
