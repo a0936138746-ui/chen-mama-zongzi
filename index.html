@@ -766,6 +766,35 @@ async function loadVendors() {
     `).join("");
 }
 
+async function saveVendor() {
+  const name = document.getElementById("vendorName").value.trim();
+  const category = document.getElementById("vendorCategory").value;
+  const note = document.getElementById("vendorNote").value.trim();
+
+  if (!name) {
+    alert("請輸入商家名稱");
+    return;
+  }
+
+  const { error } = await db.from("vendors").insert([{
+    name,
+    category,
+    note
+  }]);
+
+  if (error) {
+    alert("新增商家失敗：" + error.message);
+    return;
+  }
+
+  alert("新增商家成功");
+
+  document.getElementById("vendorName").value = "";
+  document.getElementById("vendorNote").value = "";
+
+  await loadVendors();
+}  
+
 function onVendorChange() {
   const select = document.getElementById("expenseVendor");
   const category = select.selectedOptions[0]?.dataset?.category;
