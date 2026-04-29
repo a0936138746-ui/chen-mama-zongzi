@@ -684,6 +684,30 @@ function renderExpenses() {
   document.getElementById("adminPanel").innerHTML = `
     <h2 class="text-2xl font-bold mb-4">成本支出紀錄</h2>
 
+<div class="bg-blue-50 p-5 rounded-2xl shadow mb-6">
+  <h3 class="font-bold mb-3">新增商家</h3>
+
+  <div class="grid md:grid-cols-3 gap-4 mb-4">
+    <input id="vendorName" class="border p-3 rounded-xl" placeholder="商家名稱，例如：阿明豬肉攤">
+
+    <select id="vendorCategory" class="border p-3 rounded-xl">
+      <option>食材</option>
+      <option>包材</option>
+      <option>物流</option>
+      <option>人事</option>
+      <option>設備場地</option>
+      <option>行銷</option>
+      <option>其他</option>
+    </select>
+
+    <input id="vendorNote" class="border p-3 rounded-xl" placeholder="備註，例如：常買豬肉">
+  </div>
+
+  <button onclick="saveVendor()" class="bg-blue-700 text-white px-6 py-3 rounded-xl font-bold">
+    新增商家
+  </button>
+</div>    
+
     <div class="bg-white p-5 rounded-2xl shadow mb-6">
       <div class="grid md:grid-cols-3 gap-4 mb-4">
         <input id="expenseDate" type="date" class="border p-3 rounded-xl" value="${todayStr()}">
