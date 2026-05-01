@@ -514,7 +514,7 @@ function orderCard(o) {
     修改
   </button>
 
-  <<button onclick="deleteOrder('${o.id}')"
+  <button onclick="deleteOrder('${o.id}')"
     class="bg-red-600 text-white px-3 py-1 rounded-xl">
     刪除
   </button>
@@ -734,43 +734,46 @@ function renderExpenses() {
       <button onclick="saveExpense()" class="bg-green-700 text-white px-6 py-3 rounded-xl font-bold">新增支出</button>
     </div>
 
-    <div class="space-y-3">
-      ${expenses.map(e => `
-       <div class="bg-white p-4 rounded-2xl shadow flex justify-between">
-  <div>
-    <div class="font-bold">
-      ${e.date} | ${e.category} | ${e.item}
-    </div>
+<div class="space-y-3">
+  ${expenses.map(e => `
+    <div class="bg-white p-4 rounded-2xl shadow flex justify-between">
+      <div>
+        <div class="font-bold">
+          ${e.date} | ${e.category} | ${e.item}
+        </div>
 
-    <div class="text-sm text-gray-500">
-      ${e.payment_method || ""} | ${e.note || ""}
-    </div>
-  </div>
+        <div class="text-sm text-gray-500">
+          ${e.payment_method || ""} | ${e.note || ""}
+        </div>
+      </div>
 
-  <div class="text-right">
-    <div class="font-bold text-red-700">
-      NT$ ${money(e.amount)}
-    </div>
+      <div class="text-right">
+        <div class="font-bold text-red-700">
+          NT$ ${money(e.amount)}
+        </div>
 
-    <div class="mt-2 space-x-2">
-      <button
-        onclick="editExpense(${e.id})"
-        class="bg-yellow-500 text-white px-2 py-1 rounded-lg text-sm">
-        修改
-      </button>
+        <div class="mt-2 space-x-2">
+          <button
+            onclick="editExpense('${e.id}')"
+            class="bg-yellow-500 text-white px-2 py-1 rounded-lg text-sm">
+            修改
+          </button>
 
-      <button
-        onclick="deleteExpense(${e.id})"
-        class="bg-red-600 text-white px-2 py-1 rounded-lg text-sm">
-        刪除
-      </button>
+          <button
+            onclick="deleteExpense('${e.id}')"
+            class="bg-red-600 text-white px-2 py-1 rounded-lg text-sm">
+            刪除
+          </button>
+        </div>
+      </div>
     </div>
-  </div>
+  `).join("")}
 </div>
-  `;
-   loadVendors();
+`;
+    
+loadVendors();
 }
-
+      
 async function loadVendors() {
   const { data, error } = await db.from("vendors").select("*").order("name", { ascending: true });
 
@@ -818,23 +821,6 @@ async function saveVendor() {
 
   await loadVendors();
 
-function onVendorChange() {
-  const vendorSelect = document.getElementById("expenseVendor");
-  const categorySelect = document.getElementById("expenseCategory");
-
-  if (!vendorSelect || !categorySelect) return;
-
-  const selectedOption =
-    vendorSelect.options[vendorSelect.selectedIndex];
-
-  const category =
-    selectedOption.getAttribute("data-category");
-
-  if (category) {
-    categorySelect.value = category;
-  }
-}  
-  
 }  
 
 function onVendorChange() {
