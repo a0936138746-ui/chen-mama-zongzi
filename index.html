@@ -711,8 +711,10 @@ function renderExpenses() {
     <div class="bg-white p-5 rounded-2xl shadow mb-6">
       <div class="grid md:grid-cols-3 gap-4 mb-4">
         <input id="expenseDate" type="date" class="border p-3 rounded-xl" value="${todayStr()}">
-        <select id="expenseVendor" class="border p-3 rounded-xl">
-  <option value="">選擇商家</option>
+       <select id="expenseVendor"
+  onchange="onVendorChange()"
+  class="border p-3 rounded-xl">
+<option value="">選擇商家</option>
 </select>
         <select id="expenseCategory" class="border p-3 rounded-xl">
           <option>食材</option>
@@ -793,6 +795,24 @@ async function saveVendor() {
   document.getElementById("vendorNote").value = "";
 
   await loadVendors();
+
+function onVendorChange() {
+  const vendorSelect = document.getElementById("expenseVendor");
+  const categorySelect = document.getElementById("expenseCategory");
+
+  if (!vendorSelect || !categorySelect) return;
+
+  const selectedOption =
+    vendorSelect.options[vendorSelect.selectedIndex];
+
+  const category =
+    selectedOption.getAttribute("data-category");
+
+  if (category) {
+    categorySelect.value = category;
+  }
+}  
+  
 }  
 
 function onVendorChange() {
