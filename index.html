@@ -736,15 +736,37 @@ function renderExpenses() {
 
     <div class="space-y-3">
       ${expenses.map(e => `
-        <div class="bg-white p-4 rounded-2xl shadow flex justify-between">
-          <div>
-            <div class="font-bold">${e.date}｜${e.category}｜${e.item}</div>
-            <div class="text-sm text-gray-500">${e.payment_method || ""}｜${e.note || ""}</div>
-          </div>
-          <div class="font-bold text-red-700">NT$ ${money(e.amount)}</div>
-        </div>
-      `).join("") || "尚無支出紀錄"}
+       <div class="bg-white p-4 rounded-2xl shadow flex justify-between">
+  <div>
+    <div class="font-bold">
+      ${e.date} | ${e.category} | ${e.item}
     </div>
+
+    <div class="text-sm text-gray-500">
+      ${e.payment_method || ""} | ${e.note || ""}
+    </div>
+  </div>
+
+  <div class="text-right">
+    <div class="font-bold text-red-700">
+      NT$ ${money(e.amount)}
+    </div>
+
+    <div class="mt-2 space-x-2">
+      <button
+        onclick="editExpense(${e.id})"
+        class="bg-yellow-500 text-white px-2 py-1 rounded-lg text-sm">
+        修改
+      </button>
+
+      <button
+        onclick="deleteExpense(${e.id})"
+        class="bg-red-600 text-white px-2 py-1 rounded-lg text-sm">
+        刪除
+      </button>
+    </div>
+  </div>
+</div>
   `;
    loadVendors();
 }
@@ -852,6 +874,53 @@ async function saveExpense() {
   showAdminTab("expenses");
 }
 
+async function deleteExpense(id) {
+  if (!confirm("確定刪除這筆支出？")) return;
+
+  const { error } = await db
+    .from("expenses")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    alert("刪除失敗：" + error.message);
+    return;
+  }
+
+  alert("刪除成功");
+
+  await refreshAdmin();
+  showAdminTab("expenses");
+}
+
+async function editExpense(id) {
+  const e = expenses.find(x => x.id === id);
+  if (!e) return;
+
+  const newAmount = prompt("修改金額", e.amount);
+  if (newAmount === null) return;
+
+  const newNote = prompt("修改備註", e.note || "");
+
+  const { error } = await db
+    .from("expenses")
+    .update({
+      amount: Number(newAmount),
+      note: newNote
+    })
+    .eq("id", id);
+
+  if (error) {
+    alert("修改失敗：" + error.message);
+    return;
+  }
+
+  alert("修改成功");
+
+  await refreshAdmin();
+  showAdminTab("expenses");
+}
+  
 function renderStats() {
   const activeOrders = orders.filter(o => o.status !== "已取消");
   const revenue = activeOrders.reduce((s, o) => s + Number(o.total || 0), 0);
