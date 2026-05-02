@@ -831,37 +831,40 @@ function renderIncome() {
     </div>
 
     <div class="space-y-3">
-      ${incomes.map(i => `
-        <div class="bg-green-50 p-4 rounded-xl shadow flex justify-between">
-          <div>
-            ${i.date} | ${i.item} | ${i.qty}份
-            <div class="text-sm text-gray-500">
-              ${i.payment_method || ""}
-              ${i.note || ""}
-            </div>
+  ${incomes.map(i => `
+    <div class="bg-green-50 p-4 rounded-xl shadow">
+      <div class="flex justify-between items-start gap-4">
+        <div>
+          <div class="font-bold">
+            ${i.date} | ${i.item} | ${i.qty || 0}份
           </div>
 
-          <div class="text-right">
-  <div class="font-bold text-green-700">
-    NT$ ${money(i.amount)}
-  </div>
+          <div class="text-sm text-gray-500 mt-1">
+            ${i.payment_method || ""} ${i.note || ""}
+          </div>
+        </div>
 
-  <div class="mt-2 space-x-2">
-    <button
-      onclick="editIncome('${i.id}')"
-      class="bg-yellow-500 text-white px-2 py-1 rounded-lg text-sm">
-      修改
-    </button>
+        <div class="text-right">
+          <div class="font-bold text-green-700">
+            NT$ ${money(i.amount)}
+          </div>
 
-    <button
-      onclick="deleteIncome('${i.id}')"
-      class="bg-red-600 text-white px-2 py-1 rounded-lg text-sm">
-      刪除
-    </button>
-  </div>
-</div>
-      `).join("")}
+          <div class="mt-2 space-x-2">
+            <button onclick="editIncome('${i.id}')"
+              class="bg-yellow-500 text-white px-2 py-1 rounded-lg text-sm">
+              修改
+            </button>
+
+            <button onclick="deleteIncome('${i.id}')"
+              class="bg-red-600 text-white px-2 py-1 rounded-lg text-sm">
+              刪除
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
+  `).join("")}
+</div>
   `;
 }
 
