@@ -859,8 +859,7 @@ async function saveIncome() {
   if (!amount) return alert("請輸入金額");
 
   const income = {
-    id: "INC" + Date.now(),
-    date: document.getElementById("incomeDate").value,
+     date: document.getElementById("incomeDate").value,
     item,
     qty,
     amount,
