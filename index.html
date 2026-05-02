@@ -72,6 +72,7 @@
       <button onclick="showAdminTab('todo')" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">今日待辦</button>
       <button onclick="showAdminTab('paper')" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">紙本/電話訂單</button>
       <button onclick="showAdminTab('expenses')" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">成本支出</button>
+      <button onclick="showAdminTab('income')" class="adminBtn bg-green-700 text-white px-4 py-2 rounded-xl">現場收入</button>
       <button onclick="showAdminTab('stats')" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">營運統計</button>
       <button onclick="showAdminTab('stock')" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">庫存查看</button>
       <button onclick="renderProductAdmin()" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">商品管理</button>
@@ -91,6 +92,7 @@ const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let products = [];
 let orders = [];
 let expenses = [];
+let incomes = [];
 let cart = [];
 
 function money(n) {
@@ -477,11 +479,26 @@ async function loadExpenses() {
   expenses = data || [];
 }
 
+async function loadIncome() {
+  const { data, error } = await db
+    .from("income_records")
+    .select("*")
+    .order("date", { ascending: false });
+
+  if (error) {
+    incomes = [];
+    return;
+  }
+
+  incomes = data || [];
+}  
+
 function showAdminTab(tab) {
   if (tab === "orders") renderOrders();
   if (tab === "todo") renderTodo();
   if (tab === "paper") renderPaperOrder();
   if (tab === "expenses") renderExpenses();
+  if (tab === "income") renderIncome();
   if (tab === "stats") renderStats();
   if (tab === "stock") renderStock();
 }
@@ -773,7 +790,103 @@ function renderExpenses() {
     
 loadVendors();
 }
-      
+
+function renderIncome() {
+  document.getElementById("adminPanel").innerHTML = `
+    <h2 class="text-2xl font-bold mb-4">現場收入</h2>
+
+    <div class="bg-white p-5 rounded-2xl shadow mb-6">
+      <div class="grid md:grid-cols-3 gap-4 mb-4">
+        <input id="incomeDate" type="date"
+          value="${todayStr()}"
+          class="border p-3 rounded-xl">
+
+        <input id="incomeItem"
+          placeholder="品項"
+          class="border p-3 rounded-xl">
+
+        <input id="incomeQty"
+          type="number"
+          placeholder="數量"
+          class="border p-3 rounded-xl">
+
+        <input id="incomeAmount"
+          type="number"
+          placeholder="收入金額"
+          class="border p-3 rounded-xl">
+
+        <input id="incomePayment"
+          placeholder="付款方式"
+          class="border p-3 rounded-xl">
+
+        <input id="incomeNote"
+          placeholder="備註"
+          class="border p-3 rounded-xl">
+      </div>
+
+      <button onclick="saveIncome()"
+        class="bg-green-700 text-white px-6 py-3 rounded-xl">
+        新增收入
+      </button>
+    </div>
+
+    <div class="space-y-3">
+      ${incomes.map(i => `
+        <div class="bg-green-50 p-4 rounded-xl shadow flex justify-between">
+          <div>
+            ${i.date} | ${i.item} | ${i.qty}份
+            <div class="text-sm text-gray-500">
+              ${i.payment_method || ""}
+              ${i.note || ""}
+            </div>
+          </div>
+
+          <div class="font-bold text-green-700">
+            NT$ ${money(i.amount)}
+          </div>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+async function saveIncome() {
+  const item = document.getElementById("incomeItem").value.trim();
+  const qty = Number(document.getElementById("incomeQty").value);
+  const amount = Number(document.getElementById("incomeAmount").value);
+
+  if (!item) return alert("請輸入品項");
+  if (!amount) return alert("請輸入金額");
+
+  const income = {
+    id: "INC" + Date.now(),
+    date: document.getElementById("incomeDate").value,
+    item,
+    qty,
+    amount,
+    payment_method:
+      document.getElementById("incomePayment").value.trim(),
+    note:
+      document.getElementById("incomeNote").value.trim()
+  };
+
+  const { error } = await db
+    .from("income_records")
+    .insert([income]);
+
+  if (error) {
+    alert("新增收入失敗：" + error.message);
+    return;
+  }
+
+  alert("收入新增成功");
+
+  await refreshAdmin();
+  await loadIncome();
+
+  showAdminTab("income");
+}
+  
 async function loadVendors() {
   const { data, error } = await db.from("vendors").select("*").order("name", { ascending: true });
 
@@ -963,6 +1076,7 @@ function renderStock() {
 async function refreshAdmin() {
   await loadOrders();
   await loadExpenses();
+  await loadIncome();
   await loadProducts();
 }
 
