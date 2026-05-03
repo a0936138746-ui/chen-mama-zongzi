@@ -301,12 +301,35 @@ async function editOrder(id) {
   const newNote = prompt("修改備註", order.note || "");
   if (newNote === null) return;
 
+let updatedItems = [...(order.items || [])];
+
+const editItems = confirm("是否要修改商品數量？");
+
+if (editItems) {
+  updatedItems = updatedItems.map(item => {
+    const newQty = prompt(
+      `${item.name} 目前 ${item.qty} 顆，輸入新數量`,
+      item.qty
+    );
+
+    if (newQty === null) {
+      return item;
+    }
+
+    return {
+      ...item,
+      qty: Number(newQty)
+    };
+  });
+}
+  
   const updateData = {
     name: newName,
     phone: newPhone,
     delivery: newDelivery,
     address: newAddress,
     note: newNote
+    items: updatedItems,
   };
 
   if (newDelivery === "宅配") {
@@ -957,6 +980,12 @@ async function saveIncome() {
 async function deleteIncome(id) {
   if (!confirm("確定刪除這筆收入？")) return;
 
+const newTotal = updatedItems.reduce((sum, item) => {
+  return sum + (Number(item.qty) * Number(item.price));
+}, 0);
+
+updateData.total = newTotal;
+  
   const { error } = await db
     .from("income_records")
     .delete()
