@@ -285,30 +285,41 @@ async function editOrder(id) {
   const newPhone = prompt("修改電話", order.phone || "");
   if (newPhone === null) return;
 
+  const newDelivery = prompt(
+    "修改方式（自取 / 宅配 / 有限外送）",
+    order.delivery || "自取"
+  );
+  if (newDelivery === null) return;
+
+  const oldDate = order.pickup_date || order.arrival_date || "";
+  const newDate = prompt("修改日期", oldDate);
+  if (newDate === null) return;
+
+  const newAddress = prompt("修改地址", order.address || "");
+  if (newAddress === null) return;
+
   const newNote = prompt("修改備註", order.note || "");
   if (newNote === null) return;
 
-  const newArrivalDate = prompt(
-    "修改到貨/取貨日期",
-    order.arrivalDate || ""
-  );
-  if (newArrivalDate === null) return;
+  const updateData = {
+    name: newName,
+    phone: newPhone,
+    delivery: newDelivery,
+    address: newAddress,
+    note: newNote
+  };
 
-  const newDeliveryType = prompt(
-    "配送方式（1=自取 / 2=宅配）",
-    order.deliveryType || "1"
-  );
-  if (newDeliveryType === null) return;
+  if (newDelivery === "宅配") {
+    updateData.arrival_date = newDate;
+    updateData.pickup_date = null;
+  } else {
+    updateData.pickup_date = newDate;
+    updateData.arrival_date = null;
+  }
 
   const { error } = await db
     .from("orders")
-    .update({
-      name: newName,
-      phone: newPhone,
-      note: newNote,
-      arrivalDate: newArrivalDate,
-      deliveryType: Number(newDeliveryType)
-    })
+    .update(updateData)
     .eq("id", id);
 
   if (error) {
