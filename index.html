@@ -271,16 +271,55 @@ async function deleteStock(id, productId) {
   loadStockHistory(productId);
 }
   
-function editOrder(id) {
-  const o = orders.find(x => x.id === id);
-  if (!o) return;
+async function editOrder(id) {
+  const order = orders.find(o => o.id === id);
 
-  const name = prompt("客戶姓名", o.name);
-  const phone = prompt("電話", o.phone);
+  if (!order) {
+    alert("找不到訂單");
+    return;
+  }
 
-  if (!name) return;
+  const newName = prompt("修改姓名", order.name || "");
+  if (newName === null) return;
 
-  updateOrder(id, name, phone);
+  const newPhone = prompt("修改電話", order.phone || "");
+  if (newPhone === null) return;
+
+  const newNote = prompt("修改備註", order.note || "");
+  if (newNote === null) return;
+
+  const newArrivalDate = prompt(
+    "修改到貨/取貨日期",
+    order.arrivalDate || ""
+  );
+  if (newArrivalDate === null) return;
+
+  const newDeliveryType = prompt(
+    "配送方式（1=自取 / 2=宅配）",
+    order.deliveryType || "1"
+  );
+  if (newDeliveryType === null) return;
+
+  const { error } = await db
+    .from("orders")
+    .update({
+      name: newName,
+      phone: newPhone,
+      note: newNote,
+      arrivalDate: newArrivalDate,
+      deliveryType: Number(newDeliveryType)
+    })
+    .eq("id", id);
+
+  if (error) {
+    alert("修改失敗：" + error.message);
+    return;
+  }
+
+  alert("訂單修改成功");
+
+  await refreshAdmin();
+  renderOrders();
 }
   
 function renderPaperTotal() {
