@@ -328,7 +328,7 @@ if (editItems) {
   if (addNewItem) {
     const productText = products
       .filter(p => p.active !== false && p.type !== "fee")
-      .map(p => `${p.id}：${p.name}｜NT$ ${p.price}`)
+      .map((p, index) => `${index + 1}：${p.name}｜NT$ ${p.price}`)
       .join("\n");
 
     const productId = prompt(
@@ -336,7 +336,11 @@ if (editItems) {
     );
 
     if (productId !== null) {
-      const product = products.find(p => Number(p.id) === Number(productId));
+      const availableProducts = products.filter(
+  p => p.active !== false && p.type !== "fee"
+);
+
+const product = availableProducts[Number(productId) - 1];
 
       if (!product) {
         alert("找不到這個商品 ID");
