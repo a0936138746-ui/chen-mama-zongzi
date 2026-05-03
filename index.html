@@ -323,6 +323,37 @@ if (editItems) {
     };
   })
   .filter(item => item.qty > 0);
+    const addNewItem = confirm("是否要新增商品到這筆訂單？");
+
+  if (addNewItem) {
+    const productText = products
+      .filter(p => p.active !== false && p.type !== "fee")
+      .map(p => `${p.id}：${p.name}｜NT$ ${p.price}`)
+      .join("\n");
+
+    const productId = prompt(
+      "請輸入要新增的商品 ID：\n\n" + productText
+    );
+
+    if (productId !== null) {
+      const product = products.find(p => Number(p.id) === Number(productId));
+
+      if (!product) {
+        alert("找不到這個商品 ID");
+      } else {
+        const qty = prompt(`請輸入 ${product.name} 的數量`, 1);
+
+        if (qty !== null && Number(qty) > 0) {
+          updatedItems.push({
+            id: product.id,
+            name: product.name,
+            price: product.price,
+            qty: Number(qty)
+          });
+        }
+      }
+    }
+  }
 }
   
   const updateData = {
