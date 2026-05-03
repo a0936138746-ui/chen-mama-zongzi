@@ -332,6 +332,12 @@ if (editItems) {
     items: updatedItems,
   };
 
+const newTotal = updatedItems.reduce((sum, item) => {
+  return sum + (Number(item.qty) * Number(item.price));
+}, 0);
+
+updateData.total = newTotal;
+  
   if (newDelivery === "宅配") {
     updateData.arrival_date = newDate;
     updateData.pickup_date = null;
@@ -980,12 +986,6 @@ async function saveIncome() {
 async function deleteIncome(id) {
   if (!confirm("確定刪除這筆收入？")) return;
 
-const newTotal = updatedItems.reduce((sum, item) => {
-  return sum + (Number(item.qty) * Number(item.price));
-}, 0);
-
-updateData.total = newTotal;
-  
   const { error } = await db
     .from("income_records")
     .delete()
