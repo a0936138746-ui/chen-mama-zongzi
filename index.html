@@ -306,9 +306,10 @@ let updatedItems = [...(order.items || [])];
 const editItems = confirm("是否要修改商品數量？");
 
 if (editItems) {
-  updatedItems = updatedItems.map(item => {
+  updatedItems = updatedItems
+  .map(item => {
     const newQty = prompt(
-      `${item.name} 目前 ${item.qty} 顆，輸入新數量`,
+      `${item.name} 目前 ${item.qty} 顆\n輸入新數量（輸入 0 = 刪除商品）`,
       item.qty
     );
 
@@ -320,7 +321,8 @@ if (editItems) {
       ...item,
       qty: Number(newQty)
     };
-  });
+  })
+  .filter(item => item.qty > 0);
 }
   
   const updateData = {
