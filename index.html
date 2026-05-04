@@ -355,31 +355,77 @@ async function editOrder(id) {
   const newNote = prompt("修改備註", order.note || "");
   if (newNote === null) return;
 
-let updatedItems = [...(order.items || [])];
+  let updatedItems = [...(order.items || [])];
 
-const editItems = confirm("是否要修改商品數量？");
+  const editItems = confirm("是否要修改商品數量？");
 
-if (editItems) {
-  updatedItems = updatedItems
-  .map(item => {
-    const newQty = prompt(
-      `${item.name} 目前 ${item.qty} 顆\n輸入新數量（輸入 0 = 刪除商品）`,
-      item.qty
-    );
+  if (editItems) {
+    updatedItems = updatedItems
+      .map(item => {
+        const newQty = prompt(
+          `${item.name} 目前 ${item.qty} 顆\n輸入新數量（輸入 0 = 刪除商品）`,
+          item.qty
+        );
 
-    if (newQty === null) {
-      return item;
-    }
+        if (newQty === null) {
+          return item;
+        }
 
-    return {
-      ...item,
-      qty: Number(newQty)
-    };
-  })
+        return {
+          ...item,
+          qty: Number(newQty)
+        };
+      })
+      .filter(item => item.qty > 0);
+  }
+
   const addNewItem = confirm("是否要新增商品到這筆訂單？");
 
-if (addNewItem) {
-  const keyword = prompt("請輸入商品名稱關鍵字，例如：北部 / 豪華 / 素粽");
+  if (addNewItem) {
+    const keyword = prompt("請輸入商品名稱關鍵字，例如：北部 / 豪華 / 素粽");
+
+    if (keyword) {
+      const matchedProducts = products
+        .filter(p =>
+          p.name.includes(keyword) &&
+          p.active !== false &&
+          p.type !== "fee"
+        )
+        .slice(0, 10);
+
+      if (matchedProducts.length === 0) {
+        alert("找不到符合商品");
+      } else {
+        const productText = matchedProducts
+          .map((p, index) => `${index + 1}：${p.name}｜NT$ ${p.price}`)
+          .join("\n");
+
+        const choice = prompt(
+          "請輸入要新增的商品編號：\n\n" + productText
+        );
+
+        if (choice !== null) {
+          const product = matchedProducts[Number(choice) - 1];
+
+          if (!product) {
+            alert("找不到這個商品編號");
+          } else {
+            const qty = prompt(`請輸入 ${product.name} 的數量`, 1);
+
+            if (qty !== null && Number(qty) > 0) {
+              updatedItems.push({
+                id: product.id,
+                name: product.name,
+                price: product.price,
+                qty: Number(qty)
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+
   const updateData = {
     name: newName,
     phone: newPhone,
@@ -389,12 +435,12 @@ if (addNewItem) {
     items: updatedItems
   };
 
-const newTotal = updatedItems.reduce((sum, item) => {
-  return sum + (Number(item.qty) * Number(item.price));
-}, 0);
+  const newTotal = updatedItems.reduce((sum, item) => {
+    return sum + (Number(item.qty) * Number(item.price));
+  }, 0);
 
-updateData.total = newTotal;
-  
+  updateData.total = newTotal;
+
   if (newDelivery === "宅配") {
     updateData.arrival_date = newDate;
     updateData.pickup_date = null;
