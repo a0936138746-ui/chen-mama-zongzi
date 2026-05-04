@@ -380,35 +380,35 @@ if (editItems) {
     const addNewItem = confirm("是否要新增商品到這筆訂單？");
 
   if (addNewItem) {
-    const productText = products
-      .filter(p => p.active !== false && p.type !== "fee")
-      .map((p, index) => `${index + 1}：${p.name}｜NT$ ${p.price}`)
-      .join("\n");
+  const availableProducts = products
+    .filter(p => p.active !== false && p.type !== "fee")
+    .slice()
+    .reverse()
+    .slice(0, 20);
 
-    const productId = prompt(
-      "請輸入要新增的商品 ID：\n\n" + productText
-    );
+  const productText = availableProducts
+    .map((p, index) => `${index + 1}：${p.name}｜NT$ ${p.price}`)
+    .join("\n");
 
-    if (productId !== null) {
-      const availableProducts = products.filter(
-  p => p.active !== false && p.type !== "fee"
-);
+  const productId = prompt(
+    "請輸入要新增的商品編號：\n\n" + productText
+  );
 
-const product = availableProducts[Number(productId) - 1];
+  if (productId !== null) {
+    const product = availableProducts[Number(productId) - 1];
 
-      if (!product) {
-        alert("找不到這個商品 ID");
-      } else {
-        const qty = prompt(`請輸入 ${product.name} 的數量`, 1);
+    if (!product) {
+      alert("找不到這個商品編號");
+    } else {
+      const qty = prompt(`請輸入 ${product.name} 的數量`, 1);
 
-        if (qty !== null && Number(qty) > 0) {
-          updatedItems.push({
-            id: product.id,
-            name: product.name,
-            price: product.price,
-            qty: Number(qty)
-          });
-        }
+      if (qty !== null && Number(qty) > 0) {
+        updatedItems.push({
+          id: product.id,
+          name: product.name,
+          price: product.price,
+          qty: Number(qty)
+        });
       }
     }
   }
