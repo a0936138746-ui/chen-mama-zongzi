@@ -376,54 +376,10 @@ if (editItems) {
       qty: Number(newQty)
     };
   })
-  .filter(item => item.qty > 0);
-const addNewItem = confirm("是否要新增商品到這筆訂單？");
+  const addNewItem = confirm("是否要新增商品到這筆訂單？");
 
 if (addNewItem) {
   const keyword = prompt("請輸入商品名稱關鍵字，例如：北部 / 豪華 / 素粽");
-
-  if (keyword) {
-   const matchedProducts = products
-  .filter(p =>
-    p.name.includes(keyword) &&
-    p.active !== false &&
-    p.type !== "fee"
-  )
-  .slice(0, 10);
-
-if (matchedProducts.length === 0) {
-  alert("找不到符合商品");
-} else {
-  const productText = matchedProducts
-    .map((p, index) => `${index + 1}：${p.name}｜NT$ ${p.price}`)
-    .join("\n");
-
-  const choice = prompt(
-    "請輸入要新增的商品編號：\n\n" + productText
-  );
-
-  if (choice !== null) {
-    const product = matchedProducts[Number(choice) - 1];
-
-    if (!product) {
-      alert("找不到這個商品編號");
-    } else {
-      const qty = prompt(`請輸入 ${product.name} 的數量`, 1);
-
-      if (qty !== null && Number(qty) > 0) {
-        updatedItems.push({
-          id: product.id,
-          name: product.name,
-          price: product.price,
-          qty: Number(qty)
-        });
-      }
-    }
-  }
-}
-    
-}  
-  
   const updateData = {
     name: newName,
     phone: newPhone,
