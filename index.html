@@ -1501,14 +1501,15 @@ function addNewProduct() {
   }
 
   const newProduct = {
-    id: Date.now(),
-    name,
-    price: price || 0,
-    web_price: web_price || price || 0,
-    stock: type === "single" ? (stock || 0) : 0,
-    components: type === "box" ? components : null,
-    active: true
-  };
+  id: Date.now(),
+  name,
+  price: price || 0,
+  web_price: web_price || price || 0,
+  stock: type === "single" ? (stock || 0) : 0,
+  type: type,
+  components: type === "box" ? components : null,
+  active: true
+};
 
   db.from("products").insert([newProduct])
     .then(({ error }) => {
@@ -1518,7 +1519,8 @@ function addNewProduct() {
       }
 
       alert("新增成功");
-      loadProducts();
+await loadProducts();
+renderProductAdmin();
     });
 }  
 </script>
