@@ -1280,21 +1280,25 @@ async function saveExpense() {
 async function deleteExpense(id) {
   if (!confirm("確定刪除這筆支出？")) return;
 
-  const { error } = await db
+  const { data, error } = await db
     .from("expenses")
     .delete()
-    .eq("id", id);
+    .eq("id", id)
+    .select();
 
   if (error) {
     alert("刪除失敗：" + error.message);
     return;
   }
 
-  expenses = expenses.filter(
-    e => String(e.id) !== String(id)
-  );
+  if (!data || data.length === 0) {
+    alert("刪除失敗：資料庫沒有刪到這筆，可能是 id 對不到或 Supabase 沒有 DELETE 權限");
+    return;
+  }
 
   alert("刪除成功");
+
+  await loadExpenses();
   renderExpenses();
 }
 
