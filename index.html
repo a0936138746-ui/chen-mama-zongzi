@@ -75,6 +75,7 @@
       <button onclick="showAdminTab('income')" class="adminBtn bg-green-700 text-white px-4 py-2 rounded-xl">現場收入</button>
       <button onclick="showAdminTab('stats')" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">營運統計</button>
       <button onclick="showAdminTab('stock')" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">庫存查看</button>
+      <button onclick="showAdminTab('shipping')" class="adminBtn bg-blue-700 text-white px-4 py-2 rounded-xl">出貨/取貨清單</button>
       <button onclick="renderProductAdmin()" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">商品管理</button>
     </div>
 
@@ -683,6 +684,7 @@ function showAdminTab(tab) {
   if (tab === "income") renderIncome();
   if (tab === "stats") renderStats();
   if (tab === "stock") renderStock();
+  if (tab === "shipping") renderShippingList();
 }
 
 function renderOrders() {
@@ -810,6 +812,72 @@ function renderTodo() {
   `;
 }
 
+function renderShippingList() {
+  const list = orders
+    .filter(o =>
+      o.status !== "已取消" &&
+      o.status !== "已取貨" &&
+      o.status !== "已宅配"
+    )
+    .sort((a, b) => {
+      const da = a.pickup_date || a.arrival_date || "";
+      const db = b.pickup_date || b.arrival_date || "";
+      return da.localeCompare(db);
+    });
+
+  document.getElementById("adminPanel").innerHTML = `
+    <h2 class="text-2xl font-bold mb-4">出貨 / 取貨清單</h2>
+
+    <div class="flex gap-2 mb-4 print:hidden">
+      <button
+        onclick="window.print()"
+        class="bg-green-700 text-white px-4 py-2 rounded-xl">
+        列印清單
+      </button>
+
+      <button
+        onclick="showAdminTab('shipping')"
+        class="bg-blue-600 text-white px-4 py-2 rounded-xl">
+        重新整理
+      </button>
+    </div>
+
+    <div class="bg-yellow-50 p-4 rounded-xl mb-4">
+      未完成出貨 / 取貨共 ${list.length} 筆
+    </div>
+
+    <div class="space-y-4">
+      ${
+        list.length
+          ? list.map(o => `
+            <div class="bg-white border rounded-xl p-4">
+              <div class="font-bold text-lg">
+                日期：${o.pickup_date || o.arrival_date || "未填"}
+              </div>
+
+              <div>方式：${o.delivery || ""}</div>
+              <div>客人：${o.name || ""}</div>
+              <div>電話：${o.phone || ""}</div>
+              <div>地址：${o.address || ""}</div>
+              <div>備註：${o.note || ""}</div>
+
+              <div class="mt-2 bg-amber-50 p-2 rounded">
+                ${(o.items || []).map(i =>
+                  `<div>${i.name} x ${i.qty}</div>`
+                ).join("")}
+              </div>
+
+              <div class="mt-2 font-bold text-right">
+                NT$ ${money(o.total)}
+              </div>
+            </div>
+          `).join("")
+          : "目前沒有待出貨/取貨訂單"
+      }
+    </div>
+  `;
+}
+  
 function renderPaperOrder() {
   document.getElementById("adminPanel").innerHTML = `
     <h2 class="text-2xl font-bold mb-4">新增紙本 / 電話訂單</h2>
