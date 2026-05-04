@@ -1290,25 +1290,47 @@ async function deleteExpense(id) {
     return;
   }
 
-  alert("刪除成功");
+  expenses = expenses.filter(
+    e => String(e.id) !== String(id)
+  );
 
-  await refreshAdmin();
-  showAdminTab("expenses");
+  alert("刪除成功");
+  renderExpenses();
 }
 
 async function editExpense(id) {
-  const e = expenses.find(x => x.id === id);
+  const e = expenses.find(x => String(x.id) === String(id));
   if (!e) return;
 
-  const newAmount = prompt("修改金額", e.amount);
+  const newDate = prompt("修改日期", e.date || todayStr());
+  if (newDate === null) return;
+
+  const newVendor = prompt("修改商家", e.vendor_name || "");
+  if (newVendor === null) return;
+
+  const newCategory = prompt("修改分類", e.category || "食材");
+  if (newCategory === null) return;
+
+  const newItem = prompt("修改項目", e.item || "");
+  if (newItem === null) return;
+
+  const newAmount = prompt("修改金額", e.amount || 0);
   if (newAmount === null) return;
+
+  const newPayment = prompt("修改付款方式", e.payment_method || "");
+  if (newPayment === null) return;
 
   const newNote = prompt("修改備註", e.note || "");
 
   const { error } = await db
     .from("expenses")
     .update({
+      date: newDate,
+      vendor_name: newVendor,
+      category: newCategory,
+      item: newItem,
       amount: Number(newAmount),
+      payment_method: newPayment,
       note: newNote
     })
     .eq("id", id);
@@ -1320,8 +1342,8 @@ async function editExpense(id) {
 
   alert("修改成功");
 
-  await refreshAdmin();
-  showAdminTab("expenses");
+  await loadExpenses();
+  renderExpenses();
 }
   
 function renderStats() {
