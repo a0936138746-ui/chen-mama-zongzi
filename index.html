@@ -1360,13 +1360,94 @@ function renderStock() {
   document.getElementById("adminPanel").innerHTML = `
     <h2 class="text-2xl font-bold mb-4">庫存查看</h2>
     <div class="grid md:grid-cols-3 gap-4">
-      ${products.filter(p => p.type !== "fee").map(p => `
-        <div class="bg-white p-5 rounded-2xl shadow ${Number(p.stock || 0) < 50 ? "border-2 border-red-400" : ""}">
-          <div class="font-bold text-xl">${p.name}</div>
-          <div class="text-amber-700 font-bold">NT$ ${p.price}</div>
-          <div class="text-gray-600">庫存：${p.stock ?? 0}</div>
+      ${products.filter(p => p.type !== "fee").map(p => {
+
+  let reservedQty = 0;
+
+  orders
+    .filter(o =>
+      o.status !== "已取消" &&
+      o.status !== "已取貨" &&
+      o.status !== "已宅配"
+    )
+    .forEach(order => {
+      (order.items || []).forEach(item => {
+
+        // 一般商品直接計算
+        if (Number(item.id) === Number(p.id)) {
+          reservedQty += Number(item.qty || 0);
+        }
+
+        // 禮盒拆解計算
+        const boxProduct = products.find(
+          x => Number(x.id) === Number(item.id)
+        );
+
+        if (
+          boxProduct &&
+          boxProduct.type === "box" &&
+          Array.isArray(boxProduct.components)
+        ) {
+          boxProduct.components.forEach(comp => {
+            if (Number(comp.productId) === Number(p.id)) {
+              reservedQty +=
+                Number(comp.qty || 0) *
+                Number(item.qty || 0);
+            }
+          });
+        }
+      });
+    });
+
+  const stock = Number(p.stock || 0);
+  const remain = stock - reservedQty;
+
+  let statusText = "🟢 安全";
+  let statusColor = "text-green-600";
+
+  if (remain <= 300) {
+    statusText = "🟡 注意";
+    statusColor = "text-yellow-600";
+  }
+
+  if (remain <= 100) {
+    statusText = "🔴 快補貨";
+    statusColor = "text-red-600";
+  }
+
+  const percent = stock > 0
+    ? Math.min((reservedQty / stock) * 100, 100)
+    : 0;
+
+  return `
+    <div class="bg-white p-5 rounded-2xl shadow border">
+      <div class="font-bold text-xl">${p.name}</div>
+
+      <div class="mt-2 text-sm">
+        實際庫存：${stock}
+      </div>
+
+      <div class="text-sm">
+        訂單需求：${reservedQty}
+      </div>
+
+      <div class="text-sm font-bold">
+        可用庫存：${remain}
+      </div>
+
+      <div class="w-full bg-gray-200 rounded-full h-3 mt-3">
+        <div
+          class="bg-orange-500 h-3 rounded-full"
+          style="width:${percent}%">
         </div>
-      `).join("")}
+      </div>
+
+      <div class="${statusColor} font-bold mt-2">
+        ${statusText}
+      </div>
+    </div>
+  `;
+}).join("")}
     </div>
   `;
 }
