@@ -678,9 +678,47 @@ function renderOrders() {
   panel.innerHTML = `
     <h2 class="text-2xl font-bold mb-4">訂單管理</h2>
     <button onclick="refreshAdmin()" class="bg-blue-600 text-white px-4 py-2 rounded-xl mb-4">重新整理</button>
-    <div class="space-y-4">
-      ${orders.map(o => orderCard(o)).join("")}
-    </div>
+const keyword = document.getElementById("orderSearch")?.value?.trim() || "";
+
+const filteredOrders = orders.filter(o => {
+  const searchText = `
+    ${o.name || ""}
+    ${o.phone || ""}
+    ${o.id || ""}
+  `.toLowerCase();
+
+  return searchText.includes(keyword.toLowerCase());
+});
+
+const panel = document.getElementById("adminPanel");
+
+panel.innerHTML = `
+  <h2 class="text-2xl font-bold mb-4">訂單管理</h2>
+
+  <div class="flex gap-2 mb-4">
+    <input
+      id="orderSearch"
+      placeholder="搜尋姓名 / 電話 / 訂單編號"
+      class="border p-3 rounded-xl flex-1"
+      value="${keyword}"
+      oninput="renderOrders()"
+    >
+
+    <button
+      onclick="refreshAdmin()"
+      class="bg-blue-600 text-white px-4 py-2 rounded-xl">
+      重新整理
+    </button>
+  </div>
+
+  <div class="space-y-4">
+    ${
+      filteredOrders.length
+        ? filteredOrders.map(o => orderCard(o)).join("")
+        : `<div class="bg-gray-100 p-4 rounded-xl">找不到訂單</div>`
+    }
+  </div>
+`;
   `;
 }
 
