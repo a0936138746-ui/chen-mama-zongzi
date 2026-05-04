@@ -812,35 +812,75 @@ function renderTodo() {
   `;
 }
 
-function renderShippingList() {
-  const list = orders
-    .filter(o =>
-      o.status !== "已取消" &&
-      o.status !== "已取貨" &&
-      o.status !== "已宅配"
-    )
-    .sort((a, b) => {
-      const da = a.pickup_date || a.arrival_date || "";
-      const db = b.pickup_date || b.arrival_date || "";
-      return da.localeCompare(db);
-    });
+const startDate =
+  document.getElementById("shipStart")?.value || "";
+
+const endDate =
+  document.getElementById("shipEnd")?.value || "";
+
+const list = orders
+  .filter(o => {
+    if (
+      o.status === "已取消" ||
+      o.status === "已取貨" ||
+      o.status === "已宅配"
+    ) {
+      return false;
+    }
+
+    const orderDate =
+      o.pickup_date ||
+      o.arrival_date ||
+      o.ship_date ||
+      "";
+
+    if (startDate && orderDate < startDate) {
+      return false;
+    }
+
+    if (endDate && orderDate > endDate) {
+      return false;
+    }
+
+    return true;
+  })
+  .sort((a, b) => {
+    const da = a.pickup_date || a.arrival_date || "";
+    const db = b.pickup_date || b.arrival_date || "";
+    return da.localeCompare(db);
+  });
 
   document.getElementById("adminPanel").innerHTML = `
     <h2 class="text-2xl font-bold mb-4">出貨 / 取貨清單</h2>
 
-    <div class="flex gap-2 mb-4 print:hidden">
-      <button
-        onclick="window.print()"
-        class="bg-green-700 text-white px-4 py-2 rounded-xl">
-        列印清單
-      </button>
+    <div class="flex gap-2 mb-4 print:hidden flex-wrap">
 
-      <button
-        onclick="showAdminTab('shipping')"
-        class="bg-blue-600 text-white px-4 py-2 rounded-xl">
-        重新整理
-      </button>
-    </div>
+  <input
+    type="date"
+    id="shipStart"
+    class="border p-2 rounded-xl"
+    value="${startDate}"
+  >
+
+  <input
+    type="date"
+    id="shipEnd"
+    class="border p-2 rounded-xl"
+    value="${endDate}"
+  >
+
+  <button
+    onclick="renderShippingList()"
+    class="bg-blue-600 text-white px-4 py-2 rounded-xl">
+    篩選
+  </button>
+
+  <button
+    onclick="window.print()"
+    class="bg-green-700 text-white px-4 py-2 rounded-xl">
+    列印清單
+  </button>
+</div>
 
     <div class="bg-yellow-50 p-4 rounded-xl mb-4">
       未完成出貨 / 取貨共 ${list.length} 筆
