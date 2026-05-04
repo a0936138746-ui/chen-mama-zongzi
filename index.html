@@ -1360,7 +1360,12 @@ function renderStock() {
   document.getElementById("adminPanel").innerHTML = `
     <h2 class="text-2xl font-bold mb-4">庫存查看</h2>
     <div class="grid md:grid-cols-3 gap-4">
-      ${products.filter(p => p.type !== "fee").map(p => {
+      ${products
+  .filter(p =>
+    p.type !== "fee" &&
+    p.type !== "box"
+  )
+  .map(p => {
 
   let reservedQty = 0;
 
