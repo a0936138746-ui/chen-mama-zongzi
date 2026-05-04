@@ -377,7 +377,34 @@ if (editItems) {
     };
   })
   .filter(item => item.qty > 0);
-    
+const addNewItem = confirm("是否要新增商品到這筆訂單？");
+
+if (addNewItem) {
+  const keyword = prompt("請輸入商品名稱關鍵字，例如：北部 / 豪華 / 素粽");
+
+  if (keyword) {
+    const product = products.find(p =>
+      p.name.includes(keyword) &&
+      p.active !== false &&
+      p.type !== "fee"
+    );
+
+    if (!product) {
+      alert("找不到符合商品");
+    } else {
+      const qty = prompt(`請輸入 ${product.name} 的數量`, 1);
+
+      if (qty !== null && Number(qty) > 0) {
+        updatedItems.push({
+          id: product.id,
+          name: product.name,
+          price: product.price,
+          qty: Number(qty)
+        });
+      }
+    }
+  }
+}    
 }
   
   const updateData = {
