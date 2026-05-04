@@ -1478,7 +1478,7 @@ async function updateProduct(id, field, value) {
   await loadProducts();
   renderProductAdmin();
 }
-function addNewProduct() {
+async function addNewProduct() {
   const name = document.getElementById("newName").value.trim();
   const price = Number(document.getElementById("newPrice").value);
   const web_price = Number(document.getElementById("newWebPrice").value);
@@ -1501,27 +1501,27 @@ function addNewProduct() {
   }
 
   const newProduct = {
-  id: Date.now(),
-  name,
-  price: price || 0,
-  web_price: web_price || price || 0,
-  stock: type === "single" ? (stock || 0) : 0,
-  type: type,
-  components: type === "box" ? components : null,
-  active: true
-};
+    id: Date.now(),
+    name,
+    price: price || 0,
+    web_price: web_price || price || 0,
+    stock: type === "single" ? (stock || 0) : 0,
+    type: type,
+    components: type === "box" ? components : null,
+    active: true
+  };
 
-  db.from("products").insert([newProduct])
-    .then(({ error }) => {
-      if (error) {
-        alert("新增失敗：" + error.message);
-        return;
-      }
+  const { error } = await db.from("products").insert([newProduct]);
 
-      alert("新增成功");
-await loadProducts();
-renderProductAdmin();
-    });
+  if (error) {
+    alert("新增失敗：" + error.message);
+    return;
+  }
+
+  alert("新增成功");
+
+  await loadProducts();
+  renderProductAdmin();
 }  
 </script>
 
