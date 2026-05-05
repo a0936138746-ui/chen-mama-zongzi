@@ -315,13 +315,13 @@ async function removeStock(id) {
   }
 
   await db.from("stock_history").insert([
-    {
-      product_id: id,
-      type: "out",
-      qty,
-      note
-    }
-  ]);
+  {
+    productId: id,
+    type: "out",
+    qty,
+    note
+  }
+]);
 
   alert("出庫成功");
 
