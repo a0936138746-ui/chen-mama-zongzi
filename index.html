@@ -261,6 +261,69 @@ if (historyError) {
   renderProductAdmin();
 }
 
+function toggleStockOut(id) {
+  document
+    .getElementById(`stockOutBox-${id}`)
+    .classList.toggle("hidden");
+}
+
+async function removeStock(id) {
+  const product = products.find(p => p.id === id);
+
+  if (!product) {
+    alert("找不到商品");
+    return;
+  }
+
+  const qty = Number(
+    document.getElementById(`stockOutQty-${id}`).value
+  );
+
+  const note =
+    document.getElementById(`stockOutNote-${id}`).value || "";
+
+  if (!qty || qty <= 0) {
+    alert("請輸入正確數量");
+    return;
+  }
+
+  const currentStock = Number(product.stock || 0);
+
+  if (qty > currentStock) {
+    if (!confirm(`目前庫存只有 ${currentStock}，仍要出庫？`)) {
+      return;
+    }
+  }
+
+  const newStock = currentStock - qty;
+
+  const { error } = await db
+    .from("products")
+    .update({
+      stock: newStock
+    })
+    .eq("id", id);
+
+  if (error) {
+    alert("出庫失敗：" + error.message);
+    return;
+  }
+
+  await db.from("stock_history").insert([
+    {
+      product_id: id,
+      type: "out",
+      qty,
+      note
+    }
+  ]);
+
+  alert("出庫成功");
+
+  await loadProducts();
+  renderProductAdmin();
+}
+  
 async function adjustStock(productId) {
   const product = products.find(
     p => Number(p.id) === Number(productId)
@@ -1905,6 +1968,11 @@ loadProducts();
     class="bg-blue-600 text-white px-3 py-1 rounded-xl">
     入庫
   </button>
+
+<button onclick="toggleStockOut(${p.id})"
+  class="bg-red-600 text-white px-3 py-1 rounded-xl ml-2">
+  出庫
+</button>
 
   <button onclick="adjustStock(${p.id})"
   class="bg-orange-600 text-white px-3 py-1 rounded-xl ml-2">
