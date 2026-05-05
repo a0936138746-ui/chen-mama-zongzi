@@ -76,6 +76,7 @@
       <button onclick="showAdminTab('stats')" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">營運統計</button>
       <button onclick="showAdminTab('stock')" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">庫存查看</button>
       <button onclick="showAdminTab('shipping')" class="adminBtn bg-blue-700 text-white px-4 py-2 rounded-xl">出貨/取貨清單</button>
+      <button onclick="renderEmailImport()" class="adminBtn bg-purple-700 text-white px-4 py-2 rounded-xl">匯入官網Email</button>
       <button onclick="renderProductAdmin()" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">商品管理</button>
     </div>
 
@@ -917,6 +918,109 @@ const list = orders
       }
     </div>
   `;
+}
+
+function renderEmailImport() {
+  document.getElementById("adminPanel").innerHTML = `
+    <h2 class="text-2xl font-bold mb-4">匯入官網 Email 訂單</h2>
+
+    <div class="bg-white p-5 rounded-2xl shadow">
+      <textarea
+        id="emailOrderText"
+        class="border p-3 rounded-xl w-full h-96 mb-4"
+        placeholder="請貼上官網 Email 訂單內容">
+      </textarea>
+
+      <button
+        onclick="importEmailOrder()"
+        class="bg-purple-700 text-white px-6 py-3 rounded-xl font-bold">
+        解析並匯入
+      </button>
+    </div>
+  `;
+}
+
+async function importEmailOrder() {
+  const text = document.getElementById("emailOrderText").value;
+
+  if (!text.trim()) {
+    alert("請先貼上 Email 內容");
+    return;
+  }
+
+  const getMatch = (label) => {
+    const regex = new RegExp(label + "\\s*[:：]\\s*([^\\n\\r]+)");
+    const match = text.match(regex);
+    return match ? match[1].trim() : "";
+  };
+
+  const name = getMatch("訂購人姓名");
+  const phone = getMatch("訂購人行動電話") || getMatch("訂購人聯絡電話");
+  const address = getMatch("收件人地址") || getMatch("訂購人地址");
+  const note = getMatch("其他說明");
+  const totalText = getMatch("總金額");
+  const total = Number((totalText || "0").replace(/[^\d]/g, ""));
+
+  const items = [];
+
+  const lines = text.split(/\n/).map(x => x.trim()).filter(Boolean);
+
+  lines.forEach(line => {
+    // 抓類似：北部粽(10入)組    580    1    580
+    const match = line.match(/^(.+?)\s+(\d+)\s+(\d+)\s+(\d+)$/);
+
+    if (match) {
+      const productName = match[1].trim();
+      const price = Number(match[2]);
+      const qty = Number(match[3]);
+
+      items.push({
+        id: "email-" + Date.now() + "-" + items.length,
+        name: productName,
+        price,
+        qty
+      });
+    }
+  });
+
+  if (!name || !phone) {
+    alert("解析失敗：找不到姓名或電話");
+    return;
+  }
+
+  if (items.length === 0) {
+    alert("解析失敗：找不到商品明細");
+    return;
+  }
+
+  const order = {
+    id: "WEB" + Date.now(),
+    time: new Date().toISOString(),
+    name,
+    phone,
+    address,
+    delivery: "宅配",
+    pickup_date: null,
+    arrival_date: null,
+    ship_date: null,
+    note: note || "官網 Email 匯入",
+    items,
+    total,
+    status: "未完成",
+    type: "web"
+  };
+
+  const { error } = await db.from("orders").insert([order]);
+
+  if (error) {
+    alert("匯入失敗：" + error.message);
+    return;
+  }
+
+  alert("官網 Email 訂單匯入成功");
+
+  await refreshAdmin();
+  showAdminTab("orders");
 }
   
 function renderPaperOrder() {
