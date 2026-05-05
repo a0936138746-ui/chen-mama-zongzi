@@ -262,9 +262,14 @@ if (historyError) {
 }
 
 function toggleStockOut(id) {
-  document
-    .getElementById(`stockOutBox-${id}`)
-    .classList.toggle("hidden");
+  const box = document.getElementById(`stockOutBox-${id}`);
+
+  if (!box) {
+    alert("找不到出庫區塊");
+    return;
+  }
+
+  box.classList.toggle("hidden");
 }
 
 async function removeStock(id) {
@@ -1993,6 +1998,32 @@ loadProducts();
       確認入庫
     </button>
   </div>
+  <div id="stockOutBox-${p.id}" class="hidden mt-3 bg-red-50 p-3 rounded-xl">
+
+  <div class="grid grid-cols-3 gap-2">
+
+    <input
+      id="stockOutQty-${p.id}"
+      type="number"
+      placeholder="出庫數量"
+      class="border p-2 rounded-xl"
+    >
+
+    <input
+      id="stockOutNote-${p.id}"
+      placeholder="備註，例如 5/8宅配"
+      class="border p-2 rounded-xl col-span-2"
+    >
+
+  </div>
+
+  <button
+    onclick="removeStock(${p.id})"
+    class="mt-2 bg-red-600 text-white px-3 py-1 rounded-xl">
+    確認出庫
+  </button>
+
+</div>
   <div class="mt-2">
   <button onclick="toggleStockHistory(${p.id})"
     class="bg-gray-600 text-white px-3 py-1 rounded-xl">
