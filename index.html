@@ -799,94 +799,137 @@ async function updateOrderStatus(id, status) {
 }
 
 function renderTodo() {
-const today = todayStr();
+  const today = todayStr();
 
-const now = new Date();
+  const now = new Date();
 
-const weekLater = new Date();
-weekLater.setDate(now.getDate() + 7);
+  const weekLater = new Date();
+  weekLater.setDate(now.getDate() + 7);
 
-const monthLater = new Date();
-monthLater.setMonth(now.getMonth() + 1);
+  const monthLater = new Date();
+  monthLater.setMonth(now.getMonth() + 1);
+
   const activeOrders = orders.filter(o =>
-  o.status !== "已取消" &&
-  o.status !== "已取貨" &&
-  o.status !== "已宅配"
-);
+    o.status !== "已取消" &&
+    o.status !== "已取貨" &&
+    o.status !== "已宅配"
+  );
 
-const todayList = activeOrders.filter(o => {
-  const d = o.pickup_date || o.arrival_date || o.ship_date;
-  return d === today;
-});
+  const getOrderDate = (o) =>
+    o.pickup_date || o.arrival_date || o.ship_date || "";
 
-const weekList = activeOrders.filter(o => {
-  const d = o.pickup_date || o.arrival_date || o.ship_date;
-  if (!d) return false;
+  const getTotalQty = (o) =>
+    (o.items || []).reduce((sum, i) => sum + Number(i.qty || 0), 0);
 
-  const orderDate = new Date(d);
-  return orderDate >= now && orderDate <= weekLater;
-});
+  const todayList = activeOrders.filter(o => {
+    return getOrderDate(o) === today;
+  });
 
-const monthList = activeOrders.filter(o => {
-  const d = o.pickup_date || o.arrival_date || o.ship_date;
-  if (!d) return false;
+  const weekList = activeOrders.filter(o => {
+    const d = getOrderDate(o);
+    if (!d) return false;
 
-  const orderDate = new Date(d);
-  return orderDate >= now && orderDate <= monthLater;
-});
-  
+    const orderDate = new Date(d);
+    return orderDate >= now && orderDate <= weekLater;
+  });
+
+  const monthList = activeOrders.filter(o => {
+    const d = getOrderDate(o);
+    if (!d) return false;
+
+    const orderDate = new Date(d);
+    return orderDate >= now && orderDate <= monthLater;
+  });
+
+  const weekPreview = weekList
+    .sort((a, b) => getOrderDate(a).localeCompare(getOrderDate(b)))
+    .slice(0, 8);
+
+  const bigOrders = [...monthList]
+    .sort((a, b) => getTotalQty(b) - getTotalQty(a))
+    .slice(0, 5);
+
+  const simpleScheduleCard = (o) => {
+    const totalQty = getTotalQty(o);
+    const isBigOrder = totalQty >= 30;
+    const hasNote = o.note && o.note.trim() !== "";
+
+    return `
+      <div class="bg-white border rounded-xl p-4 mb-3">
+        <div class="font-bold">
+          ${getOrderDate(o) || "未填日期"}｜${o.delivery || ""}｜${o.name || ""}｜${o.phone || ""}
+        </div>
+
+        <div class="text-sm mt-1">
+          ${(o.items || []).map(i => `${i.name} x ${i.qty}`).join("、")}
+        </div>
+
+        <div class="mt-2 flex gap-2 flex-wrap">
+          ${
+            isBigOrder
+              ? `<span class="text-red-600 font-bold">🔴 大單 ${totalQty} 顆</span>`
+              : ""
+          }
+
+          ${
+            hasNote
+              ? `<span class="text-yellow-600 font-bold">🟡 ${o.note}</span>`
+              : ""
+          }
+        </div>
+      </div>
+    `;
+  };
 
   document.getElementById("adminPanel").innerHTML = `
-    <h2 class="text-2xl font-bold mb-4">今日待辦</h2>
+    <h2 class="text-2xl font-bold mb-4">出貨排程看板</h2>
+
     <div class="grid md:grid-cols-3 gap-4 mb-6">
+      <div class="bg-red-50 border border-red-300 p-4 rounded-xl">
+        <div class="text-lg font-bold">今日</div>
+        <div>${todayList.length} 筆</div>
+      </div>
 
-  <div class="bg-red-50 border border-red-300 p-4 rounded-xl">
-    <div class="text-lg font-bold">今日</div>
-    <div>${todayList.length} 筆</div>
-  </div>
+      <div class="bg-yellow-50 border border-yellow-300 p-4 rounded-xl">
+        <div class="text-lg font-bold">本週</div>
+        <div>${weekList.length} 筆</div>
+      </div>
 
-  <div class="bg-yellow-50 border border-yellow-300 p-4 rounded-xl">
-    <div class="text-lg font-bold">本週</div>
-    <div>${weekList.length} 筆</div>
-  </div>
+      <div class="bg-blue-50 border border-blue-300 p-4 rounded-xl">
+        <div class="text-lg font-bold">本月</div>
+        <div>${monthList.length} 筆</div>
+      </div>
+    </div>
 
-  <div class="bg-blue-50 border border-blue-300 p-4 rounded-xl">
-    <div class="text-lg font-bold">本月</div>
-    <div>${monthList.length} 筆</div>
-  </div>
+    <h3 class="text-xl font-bold mb-3">今日待辦</h3>
+    <div class="space-y-4 mb-8">
+      ${
+        todayList.length
+          ? todayList.map(o => orderCard(o)).join("")
+          : "今天沒有待辦"
+      }
+    </div>
 
-</div>
-    <div class="space-y-4">${
-  todayList.length
-    ? todayList.map(o => {
-        const totalQty = (o.items || []).reduce((sum, i) => sum + i.qty, 0);
-        const isBigOrder = totalQty >= 30;
-        const hasNote = o.note && o.note.trim() !== "";
+    <h3 class="text-xl font-bold mb-3">本週即將出貨 / 取貨</h3>
+    <div class="mb-8">
+      ${
+        weekPreview.length
+          ? weekPreview.map(o => simpleScheduleCard(o)).join("")
+          : "本週沒有排程"
+      }
+    </div>
 
-        return `
-          <div class="bg-white border rounded-xl p-4 mb-3">
-
-            ${
-              isBigOrder
-                ? `<div class="text-red-600 font-bold mb-2">🔴 大單 (${totalQty}顆)</div>`
-                : ""
-            }
-
-            ${
-              hasNote
-                ? `<div class="text-yellow-600 font-bold mb-2">🟡 特殊備註</div>`
-                : ""
-            }
-
-            ${orderCard(o)}
-          </div>
-        `;
-      }).join("")
-    : "今天沒有待辦"
-}
+    <h3 class="text-xl font-bold mb-3">本月大單 TOP 5</h3>
+    <div>
+      ${
+        bigOrders.length
+          ? bigOrders.map(o => simpleScheduleCard(o)).join("")
+          : "本月沒有大單"
+      }
+    </div>
   `;
 }
-
+  
 function renderShippingList() {  
 const startDate =
   document.getElementById("shipStart")?.value || "";
