@@ -67,10 +67,11 @@
   </div>
 
   <div id="adminContent" class="hidden">
-    <div class="flex flex-wrap gap-3 mb-6">
+        <div class="flex flex-wrap gap-3 mb-6">
       <button onclick="showAdminTab('orders')" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">訂單管理</button>
       <button onclick="showAdminTab('todo')" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">今日待辦</button>
       <button onclick="showAdminTab('paper')" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">紙本/電話訂單</button>
+      <button onclick="showAdminTab('project')" class="adminBtn bg-indigo-700 text-white px-4 py-2 rounded-xl">專案/特殊訂單</button>
       <button onclick="showAdminTab('expenses')" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">成本支出</button>
       <button onclick="showAdminTab('income')" class="adminBtn bg-green-700 text-white px-4 py-2 rounded-xl">現場收入</button>
       <button onclick="showAdminTab('stats')" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">營運統計</button>
@@ -751,6 +752,7 @@ function showAdminTab(tab) {
   if (tab === "orders") renderOrders();
   if (tab === "todo") renderTodo();
   if (tab === "paper") renderPaperOrder();
+  if (tab === "project") renderProjectOrder();
   if (tab === "expenses") renderExpenses();
   if (tab === "income") renderIncome();
   if (tab === "stats") renderStats();
@@ -1520,6 +1522,148 @@ async function savePaperOrder() {
   showAdminTab("orders");
 }
 
+function renderProjectOrder() {
+  document.getElementById("adminPanel").innerHTML = `
+    <h2 class="text-2xl font-bold mb-4">新增專案 / 特殊訂單</h2>
+
+    <div class="bg-indigo-50 border border-indigo-200 p-4 rounded-xl mb-5">
+      <div class="font-bold mb-2">適用情境</div>
+      <div class="text-sm text-gray-700">
+        蒟蒻粽試產、OEM訂單、DIY材料包、學校活動大量材料、客戶特殊客製案
+      </div>
+    </div>
+
+    <div class="bg-white p-5 rounded-2xl shadow">
+      <div class="grid md:grid-cols-2 gap-4 mb-4">
+        <input id="projectCustomer" class="border p-3 rounded-xl" placeholder="客戶名稱">
+        <input id="projectPhone" class="border p-3 rounded-xl" placeholder="電話">
+        <input id="projectName" class="border p-3 rounded-xl" placeholder="專案名稱，例如：蒟蒻粽試產 / OEM訂單">
+        <input id="projectDate" type="date" class="border p-3 rounded-xl">
+
+        <select id="projectDelivery" class="border p-3 rounded-xl">
+          <option value="自取">自取</option>
+          <option value="宅配">宅配</option>
+          <option value="有限外送">有限外送</option>
+        </select>
+
+        <input id="projectTotal" type="number" class="border p-3 rounded-xl" placeholder="預估總金額">
+        <input id="projectAddress" class="border p-3 rounded-xl md:col-span-2" placeholder="地址">
+      </div>
+
+      <div class="font-bold mb-2">專案品項</div>
+
+      <div class="grid md:grid-cols-5 gap-3 text-sm text-gray-600 mb-1">
+        <div>項目名稱</div>
+        <div>數量</div>
+        <div>單位</div>
+        <div>單價</div>
+        <div></div>
+      </div>
+
+      <div id="projectRows" class="space-y-3 mb-4"></div>
+
+      <button onclick="addProjectRow()" class="bg-indigo-600 text-white px-4 py-2 rounded-xl mb-4">
+        新增專案品項
+      </button>
+
+      <textarea id="projectNote" class="border p-3 rounded-xl w-full mb-4" placeholder="備註"></textarea>
+
+      <button onclick="saveProjectOrder()" class="bg-green-700 text-white px-6 py-3 rounded-xl font-bold">
+        儲存專案訂單
+      </button>
+    </div>
+  `;
+
+  addProjectRow("糯米", 200, "斤", "");
+  addProjectRow("蒟蒻米", 50, "公斤", "");
+  addProjectRow("桂竹葉", 800, "片", "");
+}
+
+function addProjectRow(name = "", qty = "", unit = "", price = "") {
+  const row = document.createElement("div");
+  row.className = "grid md:grid-cols-5 gap-3";
+
+  row.innerHTML = `
+    <input class="projectItemName border p-3 rounded-xl" placeholder="項目名稱" value="${name}">
+    <input class="projectQty border p-3 rounded-xl" type="number" min="0" placeholder="數量" value="${qty}">
+    <input class="projectUnit border p-3 rounded-xl" placeholder="單位，例如：斤 / 公斤 / 片 / 塊 / 條" value="${unit}">
+    <input class="projectPrice border p-3 rounded-xl" type="number" min="0" placeholder="單價" value="${price}">
+    <button onclick="this.parentElement.remove()" class="bg-red-600 text-white rounded-xl">刪除</button>
+  `;
+
+  document.getElementById("projectRows").appendChild(row);
+}
+
+async function saveProjectOrder() {
+  const name = document.getElementById("projectCustomer").value.trim();
+  const phone = document.getElementById("projectPhone").value.trim();
+  const projectName = document.getElementById("projectName").value.trim();
+  const date = document.getElementById("projectDate").value;
+  const delivery = document.getElementById("projectDelivery").value;
+  const address = document.getElementById("projectAddress").value.trim();
+  const estimatedTotal = Number(document.getElementById("projectTotal").value || 0);
+  const note = document.getElementById("projectNote").value.trim();
+
+  if (!name) return alert("請輸入客戶名稱");
+  if (!projectName) return alert("請輸入專案名稱");
+
+  const rows = [...document.querySelectorAll("#projectRows > div")];
+
+  const items = rows.map((row, index) => {
+    const itemName = row.querySelector(".projectItemName").value.trim();
+    const qty = Number(row.querySelector(".projectQty").value || 0);
+    const unit = row.querySelector(".projectUnit").value.trim();
+    const price = Number(row.querySelector(".projectPrice").value || 0);
+
+    return {
+      id: "project-" + Date.now() + "-" + index,
+      name: unit ? `${itemName}（${unit}）` : itemName,
+      raw_name: itemName,
+      qty,
+      unit,
+      price
+    };
+  }).filter(item => item.raw_name && item.qty > 0);
+
+  if (items.length === 0) return alert("請至少新增一個專案品項");
+
+  const itemTotal = items.reduce((sum, item) => {
+    return sum + Number(item.qty || 0) * Number(item.price || 0);
+  }, 0);
+
+  const total = estimatedTotal || itemTotal;
+  const projectNote = `專案名稱：${projectName}${note ? "\n" + note : ""}`;
+
+  const order = {
+    id: "PJ" + Date.now(),
+    time: new Date().toISOString(),
+    name,
+    phone,
+    address,
+    delivery,
+    pickup_date: delivery === "宅配" ? null : (date || null),
+    arrival_date: delivery === "宅配" ? (date || null) : null,
+    ship_date: delivery === "宅配" && date ? addDays(date, -3) : null,
+    note: projectNote,
+    items,
+    total,
+    status: "未完成",
+    type: "project"
+  };
+
+  const { error } = await db.from("orders").insert([order]);
+
+  if (error) {
+    alert("專案訂單新增失敗：" + error.message);
+    return;
+  }
+
+  alert("專案訂單已新增");
+
+  await refreshAdmin();
+  showAdminTab("orders");
+}
+  
 function renderExpenses() {
   document.getElementById("adminPanel").innerHTML = `
     <h2 class="text-2xl font-bold mb-4">成本支出紀錄</h2>
