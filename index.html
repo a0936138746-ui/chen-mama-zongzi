@@ -1346,42 +1346,57 @@ async function importEmailOrder() {
     return match ? match[1].trim() : "";
   };
 
+  const parseNumber = (value) => Number(String(value || "0").replace(/[^\d]/g, ""));
+
   const name = getMatch("訂購人姓名");
   const phone = getMatch("訂購人行動電話") || getMatch("訂購人聯絡電話");
   const address = getMatch("收件人地址") || getMatch("訂購人地址");
   const note = getMatch("其他說明");
   const totalText = getMatch("總金額");
-  const total = Number((totalText || "0").replace(/[^\d]/g, ""));
+  const total = parseNumber(totalText);
 
   const items = [];
 
   const lines = text
-  .split(/\n/)
-  .map(x => x.trim())
-  .filter(Boolean);
+    .split(/\n/)
+    .map(x => x.trim())
+    .filter(Boolean);
 
-for (let i = 0; i < lines.length; i++) {
-  const nameLine = lines[i];
-  const priceLine = lines[i + 1];
-  const qtyLine = lines[i + 2];
-  const subtotalLine = lines[i + 3];
+  for (let i = 0; i < lines.length; i++) {
+    const oneLineMatch = lines[i].match(/^(.+?)\s+(\d[\d,]*)\s+(\d[\d,]*)\s+(\d[\d,]*)$/);
 
-  if (
-    nameLine &&
-    /^\d+$/.test(priceLine || "") &&
-    /^\d+$/.test(qtyLine || "") &&
-    /^\d+$/.test(subtotalLine || "")
-  ) {
-    items.push({
-      id: "email-" + Date.now() + "-" + items.length,
-      name: nameLine,
-      price: Number(priceLine),
-      qty: Number(qtyLine)
-    });
+    if (oneLineMatch) {
+      items.push({
+        id: "email-" + Date.now() + "-" + items.length,
+        name: oneLineMatch[1].trim(),
+        price: parseNumber(oneLineMatch[2]),
+        qty: parseNumber(oneLineMatch[3])
+      });
 
-    i += 3;
+      continue;
+    }
+
+    const nameLine = lines[i];
+    const priceLine = lines[i + 1];
+    const qtyLine = lines[i + 2];
+    const subtotalLine = lines[i + 3];
+
+    if (
+      nameLine &&
+      /^\d[\d,]*$/.test(priceLine || "") &&
+      /^\d[\d,]*$/.test(qtyLine || "") &&
+      /^\d[\d,]*$/.test(subtotalLine || "")
+    ) {
+      items.push({
+        id: "email-" + Date.now() + "-" + items.length,
+        name: nameLine,
+        price: parseNumber(priceLine),
+        qty: parseNumber(qtyLine)
+      });
+
+      i += 3;
+    }
   }
-}
 
   if (!name || !phone) {
     alert("解析失敗：找不到姓名或電話");
