@@ -984,10 +984,26 @@ function renderOrders() {
     </div>
   `;
 }
+
 function orderCard(o) {
   const items = Array.isArray(o.items) ? o.items : [];
   const processDate = getProcessDate(o);
   const shipDate = getShipDate(o);
+  const isProject = o.type === "project";
+  const projectNameFromNote = (o.note || "").match(/專案名稱[:：]\s*([^\n]+)/)?.[1] || "";
+  const projectItemSummary = items
+    .map(i => i.raw_name || i.name || "")
+    .filter(Boolean)
+    .slice(0, 3)
+    .join("、");
+  const projectName = o.project_name || o.projectName || projectNameFromNote || projectItemSummary || "未填專案名稱";
+  const projectItemsHtml = items.map(i => {
+    const itemName = i.raw_name || i.name || "未命名項目";
+    const unit = i.unit ? ` ${i.unit}` : "";
+    return `<div>${itemName} x ${i.qty || 0}${unit}｜NT$ ${money(i.price || 0)}</div>`;
+  }).join("");
+  const normalItemsHtml = items.map(i => `<div>${i.name} x ${i.qty}｜NT$ ${money(i.price * i.qty)}</div>`).join("");
+
   return `
     <div class="
   ${
@@ -999,6 +1015,7 @@ function orderCard(o) {
   }
   p-5 rounded-2xl shadow border
 ">
+      ${isProject ? `<div class="mb-3 inline-block bg-indigo-100 text-indigo-700 border border-indigo-300 rounded-full px-3 py-1 text-sm font-bold">🧪 專案/特殊訂單</div>` : ""}
       ${renderOrderBadges(o)}
       <div class="flex justify-between flex-wrap gap-2">
         <div>
@@ -1009,6 +1026,7 @@ function orderCard(o) {
     ? `<div class="text-green-700 font-bold mb-2">✅ 已完成</div>`
     : `<div class="text-orange-600 font-bold mb-2">🕒 待處理</div>`
 }
+          ${isProject ? `<div class="font-bold text-lg text-indigo-700">${projectName}</div>` : ""}
           <div class="font-bold text-lg">${o.name || ""}｜${o.phone || ""}</div>
           <div class="text-sm text-gray-500">${new Date(o.time).toLocaleString("zh-TW")}</div>
           <div class="text-sm">方式：${o.delivery || ""}｜日期：${processDate || "未填"}</div>
@@ -1039,11 +1057,11 @@ function orderCard(o) {
         </div>
       </div>
       <div class="bg-amber-50 rounded-xl p-3 mt-3">
-        ${items.map(i => `<div>${i.name} x ${i.qty}｜NT$ ${money(i.price * i.qty)}</div>`).join("")}
+        ${isProject ? projectItemsHtml : normalItemsHtml}
       </div>
     </div>
   `;
-}
+}  
 
 async function updateOrderStatus(id, status) {
   const { error } = await db.from("orders").update({ status }).eq("id", id);
