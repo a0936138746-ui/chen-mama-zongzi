@@ -67,9 +67,9 @@
   </div>
 
   <div id="adminContent" class="hidden">
-        <div class="flex flex-wrap gap-3 mb-6">
+            <div class="flex flex-wrap gap-3 mb-6">
       <button onclick="showAdminTab('orders')" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">訂單管理</button>
-      <button onclick="showAdminTab('todo')" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">今日待辦</button>
+      <button onclick="showAdminTab('war')" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">作戰看板</button>
       <button onclick="showAdminTab('paper')" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">紙本/電話訂單</button>
       <button onclick="showAdminTab('project')" class="adminBtn bg-indigo-700 text-white px-4 py-2 rounded-xl">專案/特殊訂單</button>
       <button onclick="showAdminTab('expenses')" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">成本支出</button>
@@ -80,7 +80,6 @@
       <button onclick="renderEmailImport()" class="adminBtn bg-purple-700 text-white px-4 py-2 rounded-xl">匯入官網Email</button>
       <button onclick="renderProductAdmin()" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">商品管理</button>
     </div>
-
     <div id="adminPanel"></div>
   </div>
 </section>
@@ -750,7 +749,7 @@ async function loadIncome() {
 
 function showAdminTab(tab) {
   if (tab === "orders") renderOrders();
-  if (tab === "todo") renderTodo();
+  if (tab === "war") renderWarDashboard();
   if (tab === "paper") renderPaperOrder();
   if (tab === "project") renderProjectOrder();
   if (tab === "expenses") renderExpenses();
@@ -1073,134 +1072,208 @@ async function updateOrderStatus(id, status) {
   await refreshAdmin();
 }
 
-function renderTodo() {
-  const today = todayStr();
+function renderWarDashboard() {
+  const activeOrders = orders.filter(o => o.status !== "已取消");
+  const unfinishedOrders = activeOrders.filter(o => !isClosedOrder(o));
 
-  const now = new Date();
-
-  const weekLater = new Date();
-  weekLater.setDate(now.getDate() + 7);
-
-  const monthLater = new Date();
-  monthLater.setMonth(now.getMonth() + 1);
-
-  const activeOrders = orders.filter(o =>
-    o.status !== "已取消" &&
-    o.status !== "已取貨" &&
-    o.status !== "已宅配"
-  );
-
-  const getOrderDate = (o) =>
-    o.pickup_date || o.arrival_date || o.ship_date || "";
-
+  const getDashboardDate = (o) => getProcessDate(o) || o.ship_date || "";
   const getTotalQty = (o) =>
     (o.items || []).reduce((sum, i) => sum + Number(i.qty || 0), 0);
 
-  const todayList = activeOrders.filter(o => {
-    return getOrderDate(o) === today;
+  const todayList = unfinishedOrders.filter(o => daysFromToday(getDashboardDate(o)) === 0);
+  const tomorrowList = unfinishedOrders.filter(o => daysFromToday(getDashboardDate(o)) === 1);
+  const bigOrders = unfinishedOrders.filter(o => Number(o.total || 0) > 3000 || o.type === "project");
+
+  const duplicateGroups = Object.values(activeOrders.reduce((groups, o) => {
+    const phone = String(o.phone || "").trim();
+    const dates = [o.pickup_date, o.arrival_date, o.ship_date].filter(Boolean);
+
+    if (!phone || dates.length === 0) return groups;
+
+    dates.forEach(date => {
+      const key = `${phone}__${date}`;
+
+      if (!groups[key]) {
+        groups[key] = {
+          phone,
+          date,
+          orders: []
+        };
+      }
+
+      groups[key].orders.push(o);
+    });
+
+    return groups;
+  }, {})).filter(group => group.orders.length >= 2);
+
+  const pendingCloseList = unfinishedOrders.filter(o => {
+    const d = daysFromToday(getDashboardDate(o));
+    return d === null || d >= 0;
   });
 
-  const weekList = activeOrders.filter(o => {
-    const d = getOrderDate(o);
-    if (!d) return false;
+  const abnormalList = unfinishedOrders.filter(o => {
+    const processDays = daysFromToday(getProcessDate(o));
+    const shipDays = daysFromToday(getShipDate(o));
 
-    const orderDate = new Date(d);
-    return orderDate >= now && orderDate <= weekLater;
+    return (
+      (processDays !== null && processDays < 0) ||
+      (o.delivery === "宅配" && shipDays !== null && shipDays < 0)
+    );
   });
 
-  const monthList = activeOrders.filter(o => {
-    const d = getOrderDate(o);
-    if (!d) return false;
+  const sortByDashboardDate = (a, b) => {
+    const dateDiff = (getDashboardDate(a) || "9999-12-31")
+      .localeCompare(getDashboardDate(b) || "9999-12-31");
 
-    const orderDate = new Date(d);
-    return orderDate >= now && orderDate <= monthLater;
-  });
+    if (dateDiff !== 0) return dateDiff;
 
-  const weekPreview = weekList
-    .sort((a, b) => getOrderDate(a).localeCompare(getOrderDate(b)))
-    .slice(0, 8);
+    return String(b.time || "").localeCompare(String(a.time || ""));
+  };
 
-  const bigOrders = [...monthList]
-    .sort((a, b) => getTotalQty(b) - getTotalQty(a))
-    .slice(0, 5);
-
-  const simpleScheduleCard = (o) => {
+  const simpleDashboardCard = (o) => {
     const totalQty = getTotalQty(o);
-    const isBigOrder = totalQty >= 30;
-    const hasNote = o.note && o.note.trim() !== "";
+    const isProject = o.type === "project";
+    const projectNameFromNote =
+      (o.note || "").match(/專案名稱[:：]\s*([^\n]+)/)?.[1] || "";
+
+    const title = isProject
+      ? (o.project_name || o.projectName || projectNameFromNote || "專案/特殊訂單")
+      : `${o.name || ""}｜${o.phone || ""}`;
 
     return `
       <div class="bg-white border rounded-xl p-4 mb-3">
-        <div class="font-bold">
-          ${getOrderDate(o) || "未填日期"}｜${o.delivery || ""}｜${o.name || ""}｜${o.phone || ""}
+        <div class="font-bold ${isProject ? "text-indigo-700" : ""}">
+          ${isProject ? "🧪 " : ""}${title}
+        </div>
+
+        <div class="text-sm text-gray-600 mt-1">
+          ${getDashboardDate(o) || "未填日期"}｜${o.delivery || ""}｜${o.name || ""}｜${o.phone || ""}
         </div>
 
         <div class="text-sm mt-1">
-          ${(o.items || []).map(i => `${i.name} x ${i.qty}`).join("、")}
+          ${(o.items || [])
+            .map(i => `${i.raw_name || i.name} x ${i.qty}${i.unit ? " " + i.unit : ""}`)
+            .join("、")}
         </div>
 
-        <div class="mt-2 flex gap-2 flex-wrap">
-          ${
-            isBigOrder
-              ? `<span class="text-red-600 font-bold">🔴 大單 ${totalQty} 顆</span>`
-              : ""
-          }
-
-          ${
-            hasNote
-              ? `<span class="text-yellow-600 font-bold">🟡 ${o.note}</span>`
-              : ""
-          }
+        <div class="mt-2 flex gap-2 flex-wrap text-sm font-bold">
+          ${Number(o.total || 0) > 3000 ? `<span class="text-red-600">🔥 NT$ ${money(o.total)}</span>` : ""}
+          ${totalQty ? `<span class="text-amber-700">數量 ${totalQty}</span>` : ""}
+          ${o.note ? `<span class="text-purple-700">📝 特殊備註</span>` : ""}
         </div>
       </div>
     `;
   };
 
-  document.getElementById("adminPanel").innerHTML = `
-    <h2 class="text-2xl font-bold mb-4">出貨排程看板</h2>
-
-    <div class="grid md:grid-cols-3 gap-4 mb-6">
-      <div class="bg-red-50 border border-red-300 p-4 rounded-xl">
-        <div class="text-lg font-bold">今日</div>
-        <div>${todayList.length} 筆</div>
+  const renderSection = (title, list, emptyText, options = {}) => `
+    <section class="bg-white rounded-2xl shadow p-5">
+      <div class="flex justify-between items-center mb-3">
+        <h3 class="text-xl font-bold">${title}</h3>
+        <span class="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-sm font-bold">
+          ${list.length} 筆
+        </span>
       </div>
 
-      <div class="bg-yellow-50 border border-yellow-300 p-4 rounded-xl">
-        <div class="text-lg font-bold">本週</div>
-        <div>${weekList.length} 筆</div>
+      <div>
+        ${
+          list.length
+            ? list
+                .sort(options.sort || sortByDashboardDate)
+                .map(options.compact ? simpleDashboardCard : orderCard)
+                .join("")
+            : `<div class="bg-gray-50 p-4 rounded-xl text-gray-500">${emptyText}</div>`
+        }
+      </div>
+    </section>
+  `;
+
+  const renderDuplicateSection = () => `
+    <section class="bg-white rounded-2xl shadow p-5">
+      <div class="flex justify-between items-center mb-3">
+        <h3 class="text-xl font-bold">疑似重複訂單</h3>
+        <span class="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-bold">
+          ${duplicateGroups.length} 組
+        </span>
+      </div>
+
+      <div>
+        ${
+          duplicateGroups.length
+            ? duplicateGroups
+                .sort((a, b) =>
+                  a.date.localeCompare(b.date) ||
+                  a.phone.localeCompare(b.phone)
+                )
+                .map(group => {
+                  const names = [...new Set(
+                    group.orders.map(o => o.name || "未填姓名")
+                  )].join("、");
+
+                  const totalAmount = group.orders.reduce((sum, o) => {
+                    return sum + Number(o.total || 0);
+                  }, 0);
+
+                  return `
+                    <div class="bg-red-50 border border-red-200 rounded-xl p-4 mb-3">
+                      <div class="font-bold text-red-700">🚨 疑似重複訂單</div>
+                      <div class="text-sm mt-1">姓名：${names}</div>
+                      <div class="text-sm">電話：${group.phone}</div>
+                      <div class="text-sm">日期：${group.date}</div>
+                      <div class="text-sm">金額：NT$ ${money(totalAmount)}</div>
+                      <div class="text-sm font-bold">訂單數量：${group.orders.length} 筆</div>
+                    </div>
+                  `;
+                })
+                .join("")
+            : `<div class="bg-gray-50 p-4 rounded-xl text-gray-500">目前沒有疑似重複訂單</div>`
+        }
+      </div>
+    </section>
+  `;
+
+  document.getElementById("adminPanel").innerHTML = `
+    <h2 class="text-2xl font-bold mb-4">作戰看板</h2>
+
+    <div class="grid md:grid-cols-5 gap-4 mb-6">
+      <div class="bg-red-50 border border-red-300 p-4 rounded-xl">
+        <div class="font-bold">今日必做</div>
+        <div class="text-2xl font-bold text-red-700">${todayList.length}</div>
+      </div>
+
+      <div class="bg-orange-50 border border-orange-300 p-4 rounded-xl">
+        <div class="font-bold">明日預備</div>
+        <div class="text-2xl font-bold text-orange-700">${tomorrowList.length}</div>
+      </div>
+
+      <div class="bg-amber-50 border border-amber-300 p-4 rounded-xl">
+        <div class="font-bold">大單雷達</div>
+        <div class="text-2xl font-bold text-amber-700">${bigOrders.length}</div>
       </div>
 
       <div class="bg-blue-50 border border-blue-300 p-4 rounded-xl">
-        <div class="text-lg font-bold">本月</div>
-        <div>${monthList.length} 筆</div>
+        <div class="font-bold">待結案</div>
+        <div class="text-2xl font-bold text-blue-700">${pendingCloseList.length}</div>
+      </div>
+
+      <div class="bg-rose-50 border border-rose-300 p-4 rounded-xl">
+        <div class="font-bold">異常警報</div>
+        <div class="text-2xl font-bold text-rose-700">${abnormalList.length}</div>
       </div>
     </div>
 
-    <h3 class="text-xl font-bold mb-3">今日待辦</h3>
-    <div class="space-y-4 mb-8">
-      ${
-        todayList.length
-          ? todayList.map(o => orderCard(o)).join("")
-          : "今天沒有待辦"
-      }
-    </div>
-
-    <h3 class="text-xl font-bold mb-3">本週即將出貨 / 取貨</h3>
-    <div class="mb-8">
-      ${
-        weekPreview.length
-          ? weekPreview.map(o => simpleScheduleCard(o)).join("")
-          : "本週沒有排程"
-      }
-    </div>
-
-    <h3 class="text-xl font-bold mb-3">本月大單 TOP 5</h3>
-    <div>
-      ${
-        bigOrders.length
-          ? bigOrders.map(o => simpleScheduleCard(o)).join("")
-          : "本月沒有大單"
-      }
+    <div class="space-y-6">
+      ${renderSection("今日必做", todayList, "今天沒有必做訂單")}
+      ${renderSection("明日預備", tomorrowList, "明天沒有預備訂單")}
+      ${renderSection("大單雷達", bigOrders, "目前沒有大單或專案訂單", {
+        compact: true,
+        sort: (a, b) => Number(b.total || 0) - Number(a.total || 0)
+      })}
+      ${renderSection("待結案", pendingCloseList, "目前沒有待結案訂單", {
+        compact: true
+      })}
+      ${renderSection("異常警報", abnormalList, "目前沒有異常訂單")}
+      ${renderDuplicateSection()}
     </div>
   `;
 }
