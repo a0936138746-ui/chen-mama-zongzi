@@ -712,6 +712,7 @@ async function submitOrder() {
 async function loadAdminData() {
   await loadOrders();
   await loadExpenses();
+  await loadIncome();
   await loadProducts();
   showAdminTab("orders");
 }
@@ -2567,34 +2568,288 @@ async function editExpense(id) {
   renderExpenses();
 }
   
+function getDateFromTime(value) {
+  if (!value) return "";
+  return String(value).slice(0, 10);
+}
+
+function isDateInRange(date, startDate, endDate) {
+  if (!date) return false;
+  if (startDate && date < startDate) return false;
+  if (endDate && date > endDate) return false;
+  return true;
+}
+
+function getWeekRange() {
+  const today = parseDateOnly(todayStr());
+  const day = today.getDay() || 7;
+  const start = new Date(today);
+  start.setDate(today.getDate() - day + 1);
+
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+
+  return {
+    start: formatDateOnly(start),
+    end: formatDateOnly(end)
+  };
+}
+
+function setStatsRange(type) {
+  const startInput = document.getElementById("statsStart");
+  const endInput = document.getElementById("statsEnd");
+  if (!startInput || !endInput) return;
+
+  if (type === "today") {
+    startInput.value = todayStr();
+    endInput.value = todayStr();
+  }
+
+  if (type === "week") {
+    const range = getWeekRange();
+    startInput.value = range.start;
+    endInput.value = range.end;
+  }
+
+  if (type === "month") {
+    const today = todayStr();
+    startInput.value = today.slice(0, 8) + "01";
+    endInput.value = today;
+  }
+
+  if (type === "all") {
+    startInput.value = "";
+    endInput.value = "";
+  }
+
+  renderStats();
+}
+
+function groupSum(list, getKey, getAmount) {
+  return Object.values(list.reduce((groups, item) => {
+    const key = getKey(item) || "未分類";
+
+    if (!groups[key]) {
+      groups[key] = {
+        key,
+        count: 0,
+        amount: 0
+      };
+    }
+
+    groups[key].count += 1;
+    groups[key].amount += Number(getAmount(item) || 0);
+
+    return groups;
+  }, {})).sort((a, b) => b.amount - a.amount);
+}
+
+function renderMiniTable(rows, emptyText) {
+  if (!rows.length) {
+    return `<div class="text-gray-500 bg-gray-50 rounded-xl p-4">${emptyText}</div>`;
+  }
+
+  return `
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <tbody>
+          ${rows.join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
 function renderStats() {
-  const activeOrders = orders.filter(o => o.status !== "已取消");
-  const revenue = activeOrders.reduce((s, o) => s + Number(o.total || 0), 0);
-  const expenseTotal = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
+  const startDate = document.getElementById("statsStart")?.value || "";
+  const endDate = document.getElementById("statsEnd")?.value || "";
+
+  const filteredOrders = orders.filter(o => {
+    return isDateInRange(getDateFromTime(o.time), startDate, endDate);
+  });
+
+  const filteredExpenses = expenses.filter(e => {
+    return isDateInRange(e.date || getDateFromTime(e.created_at), startDate, endDate);
+  });
+
+  const filteredIncomes = incomes.filter(i => {
+    return isDateInRange(i.date || getDateFromTime(i.created_at), startDate, endDate);
+  });
+
+  const activeOrders = filteredOrders.filter(o => o.status !== "已取消");
+  const orderRevenue = activeOrders.reduce((s, o) => s + Number(o.total || 0), 0);
+  const onsiteRevenue = filteredIncomes.reduce((s, i) => s + Number(i.amount || 0), 0);
+  const revenue = orderRevenue + onsiteRevenue;
+  const expenseTotal = filteredExpenses.reduce((s, e) => s + Number(e.amount || 0), 0);
   const profit = revenue - expenseTotal;
+  const profitRate = revenue > 0 ? Math.round((profit / revenue) * 1000) / 10 : 0;
+
+  const unfinishedOrders = orders.filter(o => !isClosedOrder(o));
+  const todayPressure = unfinishedOrders.filter(o => daysFromToday(getProcessDate(o)) === 0).length;
+  const tomorrowPressure = unfinishedOrders.filter(o => daysFromToday(getProcessDate(o)) === 1).length;
+  const threeDayPressure = unfinishedOrders.filter(o => {
+    const diff = daysFromToday(getProcessDate(o));
+    return diff !== null && diff > 1 && diff <= 3;
+  }).length;
+  const overduePressure = unfinishedOrders.filter(o => {
+    const diff = daysFromToday(getProcessDate(o));
+    return diff !== null && diff < 0;
+  }).length;
+  const shipToday = unfinishedOrders.filter(o => o.delivery === "宅配" && daysFromToday(getShipDate(o)) === 0).length;
+  const shipOverdue = unfinishedOrders.filter(o => o.delivery === "宅配" && daysFromToday(getShipDate(o)) < 0).length;
+
+  const productMap = activeOrders.reduce((map, order) => {
+    (order.items || []).forEach(item => {
+      const name = item.raw_name || item.name || "未命名商品";
+      const qty = Number(item.qty || 0);
+      const amount = Number(item.price || 0) * qty;
+
+      if (!map[name]) {
+        map[name] = {
+          name,
+          qty: 0,
+          amount: 0
+        };
+      }
+
+      map[name].qty += qty;
+      map[name].amount += amount;
+    });
+
+    return map;
+  }, {});
+
+  const productRank = Object.values(productMap)
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, 10);
+
+  const expenseGroups = groupSum(
+    filteredExpenses,
+    e => e.category || "未分類",
+    e => e.amount
+  );
+
+  const incomeSourceGroups = groupSum(
+    activeOrders,
+    o => {
+      if (o.type === "web") return "官網 Email";
+      if (o.type === "paper") return "紙本/電話";
+      if (o.type === "project") return "專案/特殊訂單";
+      return "前台訂單";
+    },
+    o => o.total
+  );
+
+  if (onsiteRevenue > 0) {
+    incomeSourceGroups.push({
+      key: "現場收入",
+      count: filteredIncomes.length,
+      amount: onsiteRevenue
+    });
+  }
+
+  const card = (label, value, color, hint = "") => `
+    <div class="${color} p-5 rounded-2xl shadow">
+      <div class="text-gray-600">${label}</div>
+      <div class="text-3xl font-bold mt-2">${value}</div>
+      ${hint ? `<div class="text-sm text-gray-500 mt-2">${hint}</div>` : ""}
+    </div>
+  `;
+
+  const statPill = (label, value, color) => `
+    <div class="${color} border p-4 rounded-xl">
+      <div class="text-sm text-gray-600">${label}</div>
+      <div class="text-2xl font-bold mt-1">${value}</div>
+    </div>
+  `;
 
   document.getElementById("adminPanel").innerHTML = `
     <h2 class="text-2xl font-bold mb-4">營運統計</h2>
-    <div class="grid md:grid-cols-3 gap-4">
-      <div class="bg-green-50 p-6 rounded-2xl shadow">
-        <div class="text-gray-600">總營收</div>
-        <div class="text-3xl font-bold text-green-700">NT$ ${money(revenue)}</div>
+
+    <div class="bg-white rounded-2xl shadow p-5 mb-6">
+      <div class="flex flex-wrap gap-2 mb-4">
+        <button onclick="setStatsRange('today')" class="bg-amber-700 text-white px-4 py-2 rounded-xl">今日</button>
+        <button onclick="setStatsRange('week')" class="bg-amber-700 text-white px-4 py-2 rounded-xl">本週</button>
+        <button onclick="setStatsRange('month')" class="bg-amber-700 text-white px-4 py-2 rounded-xl">本月</button>
+        <button onclick="setStatsRange('all')" class="bg-gray-700 text-white px-4 py-2 rounded-xl">全部</button>
       </div>
-      <div class="bg-red-50 p-6 rounded-2xl shadow">
-        <div class="text-gray-600">總支出</div>
-        <div class="text-3xl font-bold text-red-700">NT$ ${money(expenseTotal)}</div>
-      </div>
-      <div class="bg-amber-50 p-6 rounded-2xl shadow">
-        <div class="text-gray-600">粗估淨利</div>
-        <div class="text-3xl font-bold text-amber-700">NT$ ${money(profit)}</div>
+
+      <div class="grid md:grid-cols-4 gap-3">
+        <input id="statsStart" type="date" class="border p-3 rounded-xl" value="${startDate}" onchange="renderStats()">
+        <input id="statsEnd" type="date" class="border p-3 rounded-xl" value="${endDate}" onchange="renderStats()">
+        <div class="md:col-span-2 text-sm text-gray-500 flex items-center">
+          金額、訂單狀態、商品排行、收支分類會依日期篩選；出貨壓力永遠看目前未完成訂單。
+        </div>
       </div>
     </div>
 
-    <div class="mt-6 bg-white p-5 rounded-2xl shadow">
-      <h3 class="font-bold mb-3">訂單狀態</h3>
-      <div>未完成：${orders.filter(o => o.status === "未完成").length} 筆</div>
-      <div>已完成：${orders.filter(o => o.status === "已取貨" || o.status === "已宅配").length} 筆</div>
-      <div>已取消：${orders.filter(o => o.status === "已取消").length} 筆</div>
+    <div class="grid md:grid-cols-6 gap-4 mb-6">
+      ${card("總營收", `NT$ ${money(revenue)}`, "bg-green-50 text-green-700", `訂單 ${money(orderRevenue)}｜現場 ${money(onsiteRevenue)}`)}
+      ${card("訂單營收", `NT$ ${money(orderRevenue)}`, "bg-emerald-50 text-emerald-700")}
+      ${card("現場收入", `NT$ ${money(onsiteRevenue)}`, "bg-blue-50 text-blue-700")}
+      ${card("總支出", `NT$ ${money(expenseTotal)}`, "bg-red-50 text-red-700")}
+      ${card("粗估淨利", `NT$ ${money(profit)}`, "bg-amber-50 text-amber-700")}
+      ${card("淨利率", `${profitRate}%`, "bg-purple-50 text-purple-700")}
+    </div>
+
+    <div class="grid md:grid-cols-6 gap-4 mb-6">
+      ${statPill("未完成", filteredOrders.filter(o => o.status === "未完成").length, "bg-orange-50 border-orange-200 text-orange-700")}
+      ${statPill("已取貨", filteredOrders.filter(o => o.status === "已取貨").length, "bg-green-50 border-green-200 text-green-700")}
+      ${statPill("已宅配", filteredOrders.filter(o => o.status === "已宅配").length, "bg-blue-50 border-blue-200 text-blue-700")}
+      ${statPill("已取消", filteredOrders.filter(o => o.status === "已取消").length, "bg-gray-50 border-gray-200 text-gray-700")}
+      ${statPill("宅配待寄", unfinishedOrders.filter(o => o.delivery === "宅配").length, "bg-sky-50 border-sky-200 text-sky-700")}
+      ${statPill("自取待取", unfinishedOrders.filter(o => o.delivery === "自取").length, "bg-lime-50 border-lime-200 text-lime-700")}
+    </div>
+
+    <div class="grid md:grid-cols-6 gap-4 mb-6">
+      ${statPill("今日需處理", todayPressure, "bg-red-50 border-red-200 text-red-700")}
+      ${statPill("明日需處理", tomorrowPressure, "bg-orange-50 border-orange-200 text-orange-700")}
+      ${statPill("三天內", threeDayPressure, "bg-yellow-50 border-yellow-200 text-yellow-700")}
+      ${statPill("已逾期", overduePressure, "bg-rose-50 border-rose-200 text-rose-700")}
+      ${statPill("今天應寄出", shipToday, "bg-blue-50 border-blue-200 text-blue-700")}
+      ${statPill("超過寄出日", shipOverdue, "bg-red-50 border-red-200 text-red-700")}
+    </div>
+
+    <div class="grid lg:grid-cols-3 gap-6">
+      <section class="bg-white rounded-2xl shadow p-5">
+        <h3 class="text-xl font-bold mb-4">商品銷售排行</h3>
+        ${renderMiniTable(
+          productRank.map((p, index) => `
+            <tr class="border-b">
+              <td class="py-2 pr-2 font-bold">${index + 1}</td>
+              <td class="py-2">${p.name}<div class="text-xs text-gray-500">數量 ${p.qty}</div></td>
+              <td class="py-2 text-right font-bold">NT$ ${money(p.amount)}</td>
+            </tr>
+          `),
+          "目前沒有商品銷售資料"
+        )}
+      </section>
+
+      <section class="bg-white rounded-2xl shadow p-5">
+        <h3 class="text-xl font-bold mb-4">支出分類</h3>
+        ${renderMiniTable(
+          expenseGroups.map(g => `
+            <tr class="border-b">
+              <td class="py-2">${g.key}<div class="text-xs text-gray-500">${g.count} 筆</div></td>
+              <td class="py-2 text-right font-bold text-red-700">NT$ ${money(g.amount)}</td>
+            </tr>
+          `),
+          "目前沒有支出資料"
+        )}
+      </section>
+
+      <section class="bg-white rounded-2xl shadow p-5">
+        <h3 class="text-xl font-bold mb-4">收入來源</h3>
+        ${renderMiniTable(
+          incomeSourceGroups.sort((a, b) => b.amount - a.amount).map(g => `
+            <tr class="border-b">
+              <td class="py-2">${g.key}<div class="text-xs text-gray-500">${g.count} 筆</div></td>
+              <td class="py-2 text-right font-bold text-green-700">NT$ ${money(g.amount)}</td>
+            </tr>
+          `),
+          "目前沒有收入資料"
+        )}
+      </section>
     </div>
   `;
 }
