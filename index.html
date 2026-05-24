@@ -938,6 +938,7 @@ function getOrderSortDate(o) {
 
 function renderOrders() {
   const keyword = document.getElementById("orderSearch")?.value?.trim() || "";
+  const paymentFilter = document.getElementById("orderPaymentFilter")?.value || "";
 
   const filteredOrders = orders
     .filter(o => {
@@ -947,7 +948,13 @@ function renderOrders() {
         ${o.id || ""}
       `.toLowerCase();
 
-      return searchText.includes(keyword.toLowerCase());
+      const matchKeyword = searchText.includes(keyword.toLowerCase());
+      const matchPayment =
+        !paymentFilter ||
+        (paymentFilter === "未結清" && getUnpaidAmount(o) > 0) ||
+        getPaymentStatus(o) === paymentFilter;
+
+      return matchKeyword && matchPayment;
     })
     .sort((a, b) => {
       const rankDiff = getOrderSortRank(a) - getOrderSortRank(b);
@@ -972,6 +979,17 @@ function renderOrders() {
         value="${keyword}"
         oninput="renderOrders()"
       >
+
+      <select
+        id="orderPaymentFilter"
+        class="border p-3 rounded-xl"
+        onchange="renderOrders()">
+        ${["","未結清","未收款","訂金","已收款","退款"].map(s => `
+          <option value="${s}" ${paymentFilter === s ? "selected" : ""}>
+            ${s || "付款篩選"}
+          </option>
+        `).join("")}
+      </select>
 
       <button
         onclick="refreshAdmin()"
@@ -2791,6 +2809,25 @@ function renderStats() {
   const unpaidTotal = activeOrders.reduce((s, o) => s + getUnpaidAmount(o), 0);
   const unpaidOrders = activeOrders.filter(o => getUnpaidAmount(o) > 0);
   const completedUnpaidOrders = unpaidOrders.filter(o => o.status === "已取貨" || o.status === "已宅配");
+  const unpaidTrackingRows = unpaidOrders
+    .slice()
+    .sort((a, b) => {
+      const completedRankA = (a.status === "已取貨" || a.status === "已宅配") ? 0 : 1;
+      const completedRankB = (b.status === "已取貨" || b.status === "已宅配") ? 0 : 1;
+      if (completedRankA !== completedRankB) return completedRankA - completedRankB;
+
+      const urgentA = daysFromToday(getProcessDate(a));
+      const urgentB = daysFromToday(getProcessDate(b));
+      const urgentRankA = urgentA !== null && urgentA <= 0 ? 0 : 1;
+      const urgentRankB = urgentB !== null && urgentB <= 0 ? 0 : 1;
+      if (urgentRankA !== urgentRankB) return urgentRankA - urgentRankB;
+
+      const amountDiff = getUnpaidAmount(b) - getUnpaidAmount(a);
+      if (amountDiff !== 0) return amountDiff;
+
+      return (getProcessDate(a) || "9999-12-31").localeCompare(getProcessDate(b) || "9999-12-31");
+    })
+    .slice(0, 20);
 
   const unfinishedOrders = orders.filter(o => !isClosedOrder(o));
   const todayPressure = unfinishedOrders.filter(o => daysFromToday(getProcessDate(o)) === 0).length;
@@ -2925,6 +2962,45 @@ function renderStats() {
       ${statPill("今天應寄出", shipToday, "bg-blue-50 border-blue-200 text-blue-700")}
       ${statPill("超過寄出日", shipOverdue, "bg-red-50 border-red-200 text-red-700")}
     </div>
+
+    <section class="bg-white rounded-2xl shadow p-5 mb-6">
+      <div class="flex justify-between items-center flex-wrap gap-3 mb-4">
+        <h3 class="text-xl font-bold">未收款追蹤</h3>
+        <button onclick="showAdminTab('orders'); setTimeout(() => { const f = document.getElementById('orderPaymentFilter'); if (f) { f.value = '未結清'; renderOrders(); } }, 0)"
+          class="bg-red-600 text-white px-4 py-2 rounded-xl">
+          到訂單管理看未結清
+        </button>
+      </div>
+
+      ${renderMiniTable(
+        unpaidTrackingRows.map(o => `
+          <tr class="border-b align-top">
+            <td class="py-3 pr-3">
+              <div class="font-bold">${o.name || "未填姓名"}</div>
+              <div class="text-xs text-gray-500">${o.phone || ""}</div>
+              <div class="text-xs text-gray-500">${o.id || ""}</div>
+            </td>
+            <td class="py-3 pr-3">
+              <div>${getProcessDate(o) || "未填日期"}</div>
+              <div class="text-xs text-gray-500">${o.delivery || ""}｜${o.status || ""}</div>
+            </td>
+            <td class="py-3 pr-3">
+              <div class="font-bold">${getPaymentStatus(o)}</div>
+              <div class="text-xs text-gray-500">${o.payment_method || "未填付款方式"}</div>
+            </td>
+            <td class="py-3 text-right">
+              <div>總額 NT$ ${money(o.total)}</div>
+              <div class="text-green-700">已收 NT$ ${money(getPaidAmount(o))}</div>
+              <div class="font-bold text-red-700">未收 NT$ ${money(getUnpaidAmount(o))}</div>
+            </td>
+            <td class="py-3 pl-3 text-sm text-gray-600">
+              ${o.payment_note || o.note || ""}
+            </td>
+          </tr>
+        `),
+        "目前沒有未結清訂單"
+      )}
+    </section>
 
     <div class="grid lg:grid-cols-3 gap-6">
       <section class="bg-white rounded-2xl shadow p-5">
