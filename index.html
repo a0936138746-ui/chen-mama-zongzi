@@ -2808,6 +2808,7 @@ function getPaymentBadgeClass(o) {
 function renderStats() {
   const startDate = document.getElementById("statsStart")?.value || "";
   const endDate = document.getElementById("statsEnd")?.value || "";
+  const selectedDetail = window.statsDetailKey || "unfinished";
 
   const filteredOrders = orders.filter(o => {
     return isDateInRange(getDateFromTime(o.time), startDate, endDate);
@@ -2854,18 +2855,24 @@ function renderStats() {
     .slice(0, 20);
 
   const unfinishedOrders = orders.filter(o => !isClosedOrder(o));
-  const todayPressure = unfinishedOrders.filter(o => daysFromToday(getProcessDate(o)) === 0).length;
-  const tomorrowPressure = unfinishedOrders.filter(o => daysFromToday(getProcessDate(o)) === 1).length;
-  const threeDayPressure = unfinishedOrders.filter(o => {
+  const todayPressureOrders = unfinishedOrders.filter(o => daysFromToday(getProcessDate(o)) === 0);
+  const tomorrowPressureOrders = unfinishedOrders.filter(o => daysFromToday(getProcessDate(o)) === 1);
+  const threeDayPressureOrders = unfinishedOrders.filter(o => {
     const diff = daysFromToday(getProcessDate(o));
     return diff !== null && diff > 1 && diff <= 3;
-  }).length;
-  const overduePressure = unfinishedOrders.filter(o => {
+  });
+  const overduePressureOrders = unfinishedOrders.filter(o => {
     const diff = daysFromToday(getProcessDate(o));
     return diff !== null && diff < 0;
-  }).length;
-  const shipToday = unfinishedOrders.filter(o => o.delivery === "宅配" && daysFromToday(getShipDate(o)) === 0).length;
-  const shipOverdue = unfinishedOrders.filter(o => o.delivery === "宅配" && daysFromToday(getShipDate(o)) < 0).length;
+  });
+  const shipTodayOrders = unfinishedOrders.filter(o => o.delivery === "宅配" && daysFromToday(getShipDate(o)) === 0);
+  const shipOverdueOrders = unfinishedOrders.filter(o => o.delivery === "宅配" && daysFromToday(getShipDate(o)) < 0);
+  const todayPressure = todayPressureOrders.length;
+  const tomorrowPressure = tomorrowPressureOrders.length;
+  const threeDayPressure = threeDayPressureOrders.length;
+  const overduePressure = overduePressureOrders.length;
+  const shipToday = shipTodayOrders.length;
+  const shipOverdue = shipOverdueOrders.length;
 
   const productMap = activeOrders.reduce((map, order) => {
     (order.items || []).forEach(item => {
@@ -2925,12 +2932,110 @@ function renderStats() {
     </div>
   `;
 
-  const statPill = (label, value, color) => `
-    <div class="${color} border p-4 rounded-xl">
+  const detailGroups = {
+    unfinished: {
+      title: "未完成訂單",
+      rows: filteredOrders.filter(o => o.status === "未完成")
+    },
+    picked: {
+      title: "已取貨訂單",
+      rows: filteredOrders.filter(o => o.status === "已取貨")
+    },
+    delivered: {
+      title: "已宅配訂單",
+      rows: filteredOrders.filter(o => o.status === "已宅配")
+    },
+    canceled: {
+      title: "已取消訂單",
+      rows: filteredOrders.filter(o => o.status === "已取消")
+    },
+    shipping: {
+      title: "宅配待寄",
+      rows: unfinishedOrders.filter(o => o.delivery === "宅配")
+    },
+    pickup: {
+      title: "自取待取",
+      rows: unfinishedOrders.filter(o => o.delivery === "自取")
+    },
+    today: {
+      title: "今日需處理",
+      rows: todayPressureOrders
+    },
+    tomorrow: {
+      title: "明日需處理",
+      rows: tomorrowPressureOrders
+    },
+    threeDays: {
+      title: "三天內需處理",
+      rows: threeDayPressureOrders
+    },
+    overdue: {
+      title: "已逾期",
+      rows: overduePressureOrders
+    },
+    shipToday: {
+      title: "今天應寄出",
+      rows: shipTodayOrders
+    },
+    shipOverdue: {
+      title: "超過寄出日",
+      rows: shipOverdueOrders
+    }
+  };
+
+  const selectedGroup = detailGroups[selectedDetail] || detailGroups.unfinished;
+  const detailRows = selectedGroup.rows
+    .slice()
+    .sort((a, b) => {
+      const rankDiff = getOrderSortRank(a) - getOrderSortRank(b);
+      if (rankDiff !== 0) return rankDiff;
+
+      const dateDiff = getOrderSortDate(a).localeCompare(getOrderSortDate(b));
+      if (dateDiff !== 0) return dateDiff;
+
+      return String(b.time || "").localeCompare(String(a.time || ""));
+    });
+
+  const statPill = (label, value, color, detailKey = "") => `
+    <button
+      type="button"
+      ${detailKey ? `onclick="showStatsDetail('${detailKey}')"` : ""}
+      class="${color} border p-4 rounded-xl text-left w-full transition hover:shadow-md hover:-translate-y-0.5 ${
+        detailKey && selectedDetail === detailKey ? "ring-4 ring-amber-300" : ""
+      }">
       <div class="text-sm text-gray-600">${label}</div>
       <div class="text-2xl font-bold mt-1">${value}</div>
-    </div>
+      ${detailKey ? `<div class="text-xs text-gray-500 mt-2">點一下看明細</div>` : ""}
+    </button>
   `;
+
+  const orderDetailRows = detailRows.map(o => {
+    const itemText = (o.items || [])
+      .map(i => `${i.raw_name || i.name || "未命名商品"} x ${i.qty || 0}${i.unit ? " " + i.unit : ""}`)
+      .join("、");
+    const unpaid = getUnpaidAmount(o);
+
+    return `
+      <tr class="border-b align-top">
+        <td class="py-3 pr-3">
+          <div class="font-bold">${o.name || "未填姓名"}</div>
+          <div class="text-xs text-gray-500">${o.phone || ""}</div>
+          <div class="text-xs text-gray-500">${o.id || ""}</div>
+        </td>
+        <td class="py-3 pr-3">
+          <div class="font-bold">${getProcessDate(o) || "未填日期"}</div>
+          <div class="text-xs text-gray-500">${o.delivery || ""}｜${o.status || ""}</div>
+          ${o.delivery === "宅配" ? `<div class="text-xs text-blue-700">寄出日：${getShipDate(o) || "未填"}</div>` : ""}
+        </td>
+        <td class="py-3 pr-3">
+          <div class="font-bold ${unpaid > 0 ? "text-red-700" : "text-green-700"}">${getPaymentStatus(o)}</div>
+          <div class="text-xs text-gray-500">未收 NT$ ${money(unpaid)}</div>
+        </td>
+        <td class="py-3 pr-3 text-sm">${itemText || "沒有商品明細"}</td>
+        <td class="py-3 text-sm text-gray-600">${o.note || o.payment_note || ""}</td>
+      </tr>
+    `;
+  });
 
   document.getElementById("adminPanel").innerHTML = `
     <h2 class="text-2xl font-bold mb-4">營運統計</h2>
@@ -2970,22 +3075,36 @@ function renderStats() {
     </div>
 
     <div class="grid md:grid-cols-6 gap-4 mb-6">
-      ${statPill("未完成", filteredOrders.filter(o => o.status === "未完成").length, "bg-orange-50 border-orange-200 text-orange-700")}
-      ${statPill("已取貨", filteredOrders.filter(o => o.status === "已取貨").length, "bg-green-50 border-green-200 text-green-700")}
-      ${statPill("已宅配", filteredOrders.filter(o => o.status === "已宅配").length, "bg-blue-50 border-blue-200 text-blue-700")}
-      ${statPill("已取消", filteredOrders.filter(o => o.status === "已取消").length, "bg-gray-50 border-gray-200 text-gray-700")}
-      ${statPill("宅配待寄", unfinishedOrders.filter(o => o.delivery === "宅配").length, "bg-sky-50 border-sky-200 text-sky-700")}
-      ${statPill("自取待取", unfinishedOrders.filter(o => o.delivery === "自取").length, "bg-lime-50 border-lime-200 text-lime-700")}
+      ${statPill("未完成", filteredOrders.filter(o => o.status === "未完成").length, "bg-orange-50 border-orange-200 text-orange-700", "unfinished")}
+      ${statPill("已取貨", filteredOrders.filter(o => o.status === "已取貨").length, "bg-green-50 border-green-200 text-green-700", "picked")}
+      ${statPill("已宅配", filteredOrders.filter(o => o.status === "已宅配").length, "bg-blue-50 border-blue-200 text-blue-700", "delivered")}
+      ${statPill("已取消", filteredOrders.filter(o => o.status === "已取消").length, "bg-gray-50 border-gray-200 text-gray-700", "canceled")}
+      ${statPill("宅配待寄", unfinishedOrders.filter(o => o.delivery === "宅配").length, "bg-sky-50 border-sky-200 text-sky-700", "shipping")}
+      ${statPill("自取待取", unfinishedOrders.filter(o => o.delivery === "自取").length, "bg-lime-50 border-lime-200 text-lime-700", "pickup")}
     </div>
 
     <div class="grid md:grid-cols-6 gap-4 mb-6">
-      ${statPill("今日需處理", todayPressure, "bg-red-50 border-red-200 text-red-700")}
-      ${statPill("明日需處理", tomorrowPressure, "bg-orange-50 border-orange-200 text-orange-700")}
-      ${statPill("三天內", threeDayPressure, "bg-yellow-50 border-yellow-200 text-yellow-700")}
-      ${statPill("已逾期", overduePressure, "bg-rose-50 border-rose-200 text-rose-700")}
-      ${statPill("今天應寄出", shipToday, "bg-blue-50 border-blue-200 text-blue-700")}
-      ${statPill("超過寄出日", shipOverdue, "bg-red-50 border-red-200 text-red-700")}
+      ${statPill("今日需處理", todayPressure, "bg-red-50 border-red-200 text-red-700", "today")}
+      ${statPill("明日需處理", tomorrowPressure, "bg-orange-50 border-orange-200 text-orange-700", "tomorrow")}
+      ${statPill("三天內", threeDayPressure, "bg-yellow-50 border-yellow-200 text-yellow-700", "threeDays")}
+      ${statPill("已逾期", overduePressure, "bg-rose-50 border-rose-200 text-rose-700", "overdue")}
+      ${statPill("今天應寄出", shipToday, "bg-blue-50 border-blue-200 text-blue-700", "shipToday")}
+      ${statPill("超過寄出日", shipOverdue, "bg-red-50 border-red-200 text-red-700", "shipOverdue")}
     </div>
+
+    <section id="statsDetailBox" class="bg-white rounded-2xl shadow p-5 mb-6">
+      <div class="flex justify-between items-center flex-wrap gap-3 mb-4">
+        <h3 class="text-xl font-bold">${selectedGroup.title}</h3>
+        <span class="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-sm font-bold">
+          ${detailRows.length} 筆
+        </span>
+      </div>
+
+      ${renderMiniTable(
+        orderDetailRows,
+        "這個分類目前沒有訂單"
+      )}
+    </section>
 
     <section class="bg-white rounded-2xl shadow p-5 mb-6">
       <div class="flex justify-between items-center flex-wrap gap-3 mb-4">
@@ -3068,6 +3187,18 @@ function renderStats() {
       </section>
     </div>
   `;
+}
+
+function showStatsDetail(detailKey) {
+  window.statsDetailKey = detailKey;
+  renderStats();
+
+  setTimeout(() => {
+    document.getElementById("statsDetailBox")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start"
+    });
+  }, 0);
 }
 
 function renderStock() {
