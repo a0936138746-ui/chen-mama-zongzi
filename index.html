@@ -6,6 +6,7 @@
   <title>陳媽媽肉粽訂單系統</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 </head>
 
 <body class="bg-amber-50 min-h-screen">
@@ -1349,6 +1350,12 @@ const list = orders
   </button>
 </div>
 
+<button
+  onclick="exportShippingExcel()"
+  class="bg-emerald-700 text-white px-4 py-2 rounded-xl">
+  匯出 Excel
+</button>
+
     <div class="bg-yellow-50 p-4 rounded-xl mb-4">
       未完成出貨 / 取貨共 ${list.length} 筆
     </div>
@@ -1385,6 +1392,93 @@ const list = orders
   `;
 }
 
+function getFilteredShippingOrders() {
+  const startDate = document.getElementById("shipStart")?.value || "";
+  const endDate = document.getElementById("shipEnd")?.value || "";
+
+  return orders
+    .filter(o => {
+      if (
+        o.status === "已取消" ||
+        o.status === "已取貨" ||
+        o.status === "已宅配"
+      ) {
+        return false;
+      }
+
+      const orderDate =
+        o.pickup_date ||
+        o.arrival_date ||
+        o.ship_date ||
+        "";
+
+      if (startDate && orderDate < startDate) return false;
+      if (endDate && orderDate > endDate) return false;
+
+      return true;
+    })
+    .sort((a, b) => {
+      const da = a.pickup_date || a.arrival_date || "";
+      const db = b.pickup_date || b.arrival_date || "";
+      return da.localeCompare(db);
+    });
+}
+
+function exportShippingExcel() {
+  const list = getFilteredShippingOrders();
+
+  if (!list.length) {
+    alert("目前沒有可匯出的出貨 / 取貨訂單");
+    return;
+  }
+
+  const rows = list.flatMap(o => {
+    const items = Array.isArray(o.items) ? o.items : [];
+
+    if (!items.length) {
+      return [{
+        訂單編號: o.id || "",
+        日期: o.pickup_date || o.arrival_date || o.ship_date || "",
+        方式: o.delivery || "",
+        客戶姓名: o.name || "",
+        電話: o.phone || "",
+        地址: o.address || "",
+        商品: "",
+        數量: "",
+        單價: "",
+        小計: "",
+        總金額: Number(o.total || 0),
+        備註: o.note || "",
+        狀態: o.status || ""
+      }];
+    }
+
+    return items.map(i => ({
+      訂單編號: o.id || "",
+      日期: o.pickup_date || o.arrival_date || o.ship_date || "",
+      方式: o.delivery || "",
+      客戶姓名: o.name || "",
+      電話: o.phone || "",
+      地址: o.address || "",
+      商品: i.raw_name || i.name || "",
+      數量: Number(i.qty || 0),
+      單價: Number(i.price || 0),
+      小計: Number(i.qty || 0) * Number(i.price || 0),
+      總金額: Number(o.total || 0),
+      備註: o.note || "",
+      狀態: o.status || ""
+    }));
+  });
+
+  const worksheet = XLSX.utils.json_to_sheet(rows);
+  const workbook = XLSX.utils.book_new();
+
+  XLSX.utils.book_append_sheet(workbook, worksheet, "出貨取貨清單");
+
+  const today = todayStr();
+  XLSX.writeFile(workbook, `陳媽媽出貨取貨清單_${today}.xlsx`);
+}
+  
 function renderEmailImport() {
   document.getElementById("adminPanel").innerHTML = `
     <h2 class="text-2xl font-bold mb-4">匯入官網 Email 訂單</h2>
