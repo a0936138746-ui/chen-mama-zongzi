@@ -2199,6 +2199,29 @@ function renderPaperOrder() {
       <div class="text-2xl font-bold text-amber-700 mb-4">
   總金額：NT$ <span id="paperTotal">0</span>
 </div>
+
+      <div class="bg-green-50 border border-green-200 p-4 rounded-xl mb-4">
+        <div class="font-bold mb-3">收款狀態</div>
+        <div class="grid md:grid-cols-4 gap-3">
+          <select id="paperPaymentStatus" class="border p-3 rounded-xl">
+            <option value="未收款">未收款</option>
+            <option value="已收款">已收款</option>
+            <option value="訂金">訂金</option>
+            <option value="退款">退款</option>
+          </select>
+
+          <select id="paperPaymentMethod" class="border p-3 rounded-xl">
+            <option value="">付款方式</option>
+            <option value="現金">現金</option>
+            <option value="匯款">匯款</option>
+            <option value="LINE Pay">LINE Pay</option>
+            <option value="其他">其他</option>
+          </select>
+
+          <input id="paperPaidAmount" type="number" class="border p-3 rounded-xl" placeholder="已收金額">
+          <input id="paperPaymentNote" class="border p-3 rounded-xl" placeholder="付款備註">
+        </div>
+      </div>
       
       <textarea id="paperNote" class="border p-3 rounded-xl w-full mb-4" placeholder="備註"></textarea>
 
@@ -2245,6 +2268,9 @@ async function savePaperOrder() {
   const date = document.getElementById("paperDate").value;
   const address = document.getElementById("paperAddress").value.trim();
   const note = document.getElementById("paperNote").value.trim();
+  const paymentStatus = document.getElementById("paperPaymentStatus").value;
+  const paymentMethod = document.getElementById("paperPaymentMethod").value;
+  const paymentNote = document.getElementById("paperPaymentNote").value.trim();
 
   if (!name) return alert("請填姓名");
 
@@ -2259,6 +2285,10 @@ async function savePaperOrder() {
   }).filter(i => i.qty > 0);
 
   const total = items.reduce((s, i) => s + i.price * i.qty, 0);
+  const paidInput = document.getElementById("paperPaidAmount").value;
+  const paidAmount = paymentStatus === "已收款"
+    ? total
+    : Number(paidInput || 0);
 
   const order = {
     id: "PB" + Date.now(),
@@ -2274,10 +2304,10 @@ async function savePaperOrder() {
     items,
     total,
     status: "未完成",
-    payment_status: "未收款",
-    payment_method: "",
-    paid_amount: 0,
-    payment_note: "",
+    payment_status: paymentStatus,
+    payment_method: paymentMethod,
+    paid_amount: paidAmount,
+    payment_note: paymentNote,
     type: "paper"
   };
 
@@ -2318,6 +2348,29 @@ function renderProjectOrder() {
 
         <input id="projectTotal" type="number" class="border p-3 rounded-xl" placeholder="預估總金額">
         <input id="projectAddress" class="border p-3 rounded-xl md:col-span-2" placeholder="地址">
+      </div>
+
+      <div class="bg-green-50 border border-green-200 p-4 rounded-xl mb-4">
+        <div class="font-bold mb-3">收款狀態</div>
+        <div class="grid md:grid-cols-4 gap-3">
+          <select id="projectPaymentStatus" class="border p-3 rounded-xl">
+            <option value="未收款">未收款</option>
+            <option value="已收款">已收款</option>
+            <option value="訂金">訂金</option>
+            <option value="退款">退款</option>
+          </select>
+
+          <select id="projectPaymentMethod" class="border p-3 rounded-xl">
+            <option value="">付款方式</option>
+            <option value="現金">現金</option>
+            <option value="匯款">匯款</option>
+            <option value="LINE Pay">LINE Pay</option>
+            <option value="其他">其他</option>
+          </select>
+
+          <input id="projectPaidAmount" type="number" class="border p-3 rounded-xl" placeholder="已收金額">
+          <input id="projectPaymentNote" class="border p-3 rounded-xl" placeholder="付款備註">
+        </div>
       </div>
 
       <div class="font-bold mb-2">專案品項</div>
@@ -2373,6 +2426,9 @@ async function saveProjectOrder() {
   const address = document.getElementById("projectAddress").value.trim();
   const estimatedTotal = Number(document.getElementById("projectTotal").value || 0);
   const note = document.getElementById("projectNote").value.trim();
+  const paymentStatus = document.getElementById("projectPaymentStatus").value;
+  const paymentMethod = document.getElementById("projectPaymentMethod").value;
+  const paymentNoteInput = document.getElementById("projectPaymentNote").value.trim();
 
   if (!name) return alert("請輸入客戶名稱");
   if (!projectName) return alert("請輸入專案名稱");
@@ -2402,6 +2458,10 @@ async function saveProjectOrder() {
   }, 0);
 
   const total = estimatedTotal || itemTotal;
+  const paidInput = document.getElementById("projectPaidAmount").value;
+  const paidAmount = paymentStatus === "已收款"
+    ? total
+    : Number(paidInput || 0);
   const projectNote = `專案名稱：${projectName}${note ? "\n" + note : ""}`;
 
   const order = {
@@ -2418,10 +2478,10 @@ async function saveProjectOrder() {
     items,
     total,
     status: "未完成",
-    payment_status: "未收款",
-    payment_method: "",
-    paid_amount: 0,
-    payment_note: "",
+    payment_status: paymentStatus,
+    payment_method: paymentMethod,
+    paid_amount: paidAmount,
+    payment_note: paymentNoteInput,
     type: "project"
   };
 
