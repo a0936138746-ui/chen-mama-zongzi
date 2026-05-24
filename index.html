@@ -691,6 +691,10 @@ async function submitOrder() {
     items: cart,
     total,
     status: "未完成",
+    payment_status: "未收款",
+    payment_method: "",
+    paid_amount: 0,
+    payment_note: "",
     type: "normal"
   };
 
@@ -991,6 +995,11 @@ function orderCard(o) {
   const processDate = getProcessDate(o);
   const shipDate = getShipDate(o);
   const isProject = o.type === "project";
+  const paymentStatus = getPaymentStatus(o);
+  const paidAmount = getPaidAmount(o);
+  const unpaidAmount = getUnpaidAmount(o);
+  const paymentMethod = o.payment_method || "";
+  const paymentNote = o.payment_note || "";
   const projectNameFromNote = (o.note || "").match(/專案名稱[:：]\s*([^\n]+)/)?.[1] || "";
   const projectItemSummary = items
     .map(i => i.raw_name || i.name || "")
@@ -1050,11 +1059,39 @@ function orderCard(o) {
         </div>
         <div class="text-right">
           <div class="text-xl font-bold text-amber-700">NT$ ${money(o.total)}</div>
+          <div class="mt-2 inline-block border rounded-full px-3 py-1 text-sm font-bold ${getPaymentBadgeClass(o)}">
+            ${paymentStatus}｜已收 NT$ ${money(paidAmount)}｜未收 NT$ ${money(unpaidAmount)}
+          </div>
           <select onchange="updateOrderStatus('${o.id}', this.value)" class="border p-2 rounded-xl mt-2">
             ${["未完成","已取貨","已宅配","已取消"].map(s => `
               <option value="${s}" ${o.status === s ? "selected" : ""}>${s}</option>
             `).join("")}
           </select>
+          <div class="mt-2 grid grid-cols-1 gap-2 text-left">
+            <select onchange="updateOrderPayment('${o.id}', 'payment_status', this.value)"
+              class="border p-2 rounded-xl">
+              ${["未收款","已收款","訂金","退款"].map(s => `
+                <option value="${s}" ${paymentStatus === s ? "selected" : ""}>${s}</option>
+              `).join("")}
+            </select>
+
+            <select onchange="updateOrderPayment('${o.id}', 'payment_method', this.value)"
+              class="border p-2 rounded-xl">
+              ${["","現金","匯款","LINE Pay","其他"].map(s => `
+                <option value="${s}" ${paymentMethod === s ? "selected" : ""}>${s || "付款方式"}</option>
+              `).join("")}
+            </select>
+
+            <input type="number" value="${paidAmount}"
+              onchange="updateOrderPayment('${o.id}', 'paid_amount', this.value)"
+              class="border p-2 rounded-xl"
+              placeholder="已收金額">
+
+            <button onclick="editPaymentNote('${o.id}')"
+              class="bg-gray-600 text-white px-3 py-1 rounded-xl text-sm">
+              付款備註${paymentNote ? "：" + paymentNote : ""}
+            </button>
+          </div>
         </div>
       </div>
       <div class="bg-amber-50 rounded-xl p-3 mt-3">
@@ -1072,6 +1109,37 @@ async function updateOrderStatus(id, status) {
   }
   alert("狀態已更新");
   await refreshAdmin();
+}
+
+async function updateOrderPayment(id, field, value) {
+  const updateData = {};
+
+  updateData[field] = field === "paid_amount"
+    ? Number(value || 0)
+    : value;
+
+  const { error } = await db
+    .from("orders")
+    .update(updateData)
+    .eq("id", id);
+
+  if (error) {
+    alert("付款資料更新失敗：" + error.message);
+    return;
+  }
+
+  await refreshAdmin();
+  renderOrders();
+}
+
+async function editPaymentNote(id) {
+  const order = orders.find(o => String(o.id) === String(id));
+  if (!order) return;
+
+  const note = prompt("付款備註，例如匯款末五碼", order.payment_note || "");
+  if (note === null) return;
+
+  await updateOrderPayment(id, "payment_note", note);
 }
 
 function renderWarDashboard() {
@@ -1870,6 +1938,10 @@ async function importEmailOrder() {
     items,
     total,
     status: "未完成",
+    payment_status: "未收款",
+    payment_method: "",
+    paid_amount: 0,
+    payment_note: "",
     type: "web"
   };
 
@@ -1989,6 +2061,10 @@ async function savePaperOrder() {
     items,
     total,
     status: "未完成",
+    payment_status: "未收款",
+    payment_method: "",
+    paid_amount: 0,
+    payment_note: "",
     type: "paper"
   };
 
@@ -2129,6 +2205,10 @@ async function saveProjectOrder() {
     items,
     total,
     status: "未完成",
+    payment_status: "未收款",
+    payment_method: "",
+    paid_amount: 0,
+    payment_note: "",
     type: "project"
   };
 
@@ -2660,6 +2740,29 @@ function renderMiniTable(rows, emptyText) {
   `;
 }
 
+function getPaymentStatus(o) {
+  return o.payment_status || "未收款";
+}
+
+function getPaidAmount(o) {
+  return Number(o.paid_amount || 0);
+}
+
+function getUnpaidAmount(o) {
+  return Math.max(Number(o.total || 0) - getPaidAmount(o), 0);
+}
+
+function getPaymentBadgeClass(o) {
+  const status = getPaymentStatus(o);
+  const unpaid = getUnpaidAmount(o);
+
+  if (status === "已收款" || unpaid <= 0) return "bg-green-100 text-green-700 border-green-300";
+  if (status === "訂金") return "bg-blue-100 text-blue-700 border-blue-300";
+  if (status === "退款") return "bg-purple-100 text-purple-700 border-purple-300";
+
+  return "bg-red-100 text-red-700 border-red-300";
+}
+
 function renderStats() {
   const startDate = document.getElementById("statsStart")?.value || "";
   const endDate = document.getElementById("statsEnd")?.value || "";
@@ -2683,6 +2786,11 @@ function renderStats() {
   const expenseTotal = filteredExpenses.reduce((s, e) => s + Number(e.amount || 0), 0);
   const profit = revenue - expenseTotal;
   const profitRate = revenue > 0 ? Math.round((profit / revenue) * 1000) / 10 : 0;
+  const receivableTotal = activeOrders.reduce((s, o) => s + Number(o.total || 0), 0);
+  const receivedTotal = activeOrders.reduce((s, o) => s + getPaidAmount(o), 0) + onsiteRevenue;
+  const unpaidTotal = activeOrders.reduce((s, o) => s + getUnpaidAmount(o), 0);
+  const unpaidOrders = activeOrders.filter(o => getUnpaidAmount(o) > 0);
+  const completedUnpaidOrders = unpaidOrders.filter(o => o.status === "已取貨" || o.status === "已宅配");
 
   const unfinishedOrders = orders.filter(o => !isClosedOrder(o));
   const todayPressure = unfinishedOrders.filter(o => daysFromToday(getProcessDate(o)) === 0).length;
@@ -2790,6 +2898,14 @@ function renderStats() {
       ${card("總支出", `NT$ ${money(expenseTotal)}`, "bg-red-50 text-red-700")}
       ${card("粗估淨利", `NT$ ${money(profit)}`, "bg-amber-50 text-amber-700")}
       ${card("淨利率", `${profitRate}%`, "bg-purple-50 text-purple-700")}
+    </div>
+
+    <div class="grid md:grid-cols-5 gap-4 mb-6">
+      ${statPill("訂單應收", `NT$ ${money(receivableTotal)}`, "bg-emerald-50 border-emerald-200 text-emerald-700")}
+      ${statPill("已收金額", `NT$ ${money(receivedTotal)}`, "bg-green-50 border-green-200 text-green-700")}
+      ${statPill("未收金額", `NT$ ${money(unpaidTotal)}`, "bg-red-50 border-red-200 text-red-700")}
+      ${statPill("未結清訂單", `${unpaidOrders.length} 筆`, "bg-orange-50 border-orange-200 text-orange-700")}
+      ${statPill("完成但未收", `${completedUnpaidOrders.length} 筆`, "bg-rose-50 border-rose-200 text-rose-700")}
     </div>
 
     <div class="grid md:grid-cols-6 gap-4 mb-6">
