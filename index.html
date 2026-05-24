@@ -1310,6 +1310,52 @@ function getShippingTotalQty(o) {
   }, 0);
 }
 
+function cleanShippingText(value) {
+  return String(value || "")
+    .replace(/\t/g, " ")
+    .replace(/\r/g, "\n")
+    .replace(/[ ]{2,}/g, " ")
+    .trim();
+}
+
+function getShippingCustomerName(o) {
+  return cleanShippingText(o.name)
+    .replace(/訂購人姓別\s*[:：].*$/g, "")
+    .replace(/收件人姓別\s*[:：].*$/g, "")
+    .replace(/姓別\s*[:：].*$/g, "")
+    .trim();
+}
+
+function getShippingPhoneText(o) {
+  const text = cleanShippingText(o.phone);
+  const mobile = text.match(/09\d{8}/);
+
+  if (mobile) return mobile[0];
+
+  return text
+    .replace(/訂購人行動電話\s*[:：]/g, "")
+    .replace(/訂購人聯絡電話\s*[:：]/g, "")
+    .replace(/收件人電話\s*[:：]/g, "")
+    .trim();
+}
+
+function getShippingAddressText(o) {
+  return cleanShippingText(o.address)
+    .replace(/收件人地址\s*[:：]/g, "")
+    .replace(/訂購人地址\s*[:：]/g, "")
+    .trim();
+}
+
+function getShippingNoteText(o) {
+  const lines = cleanShippingText(o.note)
+    .split("\n")
+    .map(line => line.trim())
+    .filter(Boolean)
+    .filter(line => !/^(收件人姓名|訂購人姓名|收件人姓別|訂購人姓別|姓別|收件人地址|訂購人地址|訂購人行動電話|訂購人聯絡電話)\s*[:：]/.test(line));
+
+  return lines.join("\n");
+}
+
 function getShippingReminderList(o) {
   const reminders = [];
   const processDays = daysFromToday(getProcessDate(o));
@@ -1548,13 +1594,13 @@ function exportShippingExcel() {
     getShippingDeliveryDate(o) || "",
     o.delivery === "宅配" ? (getShipDate(o) || "") : "",
     o.delivery || "",
-    o.name || "",
-    o.phone || "",
-    o.address || "",
+    getShippingCustomerName(o),
+    getShippingPhoneText(o),
+    getShippingAddressText(o),
     getShippingItemText(o),
     getShippingTotalQty(o),
     Number(o.total || 0),
-    o.note || "",
+    getShippingNoteText(o),
     o.id || "",
     o.status || ""
   ]);
@@ -1575,10 +1621,10 @@ function exportShippingExcel() {
     getShippingPriority(o),
     getShippingWorkDate(o) || "",
     o.delivery || "",
-    `${o.name || ""}\n${o.phone || ""}`,
-    o.address || "",
+    `${getShippingCustomerName(o)}\n${getShippingPhoneText(o)}`,
+    getShippingAddressText(o),
     getShippingItemText(o),
-    getShippingReminder(o) + (o.note ? `\n${o.note}` : "")
+    getShippingReminder(o) + (getShippingNoteText(o) ? `\n${getShippingNoteText(o)}` : "")
   ]);
 
   const printSheet = XLSX.utils.aoa_to_sheet([
