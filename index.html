@@ -1279,34 +1279,63 @@ function renderWarDashboard() {
   `;
 }
   
-function getShippingOrderDate(o) {
-  return o.pickup_date || o.arrival_date || o.ship_date || "";
+function getShippingWorkDate(o) {
+  if (o.delivery === "宅配") {
+    return getShipDate(o) || o.ship_date || o.arrival_date || "";
+  }
+
+  return o.pickup_date || o.arrival_date || "";
 }
 
-function getShippingReminder(o) {
+function getShippingDeliveryDate(o) {
+  return o.delivery === "宅配"
+    ? (o.arrival_date || "")
+    : (o.pickup_date || o.arrival_date || "");
+}
+
+function getShippingItemText(o) {
+  return (o.items || [])
+    .map(i => {
+      const name = i.raw_name || i.name || "";
+      const qty = Number(i.qty || 0);
+      const unit = i.unit ? i.unit : "";
+      return `${name} x ${qty}${unit}`;
+    })
+    .join("\n");
+}
+
+function getShippingTotalQty(o) {
+  return (o.items || []).reduce((sum, i) => {
+    return sum + Number(i.qty || 0);
+  }, 0);
+}
+
+function getShippingReminderList(o) {
   const reminders = [];
-
-  const processDate = getProcessDate(o);
-  const processDays = daysFromToday(processDate);
-
-  const shipDate = getShipDate(o);
-  const shipDays = daysFromToday(shipDate);
-
-  if (processDays !== null && processDays < 0) {
-    reminders.push("已逾期未結案");
-  } else if (processDays === 0) {
-    reminders.push("今日需處理");
-  } else if (processDays === 1) {
-    reminders.push("明天需處理");
-  } else if (processDays !== null && processDays > 1 && processDays <= 3) {
-    reminders.push("三天內需處理");
-  }
+  const processDays = daysFromToday(getProcessDate(o));
+  const shipDays = daysFromToday(getShipDate(o));
 
   if (o.delivery === "宅配" && shipDays !== null) {
     if (shipDays < 0) {
       reminders.push("已超過寄出日");
     } else if (shipDays === 0) {
       reminders.push("今天應寄出");
+    } else if (shipDays === 1) {
+      reminders.push("明天應寄出");
+    } else if (shipDays > 1 && shipDays <= 3) {
+      reminders.push("三天內應寄出");
+    }
+  }
+
+  if (processDays !== null) {
+    if (processDays < 0) {
+      reminders.push("已逾期未結案");
+    } else if (processDays === 0) {
+      reminders.push("今日需處理");
+    } else if (processDays === 1) {
+      reminders.push("明天需處理");
+    } else if (processDays > 1 && processDays <= 3) {
+      reminders.push("三天內需處理");
     }
   }
 
@@ -1318,23 +1347,45 @@ function getShippingReminder(o) {
     reminders.push("大單");
   }
 
-  return reminders.join(" / ");
+  return [...new Set(reminders)];
 }
 
-function getShippingSortRank(o) {
+function getShippingReminder(o) {
+  return getShippingReminderList(o).join(" / ");
+}
+
+function getShippingPriority(o) {
   const processDays = daysFromToday(getProcessDate(o));
   const shipDays = daysFromToday(getShipDate(o));
 
-  if (processDays !== null && processDays < 0) return 1;
-  if (o.delivery === "宅配" && shipDays !== null && shipDays < 0) return 2;
-  if (processDays === 0) return 3;
-  if (o.delivery === "宅配" && shipDays === 0) return 4;
-  if (processDays === 1) return 5;
-  if (processDays !== null && processDays > 1 && processDays <= 3) return 6;
-  if (o.note && o.note.trim() !== "") return 7;
-  if (Number(o.total || 0) > 3000) return 8;
+  if (processDays !== null && processDays < 0) return "A 逾期";
+  if (o.delivery === "宅配" && shipDays !== null && shipDays < 0) return "A 逾期";
+  if (processDays === 0 || (o.delivery === "宅配" && shipDays === 0)) return "B 今日";
+  if (processDays === 1 || (o.delivery === "宅配" && shipDays === 1)) return "C 明日";
+  if (
+    (processDays !== null && processDays > 1 && processDays <= 3) ||
+    (o.delivery === "宅配" && shipDays !== null && shipDays > 1 && shipDays <= 3)
+  ) {
+    return "D 三天內";
+  }
 
-  return 9;
+  if (o.note && o.note.trim() !== "") return "E 特別注意";
+  if (Number(o.total || 0) > 3000) return "F 大單";
+
+  return "G 一般";
+}
+
+function getShippingSortRank(o) {
+  const priority = getShippingPriority(o);
+
+  if (priority.startsWith("A")) return 1;
+  if (priority.startsWith("B")) return 2;
+  if (priority.startsWith("C")) return 3;
+  if (priority.startsWith("D")) return 4;
+  if (priority.startsWith("E")) return 5;
+  if (priority.startsWith("F")) return 6;
+
+  return 7;
 }
 
 function getFilteredShippingOrders() {
@@ -1343,18 +1394,12 @@ function getFilteredShippingOrders() {
 
   return orders
     .filter(o => {
-      if (
-        o.status === "已取消" ||
-        o.status === "已取貨" ||
-        o.status === "已宅配"
-      ) {
-        return false;
-      }
+      if (isClosedOrder(o)) return false;
 
-      const orderDate = getShippingOrderDate(o);
+      const workDate = getShippingWorkDate(o);
 
-      if (startDate && orderDate < startDate) return false;
-      if (endDate && orderDate > endDate) return false;
+      if (startDate && workDate < startDate) return false;
+      if (endDate && workDate > endDate) return false;
 
       return true;
     })
@@ -1362,29 +1407,27 @@ function getFilteredShippingOrders() {
       const rankDiff = getShippingSortRank(a) - getShippingSortRank(b);
       if (rankDiff !== 0) return rankDiff;
 
-      const dateDiff = (getShippingOrderDate(a) || "9999-12-31")
-        .localeCompare(getShippingOrderDate(b) || "9999-12-31");
+      const workDateDiff = (getShippingWorkDate(a) || "9999-12-31")
+        .localeCompare(getShippingWorkDate(b) || "9999-12-31");
+      if (workDateDiff !== 0) return workDateDiff;
 
-      if (dateDiff !== 0) return dateDiff;
+      const deliveryDiff = (getShippingDeliveryDate(a) || "9999-12-31")
+        .localeCompare(getShippingDeliveryDate(b) || "9999-12-31");
+      if (deliveryDiff !== 0) return deliveryDiff;
 
       return String(a.time || "").localeCompare(String(b.time || ""));
     });
 }
 
 function renderShippingList() {
-  const startDate =
-    document.getElementById("shipStart")?.value || "";
-
-  const endDate =
-    document.getElementById("shipEnd")?.value || "";
-
+  const startDate = document.getElementById("shipStart")?.value || "";
+  const endDate = document.getElementById("shipEnd")?.value || "";
   const list = getFilteredShippingOrders();
 
   document.getElementById("adminPanel").innerHTML = `
     <h2 class="text-2xl font-bold mb-4">出貨 / 取貨清單</h2>
 
     <div class="flex gap-2 mb-4 print:hidden flex-wrap">
-
       <input
         type="date"
         id="shipStart"
@@ -1419,20 +1462,23 @@ function renderShippingList() {
     </div>
 
     <div class="bg-yellow-50 p-4 rounded-xl mb-4">
-      未完成出貨 / 取貨共 ${list.length} 筆
+      未完成出貨 / 取貨共 ${list.length} 筆，排序依照逾期、今日、明日、三天內、特殊備註、大單。
     </div>
 
     <div class="space-y-4">
       ${
         list.length
-          ? list.map(o => `
+          ? list.map((o, index) => `
             <div class="bg-white border rounded-xl p-4">
               <div class="flex justify-between gap-3 flex-wrap">
                 <div>
                   <div class="font-bold text-lg">
-                    日期：${getProcessDate(o) || "未填"}
+                    #${index + 1}｜${getShippingPriority(o)}｜工作日：${getShippingWorkDate(o) || "未填"}
                   </div>
-                  ${o.delivery === "宅配" ? `<div class="text-sm text-blue-700 font-bold">應寄出日：${getShipDate(o) || "未填"}</div>` : ""}
+                  <div class="text-sm text-gray-600">
+                    交付日：${getShippingDeliveryDate(o) || "未填"}
+                    ${o.delivery === "宅配" ? `｜應寄出日：${getShipDate(o) || "未填"}` : ""}
+                  </div>
                 </div>
 
                 <div class="text-sm font-bold text-red-700">
@@ -1446,14 +1492,12 @@ function renderShippingList() {
               <div>地址：${o.address || ""}</div>
               <div>備註：${o.note || ""}</div>
 
-              <div class="mt-2 bg-amber-50 p-2 rounded">
-                ${(o.items || []).map(i =>
-                  `<div>${i.raw_name || i.name || ""} x ${i.qty || 0}${i.unit ? i.unit : ""}</div>`
-                ).join("")}
+              <div class="mt-2 bg-amber-50 p-2 rounded whitespace-pre-line">
+                ${getShippingItemText(o) || "未填商品"}
               </div>
 
               <div class="mt-2 font-bold text-right">
-                NT$ ${money(o.total)}
+                總數量 ${getShippingTotalQty(o)}｜NT$ ${money(o.total)}
               </div>
             </div>
           `).join("")
@@ -1464,6 +1508,11 @@ function renderShippingList() {
 }
 
 function exportShippingExcel() {
+  if (!window.XLSX) {
+    alert("Excel 匯出套件尚未載入，請重新整理頁面後再試一次");
+    return;
+  }
+
   const list = getFilteredShippingOrders();
 
   if (!list.length) {
@@ -1471,50 +1520,56 @@ function exportShippingExcel() {
     return;
   }
 
-  const rows = list.map((o, index) => {
-    const items = Array.isArray(o.items) ? o.items : [];
+  const headers = [
+    "順序",
+    "優先級",
+    "提醒",
+    "工作日期",
+    "交付日期",
+    "應寄出日",
+    "方式",
+    "姓名",
+    "電話",
+    "地址",
+    "商品明細",
+    "總數量",
+    "總金額",
+    "備註",
+    "訂單編號",
+    "狀態"
+  ];
 
-    const itemText = items
-      .map(i => {
-        const name = i.raw_name || i.name || "";
-        const qty = Number(i.qty || 0);
-        const unit = i.unit ? i.unit : "";
-        return `${name} x ${qty}${unit}`;
-      })
-      .join("\n");
+  const rows = list.map((o, index) => [
+    index + 1,
+    getShippingPriority(o),
+    getShippingReminder(o),
+    getShippingWorkDate(o) || "",
+    getShippingDeliveryDate(o) || "",
+    o.delivery === "宅配" ? (getShipDate(o) || "") : "",
+    o.delivery || "",
+    o.name || "",
+    o.phone || "",
+    o.address || "",
+    getShippingItemText(o),
+    getShippingTotalQty(o),
+    Number(o.total || 0),
+    o.note || "",
+    o.id || "",
+    o.status || ""
+  ]);
 
-    const totalQty = items.reduce((sum, i) => {
-      return sum + Number(i.qty || 0);
-    }, 0);
-
-    return {
-      處理順序: index + 1,
-      提醒: getShippingReminder(o),
-      處理日期: getProcessDate(o) || "",
-      應寄出日: o.delivery === "宅配" ? (getShipDate(o) || "") : "",
-      方式: o.delivery || "",
-      姓名: o.name || "",
-      電話: o.phone || "",
-      地址: o.address || "",
-      商品明細: itemText,
-      總數量: totalQty,
-      總金額: Number(o.total || 0),
-      備註: o.note || "",
-      訂單編號: o.id || "",
-      狀態: o.status || ""
-    };
-  });
-
-  const worksheet = XLSX.utils.json_to_sheet(rows);
+  const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
 
   worksheet["!cols"] = [
-    { wch: 8 },
-    { wch: 24 },
+    { wch: 6 },
+    { wch: 12 },
+    { wch: 28 },
+    { wch: 12 },
     { wch: 12 },
     { wch: 12 },
     { wch: 10 },
     { wch: 12 },
-    { wch: 14 },
+    { wch: 15 },
     { wch: 34 },
     { wch: 42 },
     { wch: 8 },
@@ -1524,10 +1579,17 @@ function exportShippingExcel() {
     { wch: 10 }
   ];
 
+  worksheet["!rows"] = [
+    { hpt: 24 },
+    ...rows.map(row => ({
+      hpt: Math.max(36, Math.min(120, String(row[10] || "").split("\n").length * 18))
+    }))
+  ];
+
   worksheet["!autofilter"] = {
     ref: XLSX.utils.encode_range({
       s: { r: 0, c: 0 },
-      e: { r: rows.length, c: 13 }
+      e: { r: rows.length, c: headers.length - 1 }
     })
   };
 
@@ -1540,17 +1602,20 @@ function exportShippingExcel() {
     paperSize: 9,
     orientation: "landscape",
     fitToWidth: 1,
-    fitToHeight: 0
+    fitToHeight: 0,
+    scale: 90
   };
 
   worksheet["!margins"] = {
-    left: 0.3,
-    right: 0.3,
-    top: 0.5,
-    bottom: 0.5,
+    left: 0.25,
+    right: 0.25,
+    top: 0.45,
+    bottom: 0.45,
     header: 0.2,
     footer: 0.2
   };
+
+  worksheet["!printHeader"] = [1, 1];
 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "出貨取貨清單");
