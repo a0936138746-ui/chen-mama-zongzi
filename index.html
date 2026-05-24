@@ -1558,9 +1558,96 @@ function exportShippingExcel() {
     o.status || ""
   ]);
 
-  const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  const printHeaders = [
+    "順序",
+    "優先",
+    "工作日",
+    "方式",
+    "客戶 / 電話",
+    "地址",
+    "商品明細",
+    "備註"
+  ];
 
-  worksheet["!cols"] = [
+  const printRows = list.map((o, index) => [
+    index + 1,
+    getShippingPriority(o),
+    getShippingWorkDate(o) || "",
+    o.delivery || "",
+    `${o.name || ""}\n${o.phone || ""}`,
+    o.address || "",
+    getShippingItemText(o),
+    getShippingReminder(o) + (o.note ? `\n${o.note}` : "")
+  ]);
+
+  const printSheet = XLSX.utils.aoa_to_sheet([
+    ["陳媽媽出貨 / 取貨清單"],
+    [`匯出日期：${todayStr()}　筆數：${list.length}　排序：逾期、今日、明日、三天內、特殊備註、大單`],
+    printHeaders,
+    ...printRows
+  ]);
+
+  printSheet["!merges"] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: printHeaders.length - 1 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: printHeaders.length - 1 } }
+  ];
+
+  printSheet["!cols"] = [
+    { wch: 6 },
+    { wch: 12 },
+    { wch: 11 },
+    { wch: 8 },
+    { wch: 16 },
+    { wch: 28 },
+    { wch: 38 },
+    { wch: 24 }
+  ];
+
+  printSheet["!rows"] = [
+    { hpt: 26 },
+    { hpt: 20 },
+    { hpt: 22 },
+    ...printRows.map(row => {
+      const customerLines = String(row[4] || "").split("\n").length;
+      const itemLines = String(row[6] || "").split("\n").length;
+      const noteLines = String(row[7] || "").split("\n").length;
+      const maxLines = Math.max(customerLines, itemLines, noteLines, 2);
+      return { hpt: Math.max(42, Math.min(110, maxLines * 18)) };
+    })
+  ];
+
+  printSheet["!autofilter"] = {
+    ref: XLSX.utils.encode_range({
+      s: { r: 2, c: 0 },
+      e: { r: printRows.length + 2, c: printHeaders.length - 1 }
+    })
+  };
+
+  printSheet["!freeze"] = {
+    xSplit: 0,
+    ySplit: 3
+  };
+
+  printSheet["!pageSetup"] = {
+    paperSize: 9,
+    orientation: "landscape",
+    fitToWidth: 1,
+    fitToHeight: 0,
+    scale: 85
+  };
+
+  printSheet["!margins"] = {
+    left: 0.2,
+    right: 0.2,
+    top: 0.35,
+    bottom: 0.35,
+    header: 0.15,
+    footer: 0.15
+  };
+
+  const detailSheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+
+  detailSheet["!cols"] = [
     { wch: 6 },
     { wch: 12 },
     { wch: 28 },
@@ -1579,26 +1666,26 @@ function exportShippingExcel() {
     { wch: 10 }
   ];
 
-  worksheet["!rows"] = [
+  detailSheet["!rows"] = [
     { hpt: 24 },
     ...rows.map(row => ({
       hpt: Math.max(36, Math.min(120, String(row[10] || "").split("\n").length * 18))
     }))
   ];
 
-  worksheet["!autofilter"] = {
+  detailSheet["!autofilter"] = {
     ref: XLSX.utils.encode_range({
       s: { r: 0, c: 0 },
       e: { r: rows.length, c: headers.length - 1 }
     })
   };
 
-  worksheet["!freeze"] = {
+  detailSheet["!freeze"] = {
     xSplit: 0,
     ySplit: 1
   };
 
-  worksheet["!pageSetup"] = {
+  detailSheet["!pageSetup"] = {
     paperSize: 9,
     orientation: "landscape",
     fitToWidth: 1,
@@ -1606,7 +1693,7 @@ function exportShippingExcel() {
     scale: 90
   };
 
-  worksheet["!margins"] = {
+  detailSheet["!margins"] = {
     left: 0.25,
     right: 0.25,
     top: 0.45,
@@ -1615,10 +1702,11 @@ function exportShippingExcel() {
     footer: 0.2
   };
 
-  worksheet["!printHeader"] = [1, 1];
+  detailSheet["!printHeader"] = [1, 1];
 
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "出貨取貨清單");
+  XLSX.utils.book_append_sheet(workbook, printSheet, "A4列印版");
+  XLSX.utils.book_append_sheet(workbook, detailSheet, "完整資料");
 
   const startDate = document.getElementById("shipStart")?.value || "";
   const endDate = document.getElementById("shipEnd")?.value || "";
