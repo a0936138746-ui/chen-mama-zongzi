@@ -1457,12 +1457,13 @@ function renderShippingList() {
       <button
         onclick="exportShippingExcel()"
         class="bg-emerald-700 text-white px-4 py-2 rounded-xl">
-        匯出 Excel
+        匯出 A4 Excel
       </button>
     </div>
 
     <div class="bg-yellow-50 p-4 rounded-xl mb-4">
-      未完成出貨 / 取貨共 ${list.length} 筆，排序依照逾期、今日、明日、三天內、特殊備註、大單。
+      未完成出貨 / 取貨共 ${list.length} 筆，Excel 會先產生「A4列印版」，再附「完整資料」。
+      排序依照逾期、今日、明日、三天內、特殊備註、大單。
     </div>
 
     <div class="space-y-4">
@@ -1716,7 +1717,7 @@ function exportShippingExcel() {
 
   XLSX.writeFile(
     workbook,
-    `陳媽媽出貨取貨清單${rangeText}_${todayStr()}.xlsx`
+    `陳媽媽出貨取貨清單_A4列印版${rangeText}_${todayStr()}.xlsx`
   );
 }
   
