@@ -1606,23 +1606,17 @@ function exportShippingExcel() {
   ]);
 
   const printHeaders = [
-    "順序",
-    "優先",
-    "工作日",
-    "方式",
-    "客戶 / 電話",
-    "地址",
-    "商品明細",
+    "#",
+    "處理",
+    "客戶 / 地址",
+    "商品",
     "備註"
   ];
 
   const printRows = list.map((o, index) => [
     index + 1,
-    getShippingPriority(o),
-    getShippingWorkDate(o) || "",
-    o.delivery || "",
-    `${getShippingCustomerName(o)}\n${getShippingPhoneText(o)}`,
-    getShippingAddressText(o),
+    `${getShippingPriority(o)}\n${getShippingWorkDate(o) || ""}\n${o.delivery || ""}`,
+    `${getShippingCustomerName(o)}\n${getShippingPhoneText(o)}\n${getShippingAddressText(o)}`,
     getShippingItemText(o),
     getShippingReminder(o) + (getShippingNoteText(o) ? `\n${getShippingNoteText(o)}` : "")
   ]);
@@ -1640,13 +1634,10 @@ function exportShippingExcel() {
   ];
 
   printSheet["!cols"] = [
-    { wch: 6 },
-    { wch: 12 },
-    { wch: 11 },
-    { wch: 8 },
-    { wch: 16 },
-    { wch: 28 },
-    { wch: 38 },
+    { wch: 4 },
+    { wch: 14 },
+    { wch: 30 },
+    { wch: 32 },
     { wch: 24 }
   ];
 
@@ -1655,11 +1646,12 @@ function exportShippingExcel() {
     { hpt: 20 },
     { hpt: 22 },
     ...printRows.map(row => {
-      const customerLines = String(row[4] || "").split("\n").length;
-      const itemLines = String(row[6] || "").split("\n").length;
-      const noteLines = String(row[7] || "").split("\n").length;
-      const maxLines = Math.max(customerLines, itemLines, noteLines, 2);
-      return { hpt: Math.max(42, Math.min(110, maxLines * 18)) };
+      const processLines = String(row[1] || "").split("\n").length;
+      const customerLines = String(row[2] || "").split("\n").length;
+      const itemLines = String(row[3] || "").split("\n").length;
+      const noteLines = String(row[4] || "").split("\n").length;
+      const maxLines = Math.max(processLines, customerLines, itemLines, noteLines, 2);
+      return { hpt: Math.max(42, Math.min(95, maxLines * 16)) };
     })
   ];
 
