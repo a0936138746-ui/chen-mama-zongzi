@@ -1131,10 +1131,34 @@ async function updateOrderStatus(id, status) {
 
 async function updateOrderPayment(id, field, value) {
   const updateData = {};
+  const order = orders.find(o => String(o.id) === String(id));
 
   updateData[field] = field === "paid_amount"
     ? Number(value || 0)
     : value;
+
+  if (field === "paid_amount" && order) {
+    const paid = Number(value || 0);
+    const total = Number(order.total || 0);
+
+    if (paid >= total && total > 0) {
+      updateData.payment_status = "已收款";
+    } else if (paid > 0) {
+      updateData.payment_status = "訂金";
+    } else {
+      updateData.payment_status = "未收款";
+    }
+  }
+
+  if (field === "payment_status" && order) {
+    if (value === "已收款") {
+      updateData.paid_amount = Number(order.total || 0);
+    }
+
+    if (value === "未收款") {
+      updateData.paid_amount = 0;
+    }
+  }
 
   const { error } = await db
     .from("orders")
