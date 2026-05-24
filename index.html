@@ -765,6 +765,43 @@ function showAdminTab(tab) {
   if (tab === "shipping") renderShippingList();
 }
 
+function openOrderInOrders(orderId) {
+  window.orderSearchKeyword = String(orderId || "");
+  window.highlightOrderId = String(orderId || "");
+  window.orderStatusFilter = "";
+  window.orderDeliveryFilter = "";
+  window.orderQuickFilter = "";
+  showAdminTab("orders");
+}
+
+function setOrderQuickFilter(type) {
+  window.orderSearchKeyword = "";
+  window.highlightOrderId = "";
+  window.orderStatusFilter = "";
+  window.orderDeliveryFilter = "";
+  window.orderQuickFilter = type;
+
+  const payment = document.getElementById("orderPaymentFilter");
+  if (payment) payment.value = "";
+
+  renderOrders();
+}
+
+function clearOrderFilters() {
+  window.orderSearchKeyword = "";
+  window.highlightOrderId = "";
+  window.orderStatusFilter = "";
+  window.orderDeliveryFilter = "";
+  window.orderQuickFilter = "";
+
+  const search = document.getElementById("orderSearch");
+  if (search) search.value = "";
+  const payment = document.getElementById("orderPaymentFilter");
+  if (payment) payment.value = "";
+
+  renderOrders();
+}
+
 function isClosedOrder(o) {
   return o.status === "已取消" || o.status === "已取貨" || o.status === "已宅配";
 }
@@ -942,6 +979,13 @@ function renderOrders() {
     ? searchInput.value.trim()
     : (window.orderSearchKeyword || "");
   const paymentFilter = document.getElementById("orderPaymentFilter")?.value || "";
+  const statusFilter = document.getElementById("orderStatusFilter")?.value || window.orderStatusFilter || "";
+  const deliveryFilter = document.getElementById("orderDeliveryFilter")?.value || window.orderDeliveryFilter || "";
+  const quickFilter = window.orderQuickFilter || "";
+
+  window.orderSearchKeyword = keyword;
+  window.orderStatusFilter = statusFilter;
+  window.orderDeliveryFilter = deliveryFilter;
 
   const filteredOrders = orders
     .filter(o => {
@@ -949,6 +993,9 @@ function renderOrders() {
         ${o.name || ""}
         ${o.phone || ""}
         ${o.id || ""}
+        ${o.address || ""}
+        ${o.note || ""}
+        ${(o.items || []).map(i => `${i.name || ""} ${i.raw_name || ""}`).join(" ")}
       `.toLowerCase();
 
       const matchKeyword = searchText.includes(keyword.toLowerCase());
@@ -956,8 +1003,18 @@ function renderOrders() {
         !paymentFilter ||
         (paymentFilter === "未結清" && getUnpaidAmount(o) > 0) ||
         getPaymentStatus(o) === paymentFilter;
+      const matchStatus = !statusFilter || o.status === statusFilter;
+      const matchDelivery = !deliveryFilter || o.delivery === deliveryFilter;
+      const matchQuick =
+        !quickFilter ||
+        (quickFilter === "today" && !isClosedOrder(o) && daysFromToday(getProcessDate(o)) === 0) ||
+        (quickFilter === "tomorrow" && !isClosedOrder(o) && daysFromToday(getProcessDate(o)) === 1) ||
+        (quickFilter === "overdue" && !isClosedOrder(o) && daysFromToday(getProcessDate(o)) < 0) ||
+        (quickFilter === "shipping" && !isClosedOrder(o) && o.delivery === "宅配") ||
+        (quickFilter === "pickup" && !isClosedOrder(o) && o.delivery === "自取") ||
+        (quickFilter === "unpaid" && getUnpaidAmount(o) > 0);
 
-      return matchKeyword && matchPayment;
+      return matchKeyword && matchPayment && matchStatus && matchDelivery && matchQuick;
     })
     .sort((a, b) => {
       const rankDiff = getOrderSortRank(a) - getOrderSortRank(b);
@@ -970,18 +1027,45 @@ function renderOrders() {
     });
 
   const panel = document.getElementById("adminPanel");
+  const activeCount = orders.filter(o => !isClosedOrder(o)).length;
+  const todayCount = orders.filter(o => !isClosedOrder(o) && daysFromToday(getProcessDate(o)) === 0).length;
+  const tomorrowCount = orders.filter(o => !isClosedOrder(o) && daysFromToday(getProcessDate(o)) === 1).length;
+  const overdueCount = orders.filter(o => !isClosedOrder(o) && daysFromToday(getProcessDate(o)) < 0).length;
+  const unpaidCount = orders.filter(o => getUnpaidAmount(o) > 0).length;
 
   panel.innerHTML = `
     <h2 class="text-2xl font-bold mb-4">訂單管理</h2>
 
-    <div class="flex gap-2 mb-4">
+    <div class="grid md:grid-cols-5 gap-3 mb-4">
       <input
         id="orderSearch"
-        placeholder="搜尋姓名 / 電話 / 訂單編號"
-        class="border p-3 rounded-xl flex-1"
+        placeholder="搜尋姓名 / 電話 / 訂單編號 / 地址 / 商品"
+        class="border p-3 rounded-xl md:col-span-2"
         value="${keyword}"
         oninput="renderOrders()"
       >
+
+      <select
+        id="orderStatusFilter"
+        class="border p-3 rounded-xl"
+        onchange="window.orderStatusFilter=this.value; renderOrders()">
+        ${["","未完成","已取貨","已宅配","已取消"].map(s => `
+          <option value="${s}" ${statusFilter === s ? "selected" : ""}>
+            ${s || "狀態篩選"}
+          </option>
+        `).join("")}
+      </select>
+
+      <select
+        id="orderDeliveryFilter"
+        class="border p-3 rounded-xl"
+        onchange="window.orderDeliveryFilter=this.value; renderOrders()">
+        ${["","自取","宅配","有限外送"].map(s => `
+          <option value="${s}" ${deliveryFilter === s ? "selected" : ""}>
+            ${s || "方式篩選"}
+          </option>
+        `).join("")}
+      </select>
 
       <select
         id="orderPaymentFilter"
@@ -993,12 +1077,25 @@ function renderOrders() {
           </option>
         `).join("")}
       </select>
+    </div>
 
+    <div class="flex gap-2 mb-4 flex-wrap">
+      <button onclick="setOrderQuickFilter('today')" class="bg-red-600 text-white px-4 py-2 rounded-xl">今日 ${todayCount}</button>
+      <button onclick="setOrderQuickFilter('tomorrow')" class="bg-orange-600 text-white px-4 py-2 rounded-xl">明日 ${tomorrowCount}</button>
+      <button onclick="setOrderQuickFilter('overdue')" class="bg-rose-600 text-white px-4 py-2 rounded-xl">逾期 ${overdueCount}</button>
+      <button onclick="setOrderQuickFilter('shipping')" class="bg-blue-600 text-white px-4 py-2 rounded-xl">宅配待寄</button>
+      <button onclick="setOrderQuickFilter('pickup')" class="bg-lime-700 text-white px-4 py-2 rounded-xl">自取待取</button>
+      <button onclick="setOrderQuickFilter('unpaid')" class="bg-amber-700 text-white px-4 py-2 rounded-xl">未結清 ${unpaidCount}</button>
+      <button onclick="clearOrderFilters()" class="bg-gray-700 text-white px-4 py-2 rounded-xl">清除篩選</button>
       <button
-        onclick="refreshAdmin()"
-        class="bg-blue-600 text-white px-4 py-2 rounded-xl">
+        onclick="refreshAdmin().then(renderOrders)"
+        class="bg-sky-700 text-white px-4 py-2 rounded-xl">
         重新整理
       </button>
+    </div>
+
+    <div class="bg-amber-50 p-3 rounded-xl mb-4 text-sm text-amber-900">
+      顯示 ${filteredOrders.length} / ${orders.length} 筆；未結案 ${activeCount} 筆。點統計、看板或清單中的客戶姓名，可直接跳到對應訂單。
     </div>
 
     <div class="space-y-4">
@@ -1123,6 +1220,13 @@ function orderCard(o) {
               class="bg-gray-600 text-white px-3 py-1 rounded-xl text-sm">
               付款備註${paymentNote ? "：" + paymentNote : ""}
             </button>
+
+            ${unpaidAmount > 0 ? `
+              <button onclick="markOrderPaid('${o.id}')"
+                class="bg-green-700 text-white px-3 py-1 rounded-xl text-sm">
+                一鍵已收全額
+              </button>
+            ` : ""}
           </div>
         </div>
       </div>
@@ -1198,6 +1302,32 @@ async function editPaymentNote(id) {
   await updateOrderPayment(id, "payment_note", note);
 }
 
+async function markOrderPaid(id) {
+  const order = orders.find(o => String(o.id) === String(id));
+  if (!order) return;
+
+  if (!confirm(`確定將 ${order.name || "這筆訂單"} 標記為已收全額？`)) {
+    return;
+  }
+
+  const { error } = await db
+    .from("orders")
+    .update({
+      payment_status: "已收款",
+      paid_amount: Number(order.total || 0)
+    })
+    .eq("id", id);
+
+  if (error) {
+    alert("更新收款失敗：" + error.message);
+    return;
+  }
+
+  alert("已標記為已收款");
+  await refreshAdmin();
+  renderOrders();
+}
+
 function renderWarDashboard() {
   const activeOrders = orders.filter(o => o.status !== "已取消");
   const unfinishedOrders = activeOrders.filter(o => !isClosedOrder(o));
@@ -1269,9 +1399,12 @@ function renderWarDashboard() {
 
     return `
       <div class="bg-white border rounded-xl p-4 mb-3">
-        <div class="font-bold ${isProject ? "text-indigo-700" : ""}">
+        <button
+          type="button"
+          onclick="openOrderInOrders('${o.id}')"
+          class="font-bold text-left ${isProject ? "text-indigo-700" : "text-blue-700 hover:underline"}">
           ${isProject ? "🧪 " : ""}${title}
-        </div>
+        </button>
 
         <div class="text-sm text-gray-600 mt-1">
           ${getDashboardDate(o) || "未填日期"}｜${o.delivery || ""}｜${o.name || ""}｜${o.phone || ""}
@@ -1287,6 +1420,9 @@ function renderWarDashboard() {
           ${Number(o.total || 0) > 3000 ? `<span class="text-red-600">🔥 NT$ ${money(o.total)}</span>` : ""}
           ${totalQty ? `<span class="text-amber-700">數量 ${totalQty}</span>` : ""}
           ${o.note ? `<span class="text-purple-700">📝 特殊備註</span>` : ""}
+          <button onclick="openOrderInOrders('${o.id}')" class="bg-blue-600 text-white px-3 py-1 rounded-xl text-xs">
+            查看訂單
+          </button>
         </div>
       </div>
     `;
@@ -1348,6 +1484,14 @@ function renderWarDashboard() {
                       <div class="text-sm">日期：${group.date}</div>
                       <div class="text-sm">金額：NT$ ${money(totalAmount)}</div>
                       <div class="text-sm font-bold">訂單數量：${group.orders.length} 筆</div>
+                      <div class="mt-2 flex gap-2 flex-wrap">
+                        ${group.orders.map(o => `
+                          <button onclick="openOrderInOrders('${o.id}')"
+                            class="bg-red-600 text-white px-3 py-1 rounded-xl text-xs">
+                            ${o.name || "查看"} ${o.id || ""}
+                          </button>
+                        `).join("")}
+                      </div>
                     </div>
                   `;
                 })
@@ -1659,7 +1803,13 @@ function renderShippingList() {
               </div>
 
               <div>方式：${o.delivery || ""}</div>
-              <div>客人：${o.name || ""}</div>
+              <div>
+                客人：
+                <button onclick="openOrderInOrders('${o.id}')"
+                  class="text-blue-700 font-bold hover:underline">
+                  ${o.name || ""}
+                </button>
+              </div>
               <div>電話：${o.phone || ""}</div>
               <div>地址：${o.address || ""}</div>
               <div>備註：${o.note || ""}</div>
@@ -1670,6 +1820,13 @@ function renderShippingList() {
 
               <div class="mt-2 font-bold text-right">
                 總數量 ${getShippingTotalQty(o)}｜NT$ ${money(o.total)}
+              </div>
+
+              <div class="mt-3 text-right print:hidden">
+                <button onclick="openOrderInOrders('${o.id}')"
+                  class="bg-blue-600 text-white px-4 py-2 rounded-xl">
+                  查看訂單
+                </button>
               </div>
             </div>
           `).join("")
@@ -3146,7 +3303,12 @@ function renderStats() {
         unpaidTrackingRows.map(o => `
           <tr class="border-b align-top">
             <td class="py-3 pr-3">
-              <div class="font-bold">${o.name || "未填姓名"}</div>
+              <button
+                type="button"
+                onclick="openOrderInOrders('${o.id}')"
+                class="font-bold text-left text-blue-700 hover:underline">
+                ${o.name || "未填姓名"}
+              </button>
               <div class="text-xs text-gray-500">${o.phone || ""}</div>
               <div class="text-xs text-gray-500">${o.id || ""}</div>
             </td>
@@ -3164,7 +3326,13 @@ function renderStats() {
               <div class="font-bold text-red-700">未收 NT$ ${money(getUnpaidAmount(o))}</div>
             </td>
             <td class="py-3 pl-3 text-sm text-gray-600">
-              ${o.payment_note || o.note || ""}
+              <div>${o.payment_note || o.note || ""}</div>
+              <button
+                type="button"
+                onclick="openOrderInOrders('${o.id}')"
+                class="mt-2 bg-blue-600 text-white px-3 py-1 rounded-xl text-xs font-bold">
+                查看訂單
+              </button>
             </td>
           </tr>
         `),
@@ -3229,9 +3397,7 @@ function showStatsDetail(detailKey) {
 }
 
 function openOrderFromStats(orderId) {
-  window.orderSearchKeyword = String(orderId || "");
-  window.highlightOrderId = String(orderId || "");
-  showAdminTab("orders");
+  openOrderInOrders(orderId);
 }
 
 function renderStock() {
