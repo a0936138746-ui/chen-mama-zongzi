@@ -3535,108 +3535,214 @@ function openOrderFromStats(orderId) {
   openOrderInOrders(orderId);
 }
 
-function renderStock() {
-  document.getElementById("adminPanel").innerHTML = `
-    <h2 class="text-2xl font-bold mb-4">庫存查看</h2>
-    <div class="grid md:grid-cols-3 gap-4">
-${products
-  .filter(p =>
-    p.type !== "fee" &&
-    p.type !== "box" &&
-    !p.name.includes("粒裝") &&
-    !p.name.includes("禮盒") &&
-    !p.name.includes("6粒") &&
-    !p.name.includes("10粒") &&
-    !p.name.includes("12粒") &&
-    !p.name.includes("20粒")
-  )
-  .map(p => {
-  let reservedQty = 0;
-
-  orders
-    .filter(o =>
-      o.status !== "已取消" &&
-      o.status !== "已取貨" &&
-      o.status !== "已宅配"
+function getStockRows() {
+  return products
+    .filter(p =>
+      p.type !== "fee" &&
+      p.type !== "box" &&
+      !p.name.includes("粒裝") &&
+      !p.name.includes("禮盒") &&
+      !p.name.includes("6粒") &&
+      !p.name.includes("10粒") &&
+      !p.name.includes("12粒") &&
+      !p.name.includes("20粒")
     )
-    .forEach(order => {
-      (order.items || []).forEach(item => {
+    .map(p => {
+      let reservedQty = 0;
+      const relatedOrders = [];
 
-        // 一般商品直接計算
-        if (Number(item.id) === Number(p.id)) {
-          reservedQty += Number(item.qty || 0);
-        }
+      orders
+        .filter(o => !isClosedOrder(o))
+        .forEach(order => {
+          let orderQty = 0;
 
-        // 禮盒拆解計算
-        const boxProduct = products.find(
-          x => Number(x.id) === Number(item.id)
-        );
+          (order.items || []).forEach(item => {
+            if (Number(item.id) === Number(p.id)) {
+              orderQty += Number(item.qty || 0);
+            }
 
-        if (
-          boxProduct &&
-          boxProduct.type === "box" &&
-          Array.isArray(boxProduct.components)
-        ) {
-          boxProduct.components.forEach(comp => {
-            if (Number(comp.productId) === Number(p.id)) {
-              reservedQty +=
-                Number(comp.qty || 0) *
-                Number(item.qty || 0);
+            const boxProduct = products.find(
+              x => Number(x.id) === Number(item.id)
+            );
+
+            if (
+              boxProduct &&
+              boxProduct.type === "box" &&
+              Array.isArray(boxProduct.components)
+            ) {
+              boxProduct.components.forEach(comp => {
+                if (Number(comp.productId) === Number(p.id)) {
+                  orderQty +=
+                    Number(comp.qty || 0) *
+                    Number(item.qty || 0);
+                }
+              });
             }
           });
-        }
-      });
+
+          if (orderQty > 0) {
+            reservedQty += orderQty;
+            relatedOrders.push({
+              id: order.id,
+              name: order.name || "未填姓名",
+              date: getProcessDate(order) || "未填日期",
+              qty: orderQty
+            });
+          }
+        });
+
+      const stock = Number(p.stock || 0);
+      const remain = stock - reservedQty;
+      const percent = stock > 0
+        ? Math.min((reservedQty / stock) * 100, 100)
+        : reservedQty > 0 ? 100 : 0;
+
+      let level = "safe";
+      let statusText = "安全";
+      let statusClass = "bg-green-50 border-green-200 text-green-700";
+
+      if (remain <= 300) {
+        level = "watch";
+        statusText = "注意";
+        statusClass = "bg-yellow-50 border-yellow-200 text-yellow-700";
+      }
+
+      if (remain <= 100) {
+        level = "low";
+        statusText = "快補貨";
+        statusClass = "bg-red-50 border-red-200 text-red-700";
+      }
+
+      return {
+        product: p,
+        stock,
+        reservedQty,
+        remain,
+        percent,
+        level,
+        statusText,
+        statusClass,
+        relatedOrders
+      };
+    });
+}
+
+function setStockMode(mode) {
+  window.stockMode = mode;
+  renderStock();
+}
+
+function setStockSort(sort) {
+  window.stockSort = sort;
+  renderStock();
+}
+
+function renderStock() {
+  const mode = window.stockMode || "all";
+  const sort = window.stockSort || "risk";
+  const rows = getStockRows();
+
+  const filteredRows = rows
+    .filter(row => {
+      if (mode === "low") return row.level === "low";
+      if (mode === "watch") return row.level === "watch";
+      if (mode === "safe") return row.level === "safe";
+      if (mode === "needed") return row.reservedQty > 0;
+      return true;
+    })
+    .sort((a, b) => {
+      if (sort === "remain") return a.remain - b.remain;
+      if (sort === "demand") return b.reservedQty - a.reservedQty;
+      if (sort === "stock") return a.stock - b.stock;
+
+      const levelRank = { low: 1, watch: 2, safe: 3 };
+      const rankDiff = levelRank[a.level] - levelRank[b.level];
+      if (rankDiff !== 0) return rankDiff;
+
+      return a.remain - b.remain;
     });
 
-  const stock = Number(p.stock || 0);
-  const remain = stock - reservedQty;
-
-  let statusText = "🟢 安全";
-  let statusColor = "text-green-600";
-
-  if (remain <= 300) {
-    statusText = "🟡 注意";
-    statusColor = "text-yellow-600";
-  }
-
-  if (remain <= 100) {
-    statusText = "🔴 快補貨";
-    statusColor = "text-red-600";
-  }
-
-  const percent = stock > 0
-    ? Math.min((reservedQty / stock) * 100, 100)
-    : 0;
-
-  return `
-    <div class="bg-white p-5 rounded-2xl shadow border">
-      <div class="font-bold text-xl">${p.name}</div>
-
-      <div class="mt-2 text-sm">
-        實際庫存：${stock}
-      </div>
-
-      <div class="text-sm">
-        訂單需求：${reservedQty}
-      </div>
-
-      <div class="text-sm font-bold">
-        可用庫存：${remain}
-      </div>
-
-      <div class="w-full bg-gray-200 rounded-full h-3 mt-3">
-        <div
-          class="bg-orange-500 h-3 rounded-full"
-          style="width:${percent}%">
-        </div>
-      </div>
-
-      <div class="${statusColor} font-bold mt-2">
-        ${statusText}
-      </div>
-    </div>
+  const stockButton = (key, label, count, cls) => `
+    <button onclick="setStockMode('${key}')"
+      class="${cls} text-white px-4 py-2 rounded-xl ${mode === key ? "ring-4 ring-amber-300" : ""}">
+      ${label} ${count}
+    </button>
   `;
-}).join("")}
+
+  const lowCount = rows.filter(r => r.level === "low").length;
+  const watchCount = rows.filter(r => r.level === "watch").length;
+  const safeCount = rows.filter(r => r.level === "safe").length;
+  const neededCount = rows.filter(r => r.reservedQty > 0).length;
+
+  document.getElementById("adminPanel").innerHTML = `
+    <h2 class="text-2xl font-bold mb-4">庫存查看</h2>
+
+    <div class="flex gap-2 flex-wrap mb-4">
+      ${stockButton("all", "全部", rows.length, "bg-gray-700")}
+      ${stockButton("low", "快補貨", lowCount, "bg-red-700")}
+      ${stockButton("watch", "注意", watchCount, "bg-yellow-600")}
+      ${stockButton("needed", "有訂單需求", neededCount, "bg-blue-700")}
+      ${stockButton("safe", "安全", safeCount, "bg-green-700")}
+
+      <select onchange="setStockSort(this.value)" class="border p-2 rounded-xl">
+        <option value="risk" ${sort === "risk" ? "selected" : ""}>依風險排序</option>
+        <option value="remain" ${sort === "remain" ? "selected" : ""}>可用庫存少到多</option>
+        <option value="demand" ${sort === "demand" ? "selected" : ""}>訂單需求多到少</option>
+        <option value="stock" ${sort === "stock" ? "selected" : ""}>實際庫存少到多</option>
+      </select>
+    </div>
+
+    <div class="bg-amber-50 p-4 rounded-xl mb-4 text-sm text-amber-900">
+      可用庫存 = 實際庫存 - 未完成訂單需求；禮盒會自動拆成單品需求計算。
+      目前顯示 ${filteredRows.length} / ${rows.length} 項。
+    </div>
+
+    <div class="grid md:grid-cols-3 gap-4">
+      ${filteredRows.map(row => `
+        <div class="p-5 rounded-2xl shadow border ${row.statusClass}">
+          <div class="flex justify-between gap-2">
+            <div class="font-bold text-xl">${row.product.name}</div>
+            <div class="font-bold">${row.statusText}</div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-2 mt-4 text-center">
+            <div class="bg-white/70 rounded-xl p-3">
+              <div class="text-xs text-gray-500">實際</div>
+              <div class="text-xl font-bold">${row.stock}</div>
+            </div>
+            <div class="bg-white/70 rounded-xl p-3">
+              <div class="text-xs text-gray-500">需求</div>
+              <div class="text-xl font-bold">${row.reservedQty}</div>
+            </div>
+            <div class="bg-white/70 rounded-xl p-3">
+              <div class="text-xs text-gray-500">可用</div>
+              <div class="text-xl font-bold">${row.remain}</div>
+            </div>
+          </div>
+
+          <div class="w-full bg-white/70 rounded-full h-3 mt-4">
+            <div class="bg-orange-500 h-3 rounded-full" style="width:${row.percent}%"></div>
+          </div>
+
+          <div class="mt-3 text-sm">
+            ${
+              row.relatedOrders.length
+                ? row.relatedOrders.slice(0, 4).map(order => `
+                  <button onclick="openOrderInOrders('${order.id}')"
+                    class="block text-left w-full py-1 text-blue-700 hover:underline">
+                    ${order.date}｜${order.name}｜需求 ${order.qty}
+                  </button>
+                `).join("")
+                : `<div class="text-gray-500">目前沒有未完成訂單需求</div>`
+            }
+            ${
+              row.relatedOrders.length > 4
+                ? `<div class="text-gray-500">另有 ${row.relatedOrders.length - 4} 筆訂單需求</div>`
+                : ""
+            }
+          </div>
+        </div>
+      `).join("")}
     </div>
   `;
 }
