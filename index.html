@@ -781,6 +781,8 @@ function showAdminTab(tab) {
 function openOrderInOrders(orderId) {
   window.orderSearchKeyword = String(orderId || "");
   window.highlightOrderId = String(orderId || "");
+  window.expandedOrderIds = window.expandedOrderIds || {};
+  window.expandedOrderIds[String(orderId || "")] = true;
   window.orderStatusFilter = "";
   window.orderDeliveryFilter = "";
   window.orderQuickFilter = "";
@@ -813,6 +815,25 @@ function clearOrderFilters() {
   if (payment) payment.value = "";
 
   renderOrders();
+}
+
+function isOrderDetailOpen(orderId) {
+  window.expandedOrderIds = window.expandedOrderIds || {};
+  return Boolean(window.expandedOrderIds[String(orderId)]);
+}
+
+function toggleOrderDetail(orderId) {
+  window.expandedOrderIds = window.expandedOrderIds || {};
+  const key = String(orderId);
+  window.expandedOrderIds[key] = !window.expandedOrderIds[key];
+  renderOrders();
+
+  setTimeout(() => {
+    document.getElementById("orderCard-" + key)?.scrollIntoView({
+      behavior: "smooth",
+      block: "start"
+    });
+  }, 0);
 }
 
 function isClosedOrder(o) {
@@ -1138,6 +1159,7 @@ function orderCard(o) {
   const unpaidAmount = getUnpaidAmount(o);
   const paymentMethod = o.payment_method || "";
   const paymentNote = o.payment_note || "";
+  const detailOpen = isOrderDetailOpen(o.id);
   const projectNameFromNote = (o.note || "").match(/專案名稱[:：]\s*([^\n]+)/)?.[1] || "";
   const projectItemSummary = items
     .map(i => i.raw_name || i.name || "")
@@ -1185,9 +1207,8 @@ function orderCard(o) {
             <div class="bg-gray-50 rounded-xl p-2">方式：${o.delivery || ""}</div>
             <div class="bg-gray-50 rounded-xl p-2">日期：${processDate || "未填"}</div>
           </div>
-          ${o.delivery === "宅配" ? `<div class="text-sm">應寄出日：${shipDate || "未填"}</div>` : ""}
-          <div class="text-sm mt-2 break-words">地址：${o.address || ""}</div>
-          <div class="text-sm break-words">備註：${o.note || ""}</div>
+          ${o.delivery === "宅配" ? `<div class="text-sm mt-2 text-blue-700">應寄出日：${shipDate || "未填"}</div>` : ""}
+          ${o.note ? `<div class="text-sm mt-2 text-purple-700 break-words">備註：${o.note}</div>` : ""}
           <div class="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
             <button type="button" onclick="quickMarkPaid('${o.id}', 'orders')"
               class="mobile-action-btn bg-emerald-700 text-white px-3 py-2 rounded-xl font-bold text-sm">
@@ -1210,17 +1231,10 @@ function orderCard(o) {
             </button>
           </div>
 
-          <div class="mt-2 flex gap-2 flex-wrap">
-            <button type="button" onclick="editOrder('${o.id}')"
-              class="mobile-action-btn bg-blue-600 text-white px-4 py-2 rounded-xl">
-              修改
-            </button>
-
-            <button type="button" onclick="deleteOrder('${o.id}')"
-              class="mobile-action-btn bg-red-600 text-white px-4 py-2 rounded-xl">
-              刪除
-            </button>
-          </div>
+          <button type="button" onclick="toggleOrderDetail('${o.id}')"
+            class="mobile-action-btn mt-2 w-full sm:w-auto bg-gray-700 text-white px-4 py-2 rounded-xl font-bold">
+            ${detailOpen ? "收合明細" : "查看明細"}
+          </button>
 
 </div>
         </div>
@@ -1229,47 +1243,81 @@ function orderCard(o) {
           <div class="mt-2 inline-block border rounded-full px-3 py-1 text-sm font-bold ${getPaymentBadgeClass(o)}">
             ${paymentStatus}｜已收 NT$ ${money(paidAmount)}｜未收 NT$ ${money(unpaidAmount)}
           </div>
-          <select onchange="updateOrderStatus('${o.id}', this.value)" class="border p-3 rounded-xl mt-2 w-full">
-            ${["未完成","已取貨","已宅配","已取消"].map(s => `
-              <option value="${s}" ${o.status === s ? "selected" : ""}>${s}</option>
-            `).join("")}
-          </select>
-          <div class="mt-2 grid grid-cols-1 gap-2 text-left">
-            <select onchange="updateOrderPayment('${o.id}', 'payment_status', this.value)"
-              class="border p-3 rounded-xl w-full">
-              ${["未收款","已收款","訂金","退款"].map(s => `
-                <option value="${s}" ${paymentStatus === s ? "selected" : ""}>${s}</option>
-              `).join("")}
-            </select>
-
-            <select onchange="updateOrderPayment('${o.id}', 'payment_method', this.value)"
-              class="border p-3 rounded-xl w-full">
-              ${["","現金","匯款","LINE Pay","其他"].map(s => `
-                <option value="${s}" ${paymentMethod === s ? "selected" : ""}>${s || "付款方式"}</option>
-              `).join("")}
-            </select>
-
-            <input type="number" value="${paidAmount}"
-              onchange="updateOrderPayment('${o.id}', 'paid_amount', this.value)"
-              class="border p-3 rounded-xl w-full"
-              placeholder="已收金額">
-
-            <button type="button" onclick="editPaymentNote('${o.id}')"
-              class="mobile-action-btn bg-gray-600 text-white px-3 py-2 rounded-xl text-sm font-bold">
-              付款備註${paymentNote ? "：" + paymentNote : ""}
-            </button>
-
-            ${unpaidAmount > 0 ? `
-              <button type="button" onclick="markOrderPaid('${o.id}')"
-                class="mobile-action-btn bg-green-700 text-white px-3 py-2 rounded-xl text-sm font-bold">
-                一鍵已收全額
-              </button>
-            ` : ""}
+          <div class="mt-2 text-sm text-gray-600 text-left lg:text-right">
+            ${paymentMethod ? `付款：${paymentMethod}` : "付款方式未填"}
+            ${paymentNote ? `<div>備註：${paymentNote}</div>` : ""}
           </div>
         </div>
       </div>
-      <div class="bg-amber-50 rounded-xl p-3 mt-3 whitespace-pre-line order-card-text">
-        ${isProject ? projectItemsHtml : normalItemsHtml}
+      <div id="orderDetail-${o.id}" class="${detailOpen ? "" : "hidden"} mt-4 border-t pt-4">
+        <div class="grid lg:grid-cols-[1fr_320px] gap-4">
+          <div class="order-card-text">
+            <div class="bg-gray-50 rounded-xl p-3 mb-3">
+              <div class="font-bold mb-1">配送資訊</div>
+              <div class="text-sm">地址：${o.address || "未填"}</div>
+              <div class="text-sm">備註：${o.note || "無"}</div>
+            </div>
+
+            <div class="bg-amber-50 rounded-xl p-3 whitespace-pre-line order-card-text">
+              <div class="font-bold mb-1">商品明細</div>
+              ${isProject ? projectItemsHtml : normalItemsHtml}
+            </div>
+          </div>
+
+          <div class="bg-gray-50 rounded-2xl p-3">
+            <div class="font-bold mb-2">狀態與付款</div>
+            <select onchange="updateOrderStatus('${o.id}', this.value)" class="border p-3 rounded-xl w-full">
+              ${["未完成","已取貨","已宅配","已取消"].map(s => `
+                <option value="${s}" ${o.status === s ? "selected" : ""}>${s}</option>
+              `).join("")}
+            </select>
+
+            <div class="mt-2 grid grid-cols-1 gap-2 text-left">
+              <select onchange="updateOrderPayment('${o.id}', 'payment_status', this.value)"
+                class="border p-3 rounded-xl w-full">
+                ${["未收款","已收款","訂金","退款"].map(s => `
+                  <option value="${s}" ${paymentStatus === s ? "selected" : ""}>${s}</option>
+                `).join("")}
+              </select>
+
+              <select onchange="updateOrderPayment('${o.id}', 'payment_method', this.value)"
+                class="border p-3 rounded-xl w-full">
+                ${["","現金","匯款","LINE Pay","其他"].map(s => `
+                  <option value="${s}" ${paymentMethod === s ? "selected" : ""}>${s || "付款方式"}</option>
+                `).join("")}
+              </select>
+
+              <input type="number" value="${paidAmount}"
+                onchange="updateOrderPayment('${o.id}', 'paid_amount', this.value)"
+                class="border p-3 rounded-xl w-full"
+                placeholder="已收金額">
+
+              <button type="button" onclick="editPaymentNote('${o.id}')"
+                class="mobile-action-btn bg-gray-600 text-white px-3 py-2 rounded-xl text-sm font-bold">
+                付款備註${paymentNote ? "：" + paymentNote : ""}
+              </button>
+
+              ${unpaidAmount > 0 ? `
+                <button type="button" onclick="markOrderPaid('${o.id}')"
+                  class="mobile-action-btn bg-green-700 text-white px-3 py-2 rounded-xl text-sm font-bold">
+                  一鍵已收全額
+                </button>
+              ` : ""}
+
+              <div class="grid grid-cols-2 gap-2">
+                <button type="button" onclick="editOrder('${o.id}')"
+                  class="mobile-action-btn bg-blue-600 text-white px-4 py-2 rounded-xl font-bold">
+                  修改
+                </button>
+
+                <button type="button" onclick="deleteOrder('${o.id}')"
+                  class="mobile-action-btn bg-red-600 text-white px-4 py-2 rounded-xl font-bold">
+                  刪除
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   `;
