@@ -1034,6 +1034,34 @@ function daysFromToday(dateStr) {
   return Math.round((date - today) / 86400000);
 }
 
+function getOrderTextForAlerts(o) {
+  return [
+    o.note || "",
+    o.payment_note || "",
+    ...(o.items || []).map(i => `${i.name || ""} ${i.raw_name || ""}`)
+  ].join(" ");
+}
+
+function hasEggYolkRequest(o) {
+  const text = getOrderTextForAlerts(o)
+    .replace(/\s+/g, "")
+    .toLowerCase();
+
+  if (!text.includes("蛋黃")) return false;
+  if (/(不要|不用|不加|無|免|去|拿掉).*蛋黃|蛋黃.*(不要|不用|不加|無|免|去|拿掉)/.test(text)) return false;
+
+  return /(加.*蛋黃|蛋黃.*加|一顆蛋黃|整顆蛋黃|蛋黃)/.test(text);
+}
+
+function getEggYolkWorkDays(o) {
+  return daysFromToday(getShippingWorkDate(o) || getProcessDate(o));
+}
+
+function needsEggYolkPrep(o) {
+  const days = getEggYolkWorkDays(o);
+  return hasEggYolkRequest(o) && days !== null && days <= 5;
+}
+
 function getOrderReminderBadges(o) {
   const badges = [];
   const isClosed = isClosedOrder(o);
@@ -1060,6 +1088,15 @@ function getOrderReminderBadges(o) {
     } else if (shipDays === 0) {
       badges.push({ text: "📦 今天應寄出", cls: "bg-blue-100 text-blue-700 border-blue-300" });
     }
+  }
+
+  if (!isClosed && hasEggYolkRequest(o)) {
+    badges.push({
+      text: needsEggYolkPrep(o) ? "🥚 蛋黃單：請先備料" : "🥚 加蛋黃 +10",
+      cls: needsEggYolkPrep(o)
+        ? "bg-red-100 text-red-800 border-red-400"
+        : "bg-yellow-100 text-yellow-800 border-yellow-400"
+    });
   }
 
   if (o.note && o.note.trim() !== "") {
@@ -1105,6 +1142,15 @@ function getOrderAlert(o) {
     badges.push({ text: "🚨 已逾期未結案", cls: "bg-red-100 text-red-700 border-red-300" });
   }
 
+  if (hasEggYolkRequest(o)) {
+    badges.push({
+      text: needsEggYolkPrep(o) ? "🥚 蛋黃單：出貨前先備料" : "🥚 加蛋黃 +10",
+      cls: needsEggYolkPrep(o)
+        ? "bg-red-100 text-red-800 border-red-400"
+        : "bg-yellow-100 text-yellow-800 border-yellow-400"
+    });
+  }
+
   if (o.note && o.note.trim() !== "") {
     badges.push({ text: "📝 特殊備註", cls: "bg-purple-100 text-purple-700 border-purple-300" });
   }
@@ -1144,6 +1190,7 @@ function getOrderSortRank(o) {
   if (o.delivery === "宅配" && shipDays !== null && shipDays <= 0) return 3;
   if (processDays === 1) return 4;
   if (processDays !== null && processDays > 1 && processDays <= 3) return 5;
+  if (needsEggYolkPrep(o)) return 5;
 
   return 6;
 }
@@ -1197,7 +1244,8 @@ function renderOrders() {
         (quickFilter === "overdue" && !isClosedOrder(o) && daysFromToday(getProcessDate(o)) < 0) ||
         (quickFilter === "shipping" && !isClosedOrder(o) && o.delivery === "宅配") ||
         (quickFilter === "pickup" && !isClosedOrder(o) && o.delivery === "自取") ||
-        (quickFilter === "unpaid" && getUnpaidAmount(o) > 0);
+        (quickFilter === "unpaid" && getUnpaidAmount(o) > 0) ||
+        (quickFilter === "eggYolk" && !isClosedOrder(o) && hasEggYolkRequest(o));
 
       return matchKeyword && matchPayment && matchStatus && matchDelivery && matchQuick;
     })
@@ -1273,6 +1321,7 @@ function renderOrders() {
       <button onclick="setOrderQuickFilter('shipping')" class="bg-blue-600 text-white px-4 py-2 rounded-xl">宅配待寄</button>
       <button onclick="setOrderQuickFilter('pickup')" class="bg-lime-700 text-white px-4 py-2 rounded-xl">自取待取</button>
       <button onclick="setOrderQuickFilter('unpaid')" class="bg-amber-700 text-white px-4 py-2 rounded-xl">未結清 ${unpaidCount}</button>
+      <button onclick="setOrderQuickFilter('eggYolk')" class="bg-yellow-600 text-white px-4 py-2 rounded-xl">加蛋黃 ${orders.filter(o => !isClosedOrder(o) && hasEggYolkRequest(o)).length}</button>
       <button onclick="clearOrderFilters()" class="bg-gray-700 text-white px-4 py-2 rounded-xl">清除篩選</button>
       <button
         onclick="refreshAdmin().then(renderOrders)"
@@ -1356,6 +1405,11 @@ function orderCard(o) {
 ">
       ${isProject ? `<div class="mb-3 inline-block bg-indigo-100 text-indigo-700 border border-indigo-300 rounded-full px-3 py-1 text-sm font-bold">🧪 專案/特殊訂單</div>` : ""}
       ${renderOrderBadges(o)}
+      ${hasEggYolkRequest(o) ? `
+        <div class="mb-3 bg-yellow-100 border-2 border-yellow-500 text-yellow-900 rounded-xl p-3 font-bold">
+          🥚 加蛋黃特殊單：一顆蛋黃 +10 元。${needsEggYolkPrep(o) ? "工作日前 5 天內，請先備料，避免出貨前來不及加。" : "請留意商品名稱可能仍顯示一般粽。"}
+        </div>
+      ` : ""}
       <div class="grid lg:grid-cols-[1fr_320px] gap-4 items-start">
         <div class="min-w-0 order-card-text">
         ${
@@ -1672,6 +1726,8 @@ function renderWarDashboard() {
   const unpaidList = unfinishedOrders.filter(o => getUnpaidAmount(o) > 0);
   const shipTodayList = unfinishedOrders.filter(o => o.delivery === "宅配" && daysFromToday(getShipDate(o)) === 0);
   const shipOverdueList = unfinishedOrders.filter(o => o.delivery === "宅配" && daysFromToday(getShipDate(o)) < 0);
+  const eggYolkList = unfinishedOrders.filter(o => hasEggYolkRequest(o));
+  const eggYolkPrepList = unfinishedOrders.filter(o => needsEggYolkPrep(o));
 
   const duplicateGroups = Object.values(activeOrders.reduce((groups, o) => {
     const phone = String(o.phone || "").trim();
@@ -1736,6 +1792,11 @@ function renderWarDashboard() {
 
     return `
       <div class="bg-white border rounded-xl p-4 mb-3 ${unpaid > 0 ? "border-red-200 bg-red-50" : ""}">
+        ${hasEggYolkRequest(o) ? `
+          <div class="mb-3 bg-yellow-100 border-2 border-yellow-500 text-yellow-900 rounded-xl p-3 font-bold">
+            🥚 加蛋黃特殊單｜一顆 +10 元｜${needsEggYolkPrep(o) ? "請先備料" : "請出貨前確認"}
+          </div>
+        ` : ""}
         <div class="grid lg:grid-cols-5 gap-3 items-start">
           <div>
             <button type="button" onclick="openOrderInOrders('${o.id}')"
@@ -1879,6 +1940,11 @@ function renderWarDashboard() {
         <div class="text-2xl font-bold text-red-700">${abnormalWorkList.length}</div>
       </button>
 
+      <button onclick="setOrderQuickFilter('eggYolk'); showAdminTab('orders')" class="bg-yellow-50 border border-yellow-300 p-4 rounded-xl text-left">
+        <div class="font-bold">蛋黃預備</div>
+        <div class="text-2xl font-bold text-yellow-700">${eggYolkPrepList.length}</div>
+      </button>
+
       <div class="bg-amber-50 border border-amber-300 p-4 rounded-xl">
         <div class="font-bold">大單雷達</div>
         <div class="text-2xl font-bold text-amber-700">${bigOrders.length}</div>
@@ -1886,6 +1952,9 @@ function renderWarDashboard() {
     </div>
 
     <div class="space-y-6">
+      ${renderSection("蛋黃預備", eggYolkList, "目前沒有加蛋黃訂單", {
+        sort: sortByDashboardDate
+      })}
       ${renderSection("異常警報", abnormalWorkList, "目前沒有異常訂單")}
       ${renderSection("今日必做", todayList, "今天沒有必做訂單")}
       ${renderSection("明日預備", tomorrowList, "明天沒有預備訂單")}
@@ -1985,6 +2054,10 @@ function getShippingReminderList(o) {
   const processDays = daysFromToday(getProcessDate(o));
   const shipDays = daysFromToday(getShipDate(o));
 
+  if (hasEggYolkRequest(o)) {
+    reminders.push(needsEggYolkPrep(o) ? "蛋黃單先備料" : "加蛋黃+10");
+  }
+
   if (o.delivery === "宅配" && shipDays !== null) {
     if (shipDays < 0) {
       reminders.push("已超過寄出日");
@@ -2039,10 +2112,12 @@ function getShippingPriority(o) {
     return "D 三天內";
   }
 
-  if (o.note && o.note.trim() !== "") return "E 特別注意";
-  if (Number(o.total || 0) > 3000) return "F 大單";
+  if (needsEggYolkPrep(o)) return "E 蛋黃預備";
+  if (hasEggYolkRequest(o)) return "F 加蛋黃";
+  if (o.note && o.note.trim() !== "") return "G 特別注意";
+  if (Number(o.total || 0) > 3000) return "H 大單";
 
-  return "G 一般";
+  return "I 一般";
 }
 
 function getShippingSortRank(o) {
@@ -2054,8 +2129,10 @@ function getShippingSortRank(o) {
   if (priority.startsWith("D")) return 4;
   if (priority.startsWith("E")) return 5;
   if (priority.startsWith("F")) return 6;
+  if (priority.startsWith("G")) return 7;
+  if (priority.startsWith("H")) return 8;
 
-  return 7;
+  return 9;
 }
 
 function getFilteredShippingOrders() {
@@ -2192,7 +2269,7 @@ function renderShippingList() {
 
     <div class="bg-yellow-50 p-4 rounded-xl mb-4">
       目前顯示 ${list.length} 筆，Excel 會依照上方模式與日期篩選輸出「A4列印版」與「完整資料」。
-      排序依照逾期、今日、明日、三天內、特殊備註、大單。
+      排序依照逾期、今日、明日、三天內、蛋黃預備、特殊備註、大單。
     </div>
 
     <div class="space-y-4">
@@ -2202,6 +2279,11 @@ function renderShippingList() {
             <div class="bg-white border rounded-xl p-4 ${
               getUnpaidAmount(o) > 0 ? "border-red-200 bg-red-50" : ""
             }">
+              ${hasEggYolkRequest(o) ? `
+                <div class="mb-3 bg-yellow-100 border-2 border-yellow-500 text-yellow-900 rounded-xl p-3 font-bold">
+                  🥚 加蛋黃特殊單｜一顆 +10 元｜${needsEggYolkPrep(o) ? "請先備料，避免出貨前來不及加" : "請出貨前確認"}
+                </div>
+              ` : ""}
               <div class="flex justify-between gap-3 flex-wrap">
                 <div>
                   <div class="font-bold text-lg">
@@ -2335,7 +2417,7 @@ function exportShippingExcel() {
 
   const printSheet = XLSX.utils.aoa_to_sheet([
     ["陳媽媽出貨 / 取貨清單"],
-    [`匯出日期：${todayStr()}　筆數：${list.length}　排序：逾期、今日、明日、三天內、特殊備註、大單`],
+    [`匯出日期：${todayStr()}　筆數：${list.length}　排序：逾期、今日、明日、三天內、蛋黃預備、特殊備註、大單`],
     printHeaders,
     ...printRows
   ]);
