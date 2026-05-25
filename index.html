@@ -4760,6 +4760,80 @@ function getStockRows() {
     });
 }
 
+function getBaseStockRows() {
+  const baseNames = [
+    "南部粽",
+    "北部粽",
+    "豪華粽",
+    "素食粽",
+    "鹼粽",
+    "紅豆鹼粽"
+  ];
+
+  return baseNames.map(baseName => {
+    const product = getBaseZongziProductByName(baseName);
+    let reservedQty = 0;
+    const relatedOrders = [];
+
+    if (product) {
+      orders
+        .filter(o => !isClosedOrder(o))
+        .forEach(order => {
+          const orderDemandMap = getOrderProductDemandMap(order);
+          const orderQty = Number(orderDemandMap[String(product.id)] || 0);
+
+          if (orderQty > 0) {
+            reservedQty += orderQty;
+            relatedOrders.push({
+              id: order.id,
+              name: order.name || "未填姓名",
+              date: getProcessDate(order) || getShippingWorkDate(order) || "未填日期",
+              qty: orderQty,
+              shortage: hasNearStockShortage(order)
+            });
+          }
+        });
+    }
+
+    const stock = product ? Number(product.stock || 0) : 0;
+    const remain = stock - reservedQty;
+    const percent = stock > 0
+      ? Math.min((reservedQty / stock) * 100, 100)
+      : reservedQty > 0 ? 100 : 0;
+
+    let level = "safe";
+    let statusText = "安全";
+    let statusClass = "bg-green-50 border-green-200 text-green-700";
+
+    if (!product) {
+      level = "missing";
+      statusText = "未建商品";
+      statusClass = "bg-gray-50 border-gray-200 text-gray-700";
+    } else if (remain <= 100) {
+      level = "low";
+      statusText = "快補貨";
+      statusClass = "bg-red-50 border-red-200 text-red-700";
+    } else if (remain <= 300) {
+      level = "watch";
+      statusText = "注意";
+      statusClass = "bg-yellow-50 border-yellow-200 text-yellow-700";
+    }
+
+    return {
+      baseName,
+      product,
+      stock,
+      reservedQty,
+      remain,
+      percent,
+      level,
+      statusText,
+      statusClass,
+      relatedOrders
+    };
+  });
+}
+
 function setStockMode(mode) {
   window.stockMode = mode;
   renderStock();
@@ -4773,6 +4847,7 @@ function setStockSort(sort) {
 function renderStock() {
   const mode = window.stockMode || "all";
   const sort = window.stockSort || "risk";
+  const baseRows = getBaseStockRows();
   const rows = getStockRows();
 
   const filteredRows = rows
@@ -4806,9 +4881,75 @@ function renderStock() {
   const watchCount = rows.filter(r => r.level === "watch").length;
   const safeCount = rows.filter(r => r.level === "safe").length;
   const neededCount = rows.filter(r => r.reservedQty > 0).length;
+  const baseLowCount = baseRows.filter(r => r.level === "low").length;
 
   document.getElementById("adminPanel").innerHTML = `
     <h2 class="text-2xl font-bold mb-4">庫存查看</h2>
+
+    <section class="bg-white rounded-2xl shadow p-5 mb-6">
+      <div class="flex justify-between items-center flex-wrap gap-3 mb-4">
+        <div>
+          <h3 class="text-xl font-bold">基準粽庫存檢查表</h3>
+          <div class="text-sm text-gray-500">
+            只看南部、北部、豪華、素食、鹼粽、紅豆鹼粽；10入、20入、禮盒都會換算回基準粽。
+          </div>
+        </div>
+        <span class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm font-bold">
+          快補貨 ${baseLowCount}
+        </span>
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-4">
+        ${baseRows.map(row => `
+          <div class="p-5 rounded-2xl border ${row.statusClass}">
+            <div class="flex justify-between gap-2">
+              <div>
+                <div class="font-bold text-xl">${row.baseName}</div>
+                <div class="text-xs text-gray-500">${row.product ? row.product.name : "找不到對應基準商品"}</div>
+              </div>
+              <div class="font-bold">${row.statusText}</div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2 mt-4 text-center">
+              <div class="bg-white/70 rounded-xl p-3">
+                <div class="text-xs text-gray-500">實際</div>
+                <div class="text-xl font-bold">${row.stock}</div>
+              </div>
+              <div class="bg-white/70 rounded-xl p-3">
+                <div class="text-xs text-gray-500">需求</div>
+                <div class="text-xl font-bold">${row.reservedQty}</div>
+              </div>
+              <div class="bg-white/70 rounded-xl p-3">
+                <div class="text-xs text-gray-500">可用</div>
+                <div class="text-xl font-bold">${row.remain}</div>
+              </div>
+            </div>
+
+            <div class="w-full bg-white/70 rounded-full h-3 mt-4">
+              <div class="bg-orange-500 h-3 rounded-full" style="width:${row.percent}%"></div>
+            </div>
+
+            <div class="mt-3 text-sm">
+              ${
+                row.relatedOrders.length
+                  ? row.relatedOrders.slice(0, 4).map(order => `
+                    <button onclick="openOrderInOrders('${order.id}')"
+                      class="block text-left w-full py-1 ${order.shortage ? "text-red-700 font-bold" : "text-blue-700"} hover:underline">
+                      ${order.shortage ? "⚠️ " : ""}${order.date}｜${order.name}｜需求 ${order.qty}
+                    </button>
+                  `).join("")
+                  : `<div class="text-gray-500">目前沒有未完成訂單需求</div>`
+              }
+              ${
+                row.relatedOrders.length > 4
+                  ? `<div class="text-gray-500">另有 ${row.relatedOrders.length - 4} 筆訂單需求</div>`
+                  : ""
+              }
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    </section>
 
     <div class="flex gap-2 flex-wrap mb-4">
       ${stockButton("all", "全部", rows.length, "bg-gray-700")}
@@ -4826,7 +4967,8 @@ function renderStock() {
     </div>
 
     <div class="bg-amber-50 p-4 rounded-xl mb-4 text-sm text-amber-900">
-      可用庫存 = 實際庫存 - 未完成訂單需求；禮盒會自動拆成單品需求計算。
+      下方是商品詳細庫存；主要粽子請以上方「基準粽庫存檢查表」為準。
+      可用庫存 = 實際庫存 - 未完成訂單需求。
       目前顯示 ${filteredRows.length} / ${rows.length} 項。
     </div>
 
