@@ -937,6 +937,37 @@ function clearOrderFilters() {
   renderOrders();
 }
 
+function handleOrderSearchCompositionStart() {
+  window.orderSearchComposing = true;
+  if (window.orderSearchTimer) {
+    clearTimeout(window.orderSearchTimer);
+  }
+}
+
+function handleOrderSearchCompositionEnd(input) {
+  window.orderSearchComposing = false;
+  window.orderSearchKeyword = input.value;
+  window.restoreOrderSearchFocus = true;
+  renderOrders();
+}
+
+function handleOrderSearchInput(input) {
+  window.orderSearchKeyword = input.value;
+
+  if (window.orderSearchComposing) {
+    return;
+  }
+
+  if (window.orderSearchTimer) {
+    clearTimeout(window.orderSearchTimer);
+  }
+
+  window.orderSearchTimer = setTimeout(() => {
+    window.restoreOrderSearchFocus = true;
+    renderOrders();
+  }, 250);
+}
+
 function isOrderDetailOpen(orderId) {
   window.expandedOrderIds = window.expandedOrderIds || {};
   return Boolean(window.expandedOrderIds[String(orderId)]);
@@ -1196,7 +1227,9 @@ function renderOrders() {
         placeholder="搜尋姓名 / 電話 / 訂單編號 / 地址 / 商品"
         class="border p-3 rounded-xl md:col-span-2"
         value="${keyword}"
-        oninput="renderOrders()"
+        oncompositionstart="handleOrderSearchCompositionStart()"
+        oncompositionend="handleOrderSearchCompositionEnd(this)"
+        oninput="handleOrderSearchInput(this)"
       >
 
       <select
@@ -1265,6 +1298,18 @@ function renderOrders() {
     setTimeout(() => {
       const target = document.getElementById("orderCard-" + window.highlightOrderId);
       target?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
+  }
+
+  if (window.restoreOrderSearchFocus) {
+    window.restoreOrderSearchFocus = false;
+    setTimeout(() => {
+      const input = document.getElementById("orderSearch");
+      if (!input) return;
+
+      input.focus();
+      const pos = input.value.length;
+      input.setSelectionRange(pos, pos);
     }, 0);
   }
 }
