@@ -2194,9 +2194,33 @@ function exportShippingExcel() {
   
 function renderEmailImport() {
   document.getElementById("adminPanel").innerHTML = `
-    <h2 class="text-2xl font-bold mb-4">匯入官網 Email 訂單</h2>
+    <h2 class="text-2xl font-bold mb-4">匯入官網訂單</h2>
+
+    <div class="bg-white p-5 rounded-2xl shadow mb-6">
+      <h3 class="text-xl font-bold mb-3">匯入官網 Excel</h3>
+      <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4 text-sm text-blue-900">
+        官網後台先勾選訂單，再按「匯出Excel」。回到這裡選檔後會先預覽，不會立刻寫入。
+      </div>
+
+      <input
+        id="websiteExcelFile"
+        type="file"
+        accept=".xlsx,.xls,.csv"
+        class="border p-3 rounded-xl w-full mb-4"
+        onchange="previewWebsiteExcelImport()"
+      >
+
+      <div id="websiteExcelPreview" class="mb-4"></div>
+
+      <button
+        onclick="importWebsiteExcelOrders()"
+        class="bg-green-700 text-white px-6 py-3 rounded-xl font-bold">
+        確認匯入預覽訂單
+      </button>
+    </div>
 
     <div class="bg-white p-5 rounded-2xl shadow">
+      <h3 class="text-xl font-bold mb-3">貼上官網 Email</h3>
       <textarea
         id="emailOrderText"
         class="border p-3 rounded-xl w-full h-96 mb-4"
@@ -2210,6 +2234,232 @@ function renderEmailImport() {
       </button>
     </div>
   `;
+}
+
+let websiteExcelImportOrders = [];
+
+function normalizeWebsiteHeader(value) {
+  return String(value || "")
+    .replace(/\s/g, "")
+    .replace(/[：:]/g, "")
+    .trim();
+}
+
+function getWebsiteCell(row, candidates) {
+  const keys = Object.keys(row || {});
+  for (const candidate of candidates) {
+    const normalizedCandidate = normalizeWebsiteHeader(candidate);
+    const key = keys.find(k => normalizeWebsiteHeader(k) === normalizedCandidate);
+    if (key) return row[key];
+  }
+
+  for (const candidate of candidates) {
+    const normalizedCandidate = normalizeWebsiteHeader(candidate);
+    const key = keys.find(k => normalizeWebsiteHeader(k).includes(normalizedCandidate));
+    if (key) return row[key];
+  }
+
+  return "";
+}
+
+function parseWebsiteAmount(value) {
+  return Number(String(value || "0").replace(/[^\d.-]/g, "")) || 0;
+}
+
+function parseWebsiteDate(value) {
+  if (!value) return new Date().toISOString();
+
+  if (typeof value === "number") {
+    const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+    excelEpoch.setUTCDate(excelEpoch.getUTCDate() + value);
+    return excelEpoch.toISOString();
+  }
+
+  const date = new Date(String(value).replace(/\//g, "-"));
+  return isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
+}
+
+function parseWebsiteItems(row) {
+  const itemText = String(
+    getWebsiteCell(row, ["商品明細", "訂單明細", "商品", "商品名稱", "品項"]) || ""
+  ).trim();
+
+  if (!itemText) return [];
+
+  const parts = itemText
+    .split(/\n|、|,/)
+    .map(x => x.trim())
+    .filter(Boolean);
+
+  return parts.map((text, index) => {
+    const qtyMatch = text.match(/(?:x|X|＊|\*)\s*(\d+)/) || text.match(/(\d+)\s*(?:組|盒|包|顆|份)$/);
+    const qty = qtyMatch ? Number(qtyMatch[1]) : 1;
+    const name = text
+      .replace(/(?:x|X|＊|\*)\s*\d+.*/, "")
+      .replace(/\d+\s*(?:組|盒|包|顆|份)$/, "")
+      .trim() || text;
+
+    return {
+      id: "webexcel-item-" + Date.now() + "-" + index,
+      name,
+      price: 0,
+      qty
+    };
+  });
+}
+
+function inferWebsiteDelivery(row, address) {
+  const deliveryText = String(getWebsiteCell(row, ["配送方式", "取貨方式", "交付方式", "運送方式"]) || "");
+
+  if (deliveryText.includes("自取")) return "自取";
+  if (deliveryText.includes("外送")) return "有限外送";
+  if (address) return "宅配";
+
+  return "宅配";
+}
+
+function mapWebsiteExcelRow(row, index) {
+  const orderNo = String(getWebsiteCell(row, ["編號", "訂單編號", "訂單ID", "id", "ID"]) || "").trim();
+  const name = String(getWebsiteCell(row, ["收件人姓名", "訂購人姓名", "訂購人", "收件人", "姓名"]) || "").trim();
+  const phone = String(getWebsiteCell(row, ["收件人行動電話", "訂購人行動電話", "行動電話", "手機", "電話"]) || "").trim();
+  const address = String(getWebsiteCell(row, ["收件人地址", "地址", "配送地址"]) || "").trim();
+  const orderDate = String(getWebsiteCell(row, ["訂單日期", "建立時間", "日期"]) || "").trim();
+  const total = parseWebsiteAmount(getWebsiteCell(row, ["總金額", "金額", "訂單金額"]));
+  const freight = parseWebsiteAmount(getWebsiteCell(row, ["運費"]));
+  const bank = String(getWebsiteCell(row, ["銀行名", "銀行"]) || "").trim();
+  const bankLast5 = String(getWebsiteCell(row, ["未五碼", "末五碼", "後五碼", "匯款末五碼"]) || "").trim();
+  const paymentMethod = String(getWebsiteCell(row, ["付款方式"]) || "").trim();
+  const noteParts = [
+    getWebsiteCell(row, ["其他說明", "備註"]),
+    getWebsiteCell(row, ["處理說明"]),
+    getWebsiteCell(row, ["收件時段"]),
+    freight ? `官網運費：${freight}` : ""
+  ].filter(Boolean);
+  const items = parseWebsiteItems(row);
+  const delivery = inferWebsiteDelivery(row, address);
+
+  return {
+    id: "WEBX" + (orderNo || Date.now() + "-" + index),
+    time: parseWebsiteDate(orderDate),
+    name,
+    phone,
+    address,
+    delivery,
+    pickup_date: delivery === "宅配" ? null : null,
+    arrival_date: null,
+    ship_date: null,
+    note: noteParts.join("\n") || "官網 Excel 匯入",
+    items: items.length ? items : [{
+      id: "webexcel-row-" + Date.now() + "-" + index,
+      name: "官網訂單品項未拆分",
+      price: total,
+      qty: 1
+    }],
+    total,
+    status: "未完成",
+    payment_status: "未收款",
+    payment_method: paymentMethod || (bank || bankLast5 ? "匯款" : ""),
+    paid_amount: 0,
+    payment_note: [bank, bankLast5 ? `末五碼 ${bankLast5}` : ""].filter(Boolean).join("｜"),
+    type: "web",
+    source_order_id: orderNo
+  };
+}
+
+async function previewWebsiteExcelImport() {
+  const file = document.getElementById("websiteExcelFile")?.files?.[0];
+  const preview = document.getElementById("websiteExcelPreview");
+
+  websiteExcelImportOrders = [];
+
+  if (!file) {
+    if (preview) preview.innerHTML = "";
+    return;
+  }
+
+  if (!window.XLSX) {
+    alert("Excel 套件尚未載入，請重新整理後再試一次");
+    return;
+  }
+
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: "array" });
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+
+  websiteExcelImportOrders = rows
+    .map(mapWebsiteExcelRow)
+    .filter(o => o.name || o.phone || o.total || o.items.length);
+
+  if (!preview) return;
+
+  preview.innerHTML = `
+    <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-3">
+      讀到 ${rows.length} 列，可匯入 ${websiteExcelImportOrders.length} 筆。請先看前 10 筆是否正常。
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm border">
+        <thead class="bg-gray-100">
+          <tr>
+            <th class="p-2 border text-left">訂單</th>
+            <th class="p-2 border text-left">客戶</th>
+            <th class="p-2 border text-left">電話</th>
+            <th class="p-2 border text-left">方式</th>
+            <th class="p-2 border text-right">金額</th>
+            <th class="p-2 border text-left">品項</th>
+            <th class="p-2 border text-left">付款</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${websiteExcelImportOrders.slice(0, 10).map(o => `
+            <tr>
+              <td class="p-2 border">${o.source_order_id || o.id}</td>
+              <td class="p-2 border">${o.name || "未填"}</td>
+              <td class="p-2 border">${o.phone || ""}</td>
+              <td class="p-2 border">${o.delivery}</td>
+              <td class="p-2 border text-right">NT$ ${money(o.total)}</td>
+              <td class="p-2 border">${o.items.map(i => `${i.name} x ${i.qty}`).join("、")}</td>
+              <td class="p-2 border">${o.payment_method || ""} ${o.payment_note || ""}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+async function importWebsiteExcelOrders() {
+  if (!websiteExcelImportOrders.length) {
+    alert("請先選擇官網 Excel，並確認預覽正常");
+    return;
+  }
+
+  if (!confirm(`確定匯入 ${websiteExcelImportOrders.length} 筆官網 Excel 訂單？`)) {
+    return;
+  }
+
+  const existingIds = new Set(orders.map(o => String(o.id)));
+  const insertOrders = websiteExcelImportOrders
+    .filter(o => !existingIds.has(String(o.id)))
+    .map(({ source_order_id, ...order }) => order);
+
+  if (insertOrders.length === 0) {
+    alert("沒有新訂單可匯入，可能都已經存在");
+    return;
+  }
+
+  const { error } = await db.from("orders").insert(insertOrders);
+
+  if (error) {
+    alert("匯入失敗：" + error.message);
+    return;
+  }
+
+  alert(`官網 Excel 匯入成功：${insertOrders.length} 筆`);
+  websiteExcelImportOrders = [];
+  await refreshAdmin();
+  showAdminTab("orders");
 }
 
 async function importEmailOrder() {
