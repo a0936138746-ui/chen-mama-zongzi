@@ -409,6 +409,15 @@ async function deleteStock(id, productId) {
   loadStockHistory(productId);
 }
   
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
 async function editOrder(id) {
   const order = orders.find(o => o.id === id);
 
@@ -417,97 +426,189 @@ async function editOrder(id) {
     return;
   }
 
-  const newName = prompt("修改姓名", order.name || "");
-  if (newName === null) return;
-
-  const newPhone = prompt("修改電話", order.phone || "");
-  if (newPhone === null) return;
-
-  const newDelivery = prompt(
-    "修改方式（自取 / 宅配 / 有限外送）",
-    order.delivery || "自取"
-  );
-  if (newDelivery === null) return;
-
   const oldDate = order.pickup_date || order.arrival_date || "";
-  const newDate = prompt("修改日期", oldDate);
-  if (newDate === null) return;
+  const items = Array.isArray(order.items) ? order.items : [];
+  const productOptions = products
+    .filter(p => p.active !== false && p.type !== "fee")
+    .map(p => `<option value="${p.id}">${escapeHtml(p.name)}｜NT$ ${money(p.price)}</option>`)
+    .join("");
 
-  const newAddress = prompt("修改地址", order.address || "");
-  if (newAddress === null) return;
+  document.getElementById("editOrderModal")?.remove();
 
-  const newNote = prompt("修改備註", order.note || "");
-  if (newNote === null) return;
+  const modal = document.createElement("div");
+  modal.id = "editOrderModal";
+  modal.className = "fixed inset-0 bg-black/50 z-50 p-3 overflow-y-auto";
+  modal.innerHTML = `
+    <div class="max-w-3xl mx-auto bg-white rounded-2xl shadow-xl p-5">
+      <div class="flex justify-between gap-3 items-start mb-4">
+        <div>
+          <h2 class="text-2xl font-bold">修改訂單</h2>
+          <div class="text-sm text-gray-500">${escapeHtml(order.id || "")}</div>
+        </div>
+        <button type="button" onclick="closeEditOrderModal()"
+          class="mobile-action-btn bg-gray-700 text-white px-4 py-2 rounded-xl font-bold">
+          關閉
+        </button>
+      </div>
 
-  let updatedItems = [...(order.items || [])];
+      <div class="grid md:grid-cols-2 gap-3 mb-4">
+        <input id="editName" class="border p-3 rounded-xl" placeholder="客戶姓名" value="${escapeHtml(order.name || "")}">
+        <input id="editPhone" class="border p-3 rounded-xl" placeholder="電話" value="${escapeHtml(order.phone || "")}">
 
-  const editItems = confirm("是否要修改商品數量？");
+        <select id="editDelivery" class="border p-3 rounded-xl">
+          ${["自取","宅配","有限外送"].map(x => `
+            <option value="${x}" ${order.delivery === x ? "selected" : ""}>${x}</option>
+          `).join("")}
+        </select>
 
-  if (editItems) {
-    updatedItems = updatedItems
-      .map(item => {
-        const newQty = prompt(
-          `${item.name} 目前 ${item.qty} 顆\n輸入新數量（輸入 0 = 刪除商品）`,
-          item.qty
-        );
+        <input id="editDate" type="date" class="border p-3 rounded-xl" value="${escapeHtml(oldDate)}">
+        <input id="editAddress" class="border p-3 rounded-xl md:col-span-2" placeholder="地址" value="${escapeHtml(order.address || "")}">
+      </div>
 
-        if (newQty === null) {
-          return item;
+      <textarea id="editNote" class="border p-3 rounded-xl w-full mb-4" rows="3" placeholder="備註">${escapeHtml(order.note || "")}</textarea>
+
+      <div class="flex justify-between items-center gap-3 mb-2">
+        <h3 class="font-bold text-lg">商品明細</h3>
+        <div class="font-bold text-amber-700">NT$ <span id="editOrderTotal">0</span></div>
+      </div>
+
+      <div id="editItemRows" class="space-y-3 mb-4">
+        ${
+          items.length
+            ? items.map((item, index) => editOrderItemRowHtml(item, index)).join("")
+            : editOrderItemRowHtml({ name: "", qty: 1, price: 0 }, 0)
         }
+      </div>
 
-        return {
-          ...item,
-          qty: Number(newQty)
-        };
-      })
-      .filter(item => item.qty > 0);
+      <div class="bg-amber-50 p-3 rounded-xl mb-4">
+        <div class="grid md:grid-cols-[1fr_auto] gap-2">
+          <select id="editAddProduct" class="border p-3 rounded-xl">
+            <option value="">選擇商品新增到訂單</option>
+            ${productOptions}
+          </select>
+          <button type="button" onclick="addEditOrderProductRow()"
+            class="mobile-action-btn bg-amber-700 text-white px-4 py-2 rounded-xl font-bold">
+            新增商品
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <button type="button" onclick="closeEditOrderModal()"
+          class="mobile-action-btn bg-gray-600 text-white px-4 py-3 rounded-xl font-bold">
+          取消
+        </button>
+        <button type="button" onclick="saveEditOrder('${order.id}')"
+          class="mobile-action-btn bg-green-700 text-white px-4 py-3 rounded-xl font-bold">
+          儲存修改
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+  updateEditOrderTotal();
+}
+
+function editOrderItemRowHtml(item, index) {
+  const itemName = item.raw_name || item.name || "";
+  const itemQty = Number(item.qty || 0);
+  const itemPrice = Number(item.price || 0);
+
+  return `
+    <div class="editItemRow grid md:grid-cols-[1fr_90px_120px_auto] gap-2 bg-gray-50 p-3 rounded-xl">
+      <input class="editItemName border p-3 rounded-xl" placeholder="商品名稱" value="${escapeHtml(itemName)}">
+      <input class="editItemQty border p-3 rounded-xl" type="number" min="0" value="${itemQty}" oninput="updateEditOrderTotal()">
+      <input class="editItemPrice border p-3 rounded-xl" type="number" min="0" value="${itemPrice}" oninput="updateEditOrderTotal()">
+      <button type="button" onclick="this.closest('.editItemRow').remove(); updateEditOrderTotal();"
+        class="mobile-action-btn bg-red-600 text-white px-4 py-2 rounded-xl font-bold">
+        刪除
+      </button>
+      <input class="editItemId" type="hidden" value="${escapeHtml(item.id || ("edit-" + Date.now() + "-" + index))}">
+      <input class="editItemUnit" type="hidden" value="${escapeHtml(item.unit || "")}">
+      <input class="editItemRawName" type="hidden" value="${escapeHtml(item.raw_name || "")}">
+    </div>
+  `;
+}
+
+function closeEditOrderModal() {
+  document.getElementById("editOrderModal")?.remove();
+}
+
+function updateEditOrderTotal() {
+  let total = 0;
+
+  document.querySelectorAll("#editItemRows .editItemRow").forEach(row => {
+    const qty = Number(row.querySelector(".editItemQty")?.value || 0);
+    const price = Number(row.querySelector(".editItemPrice")?.value || 0);
+    total += qty * price;
+  });
+
+  const box = document.getElementById("editOrderTotal");
+  if (box) box.innerText = money(total);
+}
+
+function addEditOrderProductRow() {
+  const select = document.getElementById("editAddProduct");
+  const product = products.find(p => String(p.id) === String(select?.value || ""));
+
+  if (!product) {
+    alert("請先選擇商品");
+    return;
   }
 
-  const addNewItem = confirm("是否要新增商品到這筆訂單？");
+  document.getElementById("editItemRows").insertAdjacentHTML(
+    "beforeend",
+    editOrderItemRowHtml({
+      id: product.id,
+      name: product.name,
+      qty: 1,
+      price: product.price
+    }, Date.now())
+  );
 
-  if (addNewItem) {
-    const keyword = prompt("請輸入商品名稱關鍵字，例如：北部 / 豪華 / 素粽");
+  select.value = "";
+  updateEditOrderTotal();
+}
 
-    if (keyword) {
-      const matchedProducts = products
-        .filter(p =>
-          p.name.includes(keyword) &&
-          p.active !== false &&
-          p.type !== "fee"
-        )
-        .slice(0, 10);
+async function saveEditOrder(id) {
+  const order = orders.find(o => String(o.id) === String(id));
+  if (!order) return;
 
-      if (matchedProducts.length === 0) {
-        alert("找不到符合商品");
-      } else {
-        const productText = matchedProducts
-          .map((p, index) => `${index + 1}：${p.name}｜NT$ ${p.price}`)
-          .join("\n");
+  const newName = document.getElementById("editName").value.trim();
+  const newPhone = document.getElementById("editPhone").value.trim();
+  const newDelivery = document.getElementById("editDelivery").value;
+  const newDate = document.getElementById("editDate").value;
+  const newAddress = document.getElementById("editAddress").value.trim();
+  const newNote = document.getElementById("editNote").value.trim();
 
-        const choice = prompt(
-          "請輸入要新增的商品編號：\n\n" + productText
-        );
+  if (!newName) {
+    alert("請輸入姓名");
+    return;
+  }
 
-        if (choice !== null) {
-          const product = matchedProducts[Number(choice) - 1];
+  const updatedItems = [...document.querySelectorAll("#editItemRows .editItemRow")]
+    .map(row => {
+      const name = row.querySelector(".editItemName").value.trim();
+      const qty = Number(row.querySelector(".editItemQty").value || 0);
+      const price = Number(row.querySelector(".editItemPrice").value || 0);
+      const unit = row.querySelector(".editItemUnit").value;
+      const rawName = row.querySelector(".editItemRawName").value;
 
-          if (!product) {
-            alert("找不到這個商品編號");
-          } else {
-            const qty = prompt(`請輸入 ${product.name} 的數量`, 1);
+      return {
+        id: row.querySelector(".editItemId").value || ("edit-" + Date.now()),
+        name: unit && rawName ? `${rawName}（${unit}）` : name,
+        raw_name: rawName || undefined,
+        unit: unit || undefined,
+        qty,
+        price
+      };
+    })
+    .filter(item => item.name && item.qty > 0);
 
-            if (qty !== null && Number(qty) > 0) {
-              updatedItems.push({
-                id: product.id,
-                name: product.name,
-                price: product.price,
-                qty: Number(qty)
-              });
-            }
-          }
-        }
-      }
-    }
+  if (updatedItems.length === 0) {
+    alert("請至少保留一個商品");
+    return;
   }
 
   const updateData = {
@@ -547,6 +648,7 @@ async function editOrder(id) {
 
   alert("訂單修改成功");
 
+  closeEditOrderModal();
   await refreshAdmin();
   renderOrders();
 }
