@@ -1068,12 +1068,79 @@ function addDemandToMap(map, productId, qty) {
   map[key] = (map[key] || 0) + Number(qty || 0);
 }
 
+const BASE_ZONGZI_NAMES = [
+  "紅豆鹼粽",
+  "紅豆檢粽",
+  "南部粽",
+  "北部粽",
+  "豪華粽",
+  "素食粽",
+  "鹼粽",
+  "檢粽"
+];
+
+function normalizeZongziName(value) {
+  return String(value || "")
+    .replace(/\s+/g, "")
+    .replace(/檢粽/g, "鹼粽")
+    .replace(/紅豆檢粽/g, "紅豆鹼粽");
+}
+
+function getBaseZongziProductByName(baseName) {
+  const normalizedBase = normalizeZongziName(baseName);
+
+  return products.find(p => {
+    const productName = normalizeZongziName(p.name);
+    return productName === normalizedBase ||
+      productName === normalizedBase.replace("鹼粽", "檢粽");
+  });
+}
+
+function getBaseZongziNameFromText(text) {
+  const normalizedText = normalizeZongziName(text);
+
+  return BASE_ZONGZI_NAMES
+    .map(name => normalizeZongziName(name))
+    .sort((a, b) => b.length - a.length)
+    .find(name => normalizedText.includes(name)) || "";
+}
+
+function getPackMultiplierFromText(text) {
+  const normalizedText = String(text || "").replace(/\s+/g, "");
+  const match = normalizedText.match(/(\d+)(?:入|粒|顆|個|pcs?|PCS?)/);
+
+  return match ? Number(match[1]) : 1;
+}
+
+function addBaseZongziDemand(map, item, product) {
+  const text = `${item.name || ""} ${item.raw_name || ""} ${product?.name || ""}`;
+  const baseName = getBaseZongziNameFromText(text);
+  if (!baseName) return false;
+
+  const baseProduct = getBaseZongziProductByName(baseName);
+  if (!baseProduct) return false;
+
+  const productName = normalizeZongziName(product?.name || "");
+  const baseProductName = normalizeZongziName(baseProduct.name || "");
+  const itemQty = Number(item.qty || 0);
+  const multiplier = productName === baseProductName
+    ? 1
+    : getPackMultiplierFromText(text);
+
+  addDemandToMap(map, baseProduct.id, itemQty * multiplier);
+  return true;
+}
+
 function getOrderProductDemandMap(order) {
   const map = {};
 
   (order.items || []).forEach(item => {
     const itemQty = Number(item.qty || 0);
     const product = products.find(p => Number(p.id) === Number(item.id));
+
+    if (addBaseZongziDemand(map, item, product)) {
+      return;
+    }
 
     if (
       product &&
@@ -4642,31 +4709,8 @@ function getStockRows() {
       orders
         .filter(o => !isClosedOrder(o))
         .forEach(order => {
-          let orderQty = 0;
-
-          (order.items || []).forEach(item => {
-            if (Number(item.id) === Number(p.id)) {
-              orderQty += Number(item.qty || 0);
-            }
-
-            const boxProduct = products.find(
-              x => Number(x.id) === Number(item.id)
-            );
-
-            if (
-              boxProduct &&
-              boxProduct.type === "box" &&
-              Array.isArray(boxProduct.components)
-            ) {
-              boxProduct.components.forEach(comp => {
-                if (Number(comp.productId) === Number(p.id)) {
-                  orderQty +=
-                    Number(comp.qty || 0) *
-                    Number(item.qty || 0);
-                }
-              });
-            }
-          });
+          const orderDemandMap = getOrderProductDemandMap(order);
+          const orderQty = Number(orderDemandMap[String(p.id)] || 0);
 
           if (orderQty > 0) {
             reservedQty += orderQty;
