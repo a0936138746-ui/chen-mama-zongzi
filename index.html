@@ -2245,6 +2245,48 @@ function normalizeWebsiteHeader(value) {
     .trim();
 }
 
+function normalizeWebsiteName(value) {
+  return String(value || "")
+    .replace(/\s/g, "")
+    .trim();
+}
+
+function normalizeWebsitePhone(value) {
+  return String(value || "")
+    .replace(/[^\d]/g, "")
+    .trim();
+}
+
+function buildRowsFromWebsiteSheet(sheet) {
+  const matrix = XLSX.utils.sheet_to_json(sheet, {
+    header: 1,
+    defval: "",
+    raw: false
+  });
+
+  const headerIndex = matrix.findIndex(row => {
+    const text = row.map(normalizeWebsiteHeader).join("|");
+    return text.includes("訂購人") && text.includes("金額");
+  });
+
+  if (headerIndex === -1) {
+    return XLSX.utils.sheet_to_json(sheet, { defval: "" });
+  }
+
+  const headers = matrix[headerIndex].map(normalizeWebsiteHeader);
+
+  return matrix
+    .slice(headerIndex + 1)
+    .filter(row => row.some(cell => String(cell || "").trim() !== ""))
+    .map(row => {
+      const obj = {};
+      headers.forEach((header, index) => {
+        if (header) obj[header] = row[index] ?? "";
+      });
+      return obj;
+    });
+}
+
 function getWebsiteCell(row, candidates) {
   const keys = Object.keys(row || {});
   for (const candidate of candidates) {
@@ -2306,6 +2348,31 @@ function parseWebsiteItems(row) {
       qty
     };
   });
+}
+
+function getWebsiteDuplicateInfo(order) {
+  const name = normalizeWebsiteName(order.name);
+  const phone = normalizeWebsitePhone(order.phone);
+  const total = Number(order.total || 0);
+
+  const matches = orders.filter(existing => {
+    const existingName = normalizeWebsiteName(existing.name);
+    const existingPhone = normalizeWebsitePhone(existing.phone);
+    const existingTotal = Number(existing.total || 0);
+
+    if (phone && existingPhone && phone === existingPhone) return true;
+    if (name && existingName && name === existingName) return true;
+    if (name && existingName && name === existingName && total && existingTotal === total) return true;
+
+    return false;
+  });
+
+  if (!matches.length) return "";
+
+  return matches
+    .slice(0, 3)
+    .map(o => `${o.name || "未填"}｜${o.phone || ""}｜${getProcessDate(o) || ""}｜NT$ ${money(o.total)}`)
+    .join("\n");
 }
 
 function inferWebsiteDelivery(row, address) {
@@ -2385,17 +2452,24 @@ async function previewWebsiteExcelImport() {
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: "array" });
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+  const rows = buildRowsFromWebsiteSheet(sheet);
 
   websiteExcelImportOrders = rows
-    .map(mapWebsiteExcelRow)
+    .map((row, index) => {
+      const order = mapWebsiteExcelRow(row, index);
+      order.duplicate_info = getWebsiteDuplicateInfo(order);
+      return order;
+    })
     .filter(o => o.name || o.phone || o.total || o.items.length);
+
+  const duplicateCount = websiteExcelImportOrders.filter(o => o.duplicate_info).length;
 
   if (!preview) return;
 
   preview.innerHTML = `
     <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-3">
-      讀到 ${rows.length} 列，可匯入 ${websiteExcelImportOrders.length} 筆。請先看前 10 筆是否正常。
+      讀到 ${rows.length} 列，可匯入 ${websiteExcelImportOrders.length} 筆。
+      ${duplicateCount ? `其中 ${duplicateCount} 筆疑似已在訂單內，請先確認。` : "目前沒有發現疑似重複。"}
     </div>
 
     <div class="overflow-x-auto">
@@ -2409,11 +2483,12 @@ async function previewWebsiteExcelImport() {
             <th class="p-2 border text-right">金額</th>
             <th class="p-2 border text-left">品項</th>
             <th class="p-2 border text-left">付款</th>
+            <th class="p-2 border text-left">比對</th>
           </tr>
         </thead>
         <tbody>
           ${websiteExcelImportOrders.slice(0, 10).map(o => `
-            <tr>
+            <tr class="${o.duplicate_info ? "bg-red-50" : ""}">
               <td class="p-2 border">${o.source_order_id || o.id}</td>
               <td class="p-2 border">${o.name || "未填"}</td>
               <td class="p-2 border">${o.phone || ""}</td>
@@ -2421,6 +2496,9 @@ async function previewWebsiteExcelImport() {
               <td class="p-2 border text-right">NT$ ${money(o.total)}</td>
               <td class="p-2 border">${o.items.map(i => `${i.name} x ${i.qty}`).join("、")}</td>
               <td class="p-2 border">${o.payment_method || ""} ${o.payment_note || ""}</td>
+              <td class="p-2 border whitespace-pre-line ${o.duplicate_info ? "text-red-700 font-bold" : "text-green-700"}">
+                ${o.duplicate_info ? "疑似重複：\n" + o.duplicate_info : "未發現重複"}
+              </td>
             </tr>
           `).join("")}
         </tbody>
@@ -2435,14 +2513,19 @@ async function importWebsiteExcelOrders() {
     return;
   }
 
-  if (!confirm(`確定匯入 ${websiteExcelImportOrders.length} 筆官網 Excel 訂單？`)) {
+  const duplicateCount = websiteExcelImportOrders.filter(o => o.duplicate_info).length;
+  const confirmText = duplicateCount
+    ? `有 ${duplicateCount} 筆疑似重複。仍要匯入全部 ${websiteExcelImportOrders.length} 筆嗎？`
+    : `確定匯入 ${websiteExcelImportOrders.length} 筆官網 Excel 訂單？`;
+
+  if (!confirm(confirmText)) {
     return;
   }
 
   const existingIds = new Set(orders.map(o => String(o.id)));
   const insertOrders = websiteExcelImportOrders
     .filter(o => !existingIds.has(String(o.id)))
-    .map(({ source_order_id, ...order }) => order);
+    .map(({ source_order_id, duplicate_info, ...order }) => order);
 
   if (insertOrders.length === 0) {
     alert("沒有新訂單可匯入，可能都已經存在");
