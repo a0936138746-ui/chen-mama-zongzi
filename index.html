@@ -1328,6 +1328,57 @@ async function markOrderPaid(id) {
   renderOrders();
 }
 
+async function quickCompleteOrder(id, returnTab = "war") {
+  const order = orders.find(o => String(o.id) === String(id));
+  if (!order) return;
+
+  const status = order.delivery === "宅配" ? "已宅配" : "已取貨";
+
+  if (!confirm(`確定將 ${order.name || "這筆訂單"} 標記為「${status}」？`)) {
+    return;
+  }
+
+  const { error } = await db
+    .from("orders")
+    .update({ status })
+    .eq("id", id);
+
+  if (error) {
+    alert("結案失敗：" + error.message);
+    return;
+  }
+
+  alert("已結案");
+  await refreshAdmin();
+  showAdminTab(returnTab);
+}
+
+async function quickMarkPaid(id, returnTab = "war") {
+  const order = orders.find(o => String(o.id) === String(id));
+  if (!order) return;
+
+  if (!confirm(`確定將 ${order.name || "這筆訂單"} 標記為已收全額？`)) {
+    return;
+  }
+
+  const { error } = await db
+    .from("orders")
+    .update({
+      payment_status: "已收款",
+      paid_amount: Number(order.total || 0)
+    })
+    .eq("id", id);
+
+  if (error) {
+    alert("更新收款失敗：" + error.message);
+    return;
+  }
+
+  alert("已標記為已收款");
+  await refreshAdmin();
+  showAdminTab(returnTab);
+}
+
 function renderWarDashboard() {
   const activeOrders = orders.filter(o => o.status !== "已取消");
   const unfinishedOrders = activeOrders.filter(o => !isClosedOrder(o));
@@ -1339,6 +1390,9 @@ function renderWarDashboard() {
   const todayList = unfinishedOrders.filter(o => daysFromToday(getDashboardDate(o)) === 0);
   const tomorrowList = unfinishedOrders.filter(o => daysFromToday(getDashboardDate(o)) === 1);
   const bigOrders = unfinishedOrders.filter(o => Number(o.total || 0) > 3000 || o.type === "project");
+  const unpaidList = unfinishedOrders.filter(o => getUnpaidAmount(o) > 0);
+  const shipTodayList = unfinishedOrders.filter(o => o.delivery === "宅配" && daysFromToday(getShipDate(o)) === 0);
+  const shipOverdueList = unfinishedOrders.filter(o => o.delivery === "宅配" && daysFromToday(getShipDate(o)) < 0);
 
   const duplicateGroups = Object.values(activeOrders.reduce((groups, o) => {
     const phone = String(o.phone || "").trim();
@@ -1377,6 +1431,9 @@ function renderWarDashboard() {
       (o.delivery === "宅配" && shipDays !== null && shipDays < 0)
     );
   });
+  const abnormalWorkList = [...new Map(
+    [...abnormalList, ...shipOverdueList].map(o => [o.id, o])
+  ).values()];
 
   const sortByDashboardDate = (a, b) => {
     const dateDiff = (getDashboardDate(a) || "9999-12-31")
@@ -1387,9 +1444,10 @@ function renderWarDashboard() {
     return String(b.time || "").localeCompare(String(a.time || ""));
   };
 
-  const simpleDashboardCard = (o) => {
+  const warCard = (o) => {
     const totalQty = getTotalQty(o);
     const isProject = o.type === "project";
+    const unpaid = getUnpaidAmount(o);
     const projectNameFromNote =
       (o.note || "").match(/專案名稱[:：]\s*([^\n]+)/)?.[1] || "";
 
@@ -1398,31 +1456,42 @@ function renderWarDashboard() {
       : `${o.name || ""}｜${o.phone || ""}`;
 
     return `
-      <div class="bg-white border rounded-xl p-4 mb-3">
-        <button
-          type="button"
-          onclick="openOrderInOrders('${o.id}')"
-          class="font-bold text-left ${isProject ? "text-indigo-700" : "text-blue-700 hover:underline"}">
-          ${isProject ? "🧪 " : ""}${title}
-        </button>
+      <div class="bg-white border rounded-xl p-4 mb-3 ${unpaid > 0 ? "border-red-200 bg-red-50" : ""}">
+        <div class="grid lg:grid-cols-5 gap-3 items-start">
+          <div>
+            <button type="button" onclick="openOrderInOrders('${o.id}')"
+              class="font-bold text-left ${isProject ? "text-indigo-700" : "text-blue-700 hover:underline"}">
+              ${isProject ? "專案：" : ""}${title}
+            </button>
+            <div class="text-xs text-gray-500">${o.id || ""}</div>
+          </div>
 
-        <div class="text-sm text-gray-600 mt-1">
-          ${getDashboardDate(o) || "未填日期"}｜${o.delivery || ""}｜${o.name || ""}｜${o.phone || ""}
-        </div>
+          <div class="text-sm">
+            <div class="font-bold">${getDashboardDate(o) || "未填日期"}</div>
+            <div class="text-gray-500">${o.delivery || ""}｜${o.status || ""}</div>
+            ${o.delivery === "宅配" ? `<div class="text-blue-700">寄出：${getShipDate(o) || "未填"}</div>` : ""}
+          </div>
 
-        <div class="text-sm mt-1">
-          ${(o.items || [])
-            .map(i => `${i.raw_name || i.name} x ${i.qty}${i.unit ? " " + i.unit : ""}`)
-            .join("、")}
-        </div>
+          <div class="text-sm lg:col-span-2">
+            ${(o.items || [])
+              .map(i => `${i.raw_name || i.name} x ${i.qty}${i.unit ? " " + i.unit : ""}`)
+              .join("、") || "沒有商品明細"}
+            ${o.note ? `<div class="text-purple-700 mt-1">備註：${o.note}</div>` : ""}
+          </div>
 
-        <div class="mt-2 flex gap-2 flex-wrap text-sm font-bold">
-          ${Number(o.total || 0) > 3000 ? `<span class="text-red-600">🔥 NT$ ${money(o.total)}</span>` : ""}
-          ${totalQty ? `<span class="text-amber-700">數量 ${totalQty}</span>` : ""}
-          ${o.note ? `<span class="text-purple-700">📝 特殊備註</span>` : ""}
-          <button onclick="openOrderInOrders('${o.id}')" class="bg-blue-600 text-white px-3 py-1 rounded-xl text-xs">
-            查看訂單
-          </button>
+          <div class="text-right">
+            <div class="font-bold text-amber-700">NT$ ${money(o.total)}</div>
+            <div class="${unpaid > 0 ? "text-red-700" : "text-green-700"} text-sm font-bold">
+              ${getPaymentStatus(o)}｜未收 NT$ ${money(unpaid)}
+            </div>
+            <div class="mt-2 flex gap-2 justify-end flex-wrap">
+              <button onclick="openOrderInOrders('${o.id}')" class="bg-blue-600 text-white px-3 py-1 rounded-xl text-xs">查看</button>
+              <button onclick="quickCompleteOrder('${o.id}', 'war')" class="bg-green-700 text-white px-3 py-1 rounded-xl text-xs">
+                ${o.delivery === "宅配" ? "已宅配" : "已取貨"}
+              </button>
+              ${unpaid > 0 ? `<button onclick="quickMarkPaid('${o.id}', 'war')" class="bg-amber-700 text-white px-3 py-1 rounded-xl text-xs">已收</button>` : ""}
+            </div>
+          </div>
         </div>
       </div>
     `;
@@ -1442,7 +1511,7 @@ function renderWarDashboard() {
           list.length
             ? list
                 .sort(options.sort || sortByDashboardDate)
-                .map(options.compact ? simpleDashboardCard : orderCard)
+                .map(warCard)
                 .join("")
             : `<div class="bg-gray-50 p-4 rounded-xl text-gray-500">${emptyText}</div>`
         }
@@ -1505,44 +1574,51 @@ function renderWarDashboard() {
   document.getElementById("adminPanel").innerHTML = `
     <h2 class="text-2xl font-bold mb-4">作戰看板</h2>
 
-    <div class="grid md:grid-cols-5 gap-4 mb-6">
-      <div class="bg-red-50 border border-red-300 p-4 rounded-xl">
+    <div class="grid md:grid-cols-6 gap-4 mb-6">
+      <button onclick="setOrderQuickFilter('today'); showAdminTab('orders')" class="bg-red-50 border border-red-300 p-4 rounded-xl text-left">
         <div class="font-bold">今日必做</div>
         <div class="text-2xl font-bold text-red-700">${todayList.length}</div>
-      </div>
+      </button>
 
-      <div class="bg-orange-50 border border-orange-300 p-4 rounded-xl">
+      <button onclick="setOrderQuickFilter('tomorrow'); showAdminTab('orders')" class="bg-orange-50 border border-orange-300 p-4 rounded-xl text-left">
         <div class="font-bold">明日預備</div>
         <div class="text-2xl font-bold text-orange-700">${tomorrowList.length}</div>
-      </div>
+      </button>
+
+      <button onclick="setOrderQuickFilter('shipping'); showAdminTab('orders')" class="bg-blue-50 border border-blue-300 p-4 rounded-xl text-left">
+        <div class="font-bold">今天應寄</div>
+        <div class="text-2xl font-bold text-blue-700">${shipTodayList.length}</div>
+      </button>
+
+      <button onclick="setOrderQuickFilter('unpaid'); showAdminTab('orders')" class="bg-rose-50 border border-rose-300 p-4 rounded-xl text-left">
+        <div class="font-bold">未收款</div>
+        <div class="text-2xl font-bold text-rose-700">${unpaidList.length}</div>
+      </button>
+
+      <button onclick="setOrderQuickFilter('overdue'); showAdminTab('orders')" class="bg-red-50 border border-red-300 p-4 rounded-xl text-left">
+        <div class="font-bold">異常警報</div>
+        <div class="text-2xl font-bold text-red-700">${abnormalWorkList.length}</div>
+      </button>
 
       <div class="bg-amber-50 border border-amber-300 p-4 rounded-xl">
         <div class="font-bold">大單雷達</div>
         <div class="text-2xl font-bold text-amber-700">${bigOrders.length}</div>
       </div>
-
-      <div class="bg-blue-50 border border-blue-300 p-4 rounded-xl">
-        <div class="font-bold">待結案</div>
-        <div class="text-2xl font-bold text-blue-700">${pendingCloseList.length}</div>
-      </div>
-
-      <div class="bg-rose-50 border border-rose-300 p-4 rounded-xl">
-        <div class="font-bold">異常警報</div>
-        <div class="text-2xl font-bold text-rose-700">${abnormalList.length}</div>
-      </div>
     </div>
 
     <div class="space-y-6">
+      ${renderSection("異常警報", abnormalWorkList, "目前沒有異常訂單")}
       ${renderSection("今日必做", todayList, "今天沒有必做訂單")}
       ${renderSection("明日預備", tomorrowList, "明天沒有預備訂單")}
+      ${renderSection("未收款追蹤", unpaidList, "目前沒有未收款訂單", {
+        sort: (a, b) => getUnpaidAmount(b) - getUnpaidAmount(a)
+      })}
       ${renderSection("大單雷達", bigOrders, "目前沒有大單或專案訂單", {
-        compact: true,
         sort: (a, b) => Number(b.total || 0) - Number(a.total || 0)
       })}
       ${renderSection("待結案", pendingCloseList, "目前沒有待結案訂單", {
-        compact: true
+        sort: sortByDashboardDate
       })}
-      ${renderSection("異常警報", abnormalList, "目前沒有異常訂單")}
       ${renderDuplicateSection()}
     </div>
   `;
