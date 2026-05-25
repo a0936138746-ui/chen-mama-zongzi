@@ -3299,94 +3299,112 @@ async function saveProjectOrder() {
 }
   
 function renderExpenses() {
+  const expenseTotal = expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
   document.getElementById("adminPanel").innerHTML = `
     <h2 class="text-2xl font-bold mb-4">成本支出紀錄</h2>
 
-<div class="bg-blue-50 p-5 rounded-2xl shadow mb-6">
-  <h3 class="font-bold mb-3">新增商家</h3>
+    <div class="grid lg:grid-cols-[420px_1fr] gap-5">
+      <div class="space-y-5">
+        <section class="bg-blue-50 border border-blue-200 p-5 rounded-2xl shadow">
+          <h3 class="font-bold text-xl mb-3">新增商家</h3>
 
-  <div class="grid md:grid-cols-3 gap-4 mb-4">
-    <input id="vendorName" class="border p-3 rounded-xl" placeholder="商家名稱，例如：阿明豬肉攤">
+          <div class="grid gap-3">
+            <input id="vendorName" class="border p-3 rounded-xl" placeholder="商家名稱，例如：阿明豬肉攤">
 
-    <select id="vendorCategory" class="border p-3 rounded-xl">
-      <option>食材</option>
-      <option>包材</option>
-      <option>物流</option>
-      <option>人事</option>
-      <option>設備場地</option>
-      <option>行銷</option>
-      <option>其他</option>
-    </select>
+            <select id="vendorCategory" class="border p-3 rounded-xl">
+              <option>食材</option>
+              <option>包材</option>
+              <option>物流</option>
+              <option>人事</option>
+              <option>設備場地</option>
+              <option>行銷</option>
+              <option>其他</option>
+            </select>
 
-    <input id="vendorNote" class="border p-3 rounded-xl" placeholder="備註，例如：常買豬肉">
-  </div>
+            <input id="vendorNote" class="border p-3 rounded-xl" placeholder="備註，例如：常買豬肉">
 
-  <button onclick="saveVendor()" class="bg-blue-700 text-white px-6 py-3 rounded-xl font-bold">
-    新增商家
-  </button>
-</div>    
+            <button type="button" onclick="saveVendor()"
+              class="mobile-action-btn bg-blue-700 text-white px-6 py-3 rounded-xl font-bold">
+              新增商家
+            </button>
+          </div>
+        </section>
 
-    <div class="bg-white p-5 rounded-2xl shadow mb-6">
-      <div class="grid md:grid-cols-3 gap-4 mb-4">
-        <input id="expenseDate" type="date" class="border p-3 rounded-xl" value="${todayStr()}">
-       <select id="expenseVendor"
-  onchange="onVendorChange()"
-  class="border p-3 rounded-xl">
-<option value="">選擇商家</option>
-</select>
-        <select id="expenseCategory" class="border p-3 rounded-xl">
-          <option>食材</option>
-          <option>包材</option>
-          <option>物流</option>
-          <option>人事</option>
-          <option>設備場地</option>
-          <option>行銷</option>
-          <option>其他</option>
-        </select>
-        <input id="expenseItem" class="border p-3 rounded-xl" placeholder="項目名稱">
-        <input id="expenseAmount" type="number" class="border p-3 rounded-xl" placeholder="金額">
-        <input id="expensePayment" class="border p-3 rounded-xl" placeholder="付款方式">
-        <input id="expenseNote" class="border p-3 rounded-xl" placeholder="備註">
+        <section class="bg-white p-5 rounded-2xl shadow">
+          <h3 class="font-bold text-xl mb-3">新增支出</h3>
+
+          <div class="grid gap-3">
+            <input id="expenseDate" type="date" class="border p-3 rounded-xl" value="${todayStr()}">
+
+            <select id="expenseVendor" onchange="onVendorChange()" class="border p-3 rounded-xl">
+              <option value="">選擇商家</option>
+            </select>
+
+            <select id="expenseCategory" class="border p-3 rounded-xl">
+              <option>食材</option>
+              <option>包材</option>
+              <option>物流</option>
+              <option>人事</option>
+              <option>設備場地</option>
+              <option>行銷</option>
+              <option>其他</option>
+            </select>
+
+            <input id="expenseItem" class="border p-3 rounded-xl" placeholder="項目名稱">
+            <input id="expenseAmount" type="number" class="border p-3 rounded-xl text-xl font-bold" placeholder="金額">
+            <input id="expensePayment" class="border p-3 rounded-xl" placeholder="付款方式">
+            <input id="expenseNote" class="border p-3 rounded-xl" placeholder="備註">
+
+            <button type="button" onclick="saveExpense()"
+              class="mobile-action-btn bg-green-700 text-white px-6 py-3 rounded-xl font-bold text-lg">
+              新增支出
+            </button>
+          </div>
+        </section>
       </div>
 
-      <button onclick="saveExpense()" class="bg-green-700 text-white px-6 py-3 rounded-xl font-bold">新增支出</button>
+      <section>
+        <div class="bg-red-50 border border-red-200 p-5 rounded-2xl shadow mb-4">
+          <div class="text-sm text-red-700 font-bold">支出總計</div>
+          <div class="text-3xl font-bold text-red-700">NT$ ${money(expenseTotal)}</div>
+          <div class="text-sm text-gray-600">共 ${expenses.length} 筆支出</div>
+        </div>
+
+        <div class="space-y-3">
+          ${
+            expenses.length
+              ? expenses.map(e => `
+                <div class="bg-white p-4 rounded-2xl shadow border">
+                  <div class="flex justify-between gap-3 flex-wrap">
+                    <div class="min-w-[220px] flex-1 order-card-text">
+                      <div class="font-bold text-lg">${e.item || "未填項目"}</div>
+                      <div class="text-sm text-gray-600">${e.date || ""}｜${e.vendor_name || "未選商家"}｜${e.category || ""}</div>
+                      <div class="text-sm text-gray-500">${e.payment_method || "未填付款方式"}${e.note ? "｜" + e.note : ""}</div>
+                    </div>
+
+                    <div class="text-right">
+                      <div class="font-bold text-red-700 text-xl">NT$ ${money(e.amount)}</div>
+                      <div class="mt-2 grid grid-cols-2 gap-2">
+                        <button type="button" onclick="editExpense('${e.id}')"
+                          class="mobile-action-btn bg-yellow-500 text-white px-4 py-2 rounded-xl text-sm font-bold">
+                          修改
+                        </button>
+
+                        <button type="button" onclick="deleteExpense('${e.id}')"
+                          class="mobile-action-btn bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-bold">
+                          刪除
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              `).join("")
+              : `<div class="bg-gray-100 p-4 rounded-xl">目前沒有支出紀錄</div>`
+          }
+        </div>
+      </section>
     </div>
-
-<div class="space-y-3">
-  ${expenses.map(e => `
-    <div class="bg-white p-4 rounded-2xl shadow flex justify-between">
-      <div>
-        <div class="font-bold">
-  ${e.date} | ${e.vendor_name || "未選商家"} | ${e.category} | ${e.item}
-</div>
-
-        <div class="text-sm text-gray-500">
-          ${e.payment_method || ""} | ${e.note || ""}
-        </div>
-      </div>
-
-      <div class="text-right">
-        <div class="font-bold text-red-700">
-          NT$ ${money(e.amount)}
-        </div>
-
-        <div class="mt-2 space-x-2">
-          <button
-            onclick="editExpense('${e.id}')"
-            class="bg-yellow-500 text-white px-2 py-1 rounded-lg text-sm">
-            修改
-          </button>
-
-          <button
-            onclick="deleteExpense('${e.id}')"
-            class="bg-red-600 text-white px-2 py-1 rounded-lg text-sm">
-            刪除
-          </button>
-        </div>
-      </div>
-    </div>
-  `).join("")}
-</div>
 `;
     
 loadVendors();
