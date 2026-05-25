@@ -4482,148 +4482,152 @@ async function refreshAdmin() {
 loadProducts();
   function renderProductAdmin() {
   const panel = document.getElementById("adminPanel");
+  const productCards = products.map(p => `
+    <div class="bg-white p-5 rounded-2xl mb-4 shadow border">
+      <div class="flex justify-between gap-3 flex-wrap mb-3">
+        <div class="flex-1 min-w-[220px]">
+          <label class="text-sm text-gray-500">商品名稱</label>
+          <input value="${escapeHtml(p.name)}"
+            onchange="updateProduct(${p.id}, 'name', this.value)"
+            class="border p-3 rounded-xl w-full font-bold text-lg">
+        </div>
+
+        <label class="bg-gray-50 border rounded-xl px-4 py-3 flex items-center gap-2">
+          <input type="checkbox" ${p.active ? "checked" : ""}
+            onchange="updateProduct(${p.id}, 'active', this.checked)">
+          <span class="font-bold">${p.active ? "啟用中" : "未啟用"}</span>
+        </label>
+      </div>
+
+      <div class="grid sm:grid-cols-3 gap-3 mb-4">
+        <label class="block">
+          <span class="text-sm text-gray-500">現場價</span>
+          <input type="number" value="${p.price || 0}"
+            onchange="updateProduct(${p.id}, 'price', this.value)"
+            class="border p-3 rounded-xl w-full">
+        </label>
+
+        <label class="block">
+          <span class="text-sm text-gray-500">網路價</span>
+          <input type="number" value="${p.web_price || p.price || 0}"
+            onchange="updateProduct(${p.id}, 'web_price', this.value)"
+            class="border p-3 rounded-xl w-full">
+        </label>
+
+        <label class="block">
+          <span class="text-sm text-gray-500">目前庫存</span>
+          <input type="number" value="${p.stock || 0}"
+            onchange="updateProduct(${p.id}, 'stock', this.value)"
+            class="border p-3 rounded-xl w-full">
+        </label>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <button type="button" onclick="toggleStockIn(${p.id})"
+          class="mobile-action-btn bg-blue-600 text-white px-3 py-2 rounded-xl font-bold">
+          入庫
+        </button>
+
+        <button type="button" onclick="toggleStockOut(${p.id})"
+          class="mobile-action-btn bg-red-600 text-white px-3 py-2 rounded-xl font-bold">
+          出庫
+        </button>
+
+        <button type="button" onclick="adjustStock(${p.id})"
+          class="mobile-action-btn bg-orange-600 text-white px-3 py-2 rounded-xl font-bold">
+          盤點調整
+        </button>
+
+        <button type="button" onclick="toggleStockHistory(${p.id})"
+          class="mobile-action-btn bg-gray-700 text-white px-3 py-2 rounded-xl font-bold">
+          查看紀錄
+        </button>
+      </div>
+
+      <div id="stockInBox-${p.id}" class="hidden mt-3 bg-blue-50 border border-blue-200 p-3 rounded-xl">
+        <div class="font-bold text-blue-800 mb-2">入庫</div>
+        <div class="grid sm:grid-cols-[120px_1fr] gap-2">
+          <input id="stockInQty-${p.id}" type="number" placeholder="數量"
+            class="border p-3 rounded-xl">
+
+          <input id="stockInNote-${p.id}" placeholder="備註，例如 4/28 入庫"
+            class="border p-3 rounded-xl">
+        </div>
+
+        <button type="button" onclick="addStock(${p.id})"
+          class="mobile-action-btn mt-2 bg-green-600 text-white px-4 py-2 rounded-xl font-bold w-full sm:w-auto">
+          確認入庫
+        </button>
+      </div>
+
+      <div id="stockOutBox-${p.id}" class="hidden mt-3 bg-red-50 border border-red-200 p-3 rounded-xl">
+        <div class="font-bold text-red-800 mb-2">出庫</div>
+        <div class="grid sm:grid-cols-[120px_1fr] gap-2">
+          <input id="stockOutQty-${p.id}" type="number" placeholder="數量"
+            class="border p-3 rounded-xl">
+
+          <input id="stockOutNote-${p.id}" placeholder="備註，例如 5/8 宅配"
+            class="border p-3 rounded-xl">
+        </div>
+
+        <button type="button" onclick="removeStock(${p.id})"
+          class="mobile-action-btn mt-2 bg-red-600 text-white px-4 py-2 rounded-xl font-bold w-full sm:w-auto">
+          確認出庫
+        </button>
+      </div>
+
+      <div id="stockHistoryBox-${p.id}" class="hidden mt-3 bg-gray-50 border p-3 rounded-xl text-sm">
+        <div class="font-bold mb-2">庫存紀錄</div>
+        <div id="stockHistoryList-${p.id}">載入中...</div>
+      </div>
+    </div>
+  `).join("");
 
   panel.innerHTML = `
     <h2 class="text-2xl font-bold mb-4">商品管理</h2>
-    <div class="bg-yellow-50 p-4 rounded-xl mb-6">
-  <h3 class="font-bold mb-2">➕ 新增商品</h3>
 
-  <input id="newName" placeholder="商品名稱"
-    class="border p-2 w-full mb-2">
+    <section class="bg-yellow-50 border border-yellow-200 p-5 rounded-2xl shadow mb-6">
+      <h3 class="font-bold text-xl mb-3">新增商品</h3>
 
-  <div class="grid grid-cols-3 gap-2 mb-2">
-    <input id="newPrice" type="number" placeholder="現場價"
-      class="border p-2">
-    <input id="newWebPrice" type="number" placeholder="網路價"
-      class="border p-2">
-    <input id="newStock" type="number" placeholder="庫存（單品才填）"
-      class="border p-2">
-  </div>
+      <input id="newName" placeholder="商品名稱"
+        class="border p-3 rounded-xl w-full mb-3">
 
-  <select id="newType" class="border p-2 w-full mb-2">
-    <option value="single">單品</option>
-    <option value="box">禮盒</option>
-  </select>
-
-  <textarea id="newComponents" placeholder='禮盒組成（JSON，例如：[{"productId":1,"qty":12}]）'
-    class="border p-2 w-full mb-2"></textarea>
-
-  <button onclick="addNewProduct()"
-    class="bg-green-600 text-white px-4 py-2 rounded-xl">
-    新增商品
-  </button>
-</div>
-
-    ${products.map(p => `
-      <div class="bg-white p-4 rounded-xl mb-3 shadow">
-        <input value="${p.name}" 
-          onchange="updateProduct(${p.id}, 'name', this.value)" 
-          class="border p-2 w-full mb-2">
-
-          <div class="grid grid-cols-3 gap-2 text-sm text-gray-600 mb-1">
-  <div>現場價</div>
-  <div>網路價</div>
-  <div>庫存</div>
-</div>
-
-        <div class="grid grid-cols-3 gap-2">
-          <input type="number" value="${p.price}" 
-            onchange="updateProduct(${p.id}, 'price', this.value)" 
-            class="border p-2">
-
-          <input type="number" value="${p.web_price || p.price}" 
-            onchange="updateProduct(${p.id}, 'web_price', this.value)" 
-            class="border p-2">
-
-          <input type="number" value="${p.stock || 0}" 
-            onchange="updateProduct(${p.id}, 'stock', this.value)" 
-            class="border p-2">
-        </div>
-
-        <label class="flex items-center gap-2 mt-2">
-          <input type="checkbox" ${p.active ? "checked" : ""} 
-            onchange="updateProduct(${p.id}, 'active', this.checked)">
-          啟用
-        </label>
-
-<div class="mt-3">
-  <button onclick="toggleStockIn(${p.id})"
-    class="bg-blue-600 text-white px-3 py-1 rounded-xl">
-    入庫
-  </button>
-
-<button onclick="toggleStockOut(${p.id})"
-  class="bg-red-600 text-white px-3 py-1 rounded-xl ml-2">
-  出庫
-</button>
-
-  <button onclick="adjustStock(${p.id})"
-  class="bg-orange-600 text-white px-3 py-1 rounded-xl ml-2">
-  盤點調整
-</button>
-
-  <div id="stockInBox-${p.id}" class="hidden mt-3 bg-blue-50 p-3 rounded-xl">
-    <div class="grid grid-cols-3 gap-2">
-      <input id="stockInQty-${p.id}" type="number" placeholder="入庫數量"
-        class="border p-2 rounded-xl">
-
-      <input id="stockInNote-${p.id}" placeholder="備註，例如 4/28 入庫"
-        class="border p-2 rounded-xl col-span-2">
-    </div>
-
-    <button onclick="addStock(${p.id})"
-      class="mt-2 bg-green-600 text-white px-3 py-1 rounded-xl">
-      確認入庫
-    </button>
-  </div>
-  <div id="stockOutBox-${p.id}" class="hidden mt-3 bg-red-50 p-3 rounded-xl">
-
-  <div class="grid grid-cols-3 gap-2">
-
-    <input
-      id="stockOutQty-${p.id}"
-      type="number"
-      placeholder="出庫數量"
-      class="border p-2 rounded-xl"
-    >
-
-    <input
-      id="stockOutNote-${p.id}"
-      placeholder="備註，例如 5/8宅配"
-      class="border p-2 rounded-xl col-span-2"
-    >
-
-  </div>
-
-  <button
-    onclick="removeStock(${p.id})"
-    class="mt-2 bg-red-600 text-white px-3 py-1 rounded-xl">
-    確認出庫
-  </button>
-
-</div>
-  <div class="mt-2">
-  <button onclick="toggleStockHistory(${p.id})"
-    class="bg-gray-600 text-white px-3 py-1 rounded-xl">
-    查看紀錄
-  </button>
-
-  <div id="stockHistoryBox-${p.id}" class="hidden mt-2 bg-gray-50 p-3 rounded-xl text-sm">
-    <div id="stockHistoryList-${p.id}">
-      載入中...
-    </div>
-  </div>
-</div>
-</div>
-        
+      <div class="grid sm:grid-cols-3 gap-3 mb-3">
+        <input id="newPrice" type="number" placeholder="現場價"
+          class="border p-3 rounded-xl">
+        <input id="newWebPrice" type="number" placeholder="網路價"
+          class="border p-3 rounded-xl">
+        <input id="newStock" type="number" placeholder="庫存（單品才填）"
+          class="border p-3 rounded-xl">
       </div>
-    `).join("")}
+
+      <select id="newType" class="border p-3 rounded-xl w-full mb-3">
+        <option value="single">單品</option>
+        <option value="box">禮盒</option>
+      </select>
+
+      <textarea id="newComponents" placeholder='禮盒組成（JSON，例如：[{"productId":1,"qty":12}]）'
+        class="border p-3 rounded-xl w-full mb-3"></textarea>
+
+      <button type="button" onclick="addNewProduct()"
+        class="mobile-action-btn bg-green-600 text-white px-4 py-3 rounded-xl font-bold w-full sm:w-auto">
+        新增商品
+      </button>
+    </section>
+
+    <div class="bg-amber-50 p-3 rounded-xl mb-4 text-sm text-amber-900">
+      目前共 ${products.length} 項商品。價格或庫存欄位修改後會自動儲存。
+    </div>
+
+    ${productCards}
   `;
 }
 
 async function updateProduct(id, field, value) {
   const updateData = {};
-  updateData[field] = value;
+  updateData[field] = ["price", "web_price", "stock"].includes(field)
+    ? Number(value || 0)
+    : value;
 
   const { error } = await db
     .from("products")
