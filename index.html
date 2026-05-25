@@ -3411,80 +3411,167 @@ loadVendors();
 }
 
 function renderIncome() {
+  const incomeTotal = incomes.reduce((sum, i) => sum + Number(i.amount || 0), 0);
+
   document.getElementById("adminPanel").innerHTML = `
     <h2 class="text-2xl font-bold mb-4">現場收入</h2>
 
-    <div class="bg-white p-5 rounded-2xl shadow mb-6">
-      <div class="grid md:grid-cols-3 gap-4 mb-4">
-        <input id="incomeDate" type="date"
-          value="${todayStr()}"
-          class="border p-3 rounded-xl">
+    <div class="grid lg:grid-cols-[420px_1fr] gap-5">
+      <section class="bg-white p-5 rounded-2xl shadow">
+        <h3 class="font-bold text-xl mb-3">新增收入</h3>
 
-        <input id="incomeItem"
-          placeholder="品項"
-          class="border p-3 rounded-xl">
+        <div class="grid gap-3">
+          <input id="incomeDate" type="date" value="${todayStr()}"
+            class="border p-3 rounded-xl">
 
-        <input id="incomeQty"
-          type="number"
-          placeholder="數量"
-          class="border p-3 rounded-xl">
+          <input id="incomeItem" placeholder="品項"
+            class="border p-3 rounded-xl">
 
-        <input id="incomeAmount"
-          type="number"
-          placeholder="收入金額"
-          class="border p-3 rounded-xl">
+          <input id="incomeQty" type="number" placeholder="數量"
+            class="border p-3 rounded-xl">
 
-        <input id="incomePayment"
-          placeholder="付款方式"
-          class="border p-3 rounded-xl">
+          <input id="incomeAmount" type="number" placeholder="收入金額"
+            class="border p-3 rounded-xl text-xl font-bold">
 
-        <input id="incomeNote"
-          placeholder="備註"
-          class="border p-3 rounded-xl">
-      </div>
+          <select id="incomePayment" class="border p-3 rounded-xl">
+            <option value="">付款方式</option>
+            <option value="現金">現金</option>
+            <option value="匯款">匯款</option>
+            <option value="LINE Pay">LINE Pay</option>
+            <option value="其他">其他</option>
+          </select>
 
-      <button onclick="saveIncome()"
-        class="bg-green-700 text-white px-6 py-3 rounded-xl">
-        新增收入
-      </button>
-    </div>
+          <input id="incomeNote" placeholder="備註"
+            class="border p-3 rounded-xl">
 
-    <div class="space-y-3">
-  ${incomes.map(i => `
-    <div class="bg-green-50 p-4 rounded-xl shadow">
-      <div class="flex justify-between items-start gap-4">
-        <div>
-          <div class="font-bold">
-            ${i.date} | ${i.item} | ${i.qty || 0}份
-          </div>
+          <button type="button" onclick="saveIncome()"
+            class="mobile-action-btn bg-green-700 text-white px-6 py-3 rounded-xl font-bold text-lg">
+            新增收入
+          </button>
+        </div>
+      </section>
 
-          <div class="text-sm text-gray-500 mt-1">
-            ${i.payment_method || ""} ${i.note || ""}
-          </div>
+      <section>
+        <div class="bg-green-50 border border-green-200 p-5 rounded-2xl shadow mb-4">
+          <div class="text-sm text-green-700 font-bold">現場收入總計</div>
+          <div class="text-3xl font-bold text-green-700">NT$ ${money(incomeTotal)}</div>
+          <div class="text-sm text-gray-600">共 ${incomes.length} 筆收入</div>
         </div>
 
-        <div class="text-right">
-          <div class="font-bold text-green-700">
-            NT$ ${money(i.amount)}
-          </div>
+        <div class="space-y-3">
+          ${
+            incomes.length
+              ? incomes.map(i => `
+                <div class="bg-white p-4 rounded-2xl shadow border">
+                  <div class="flex justify-between items-start gap-4 flex-wrap">
+                    <div class="min-w-[220px] flex-1 order-card-text">
+                      <div class="font-bold text-lg">${i.item || "未填品項"}</div>
+                      <div class="text-sm text-gray-600">${i.date || ""}｜${i.qty || 0} 份</div>
+                      <div class="text-sm text-gray-500">${i.payment_method || "未填付款方式"}${i.note ? "｜" + i.note : ""}</div>
+                    </div>
 
-          <div class="mt-2 space-x-2">
-            <button onclick="editIncome('${i.id}')"
-              class="bg-yellow-500 text-white px-2 py-1 rounded-lg text-sm">
-              修改
-            </button>
+                    <div class="text-right">
+                      <div class="font-bold text-green-700 text-xl">NT$ ${money(i.amount)}</div>
+                      <div class="mt-2 grid grid-cols-2 gap-2">
+                        <button type="button" onclick="editIncome('${i.id}')"
+                          class="mobile-action-btn bg-yellow-500 text-white px-4 py-2 rounded-xl text-sm font-bold">
+                          修改
+                        </button>
 
-            <button onclick="deleteIncome('${i.id}')"
-              class="bg-red-600 text-white px-2 py-1 rounded-lg text-sm">
-              刪除
-            </button>
-          </div>
+                        <button type="button" onclick="deleteIncome('${i.id}')"
+                          class="mobile-action-btn bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-bold">
+                          刪除
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              `).join("")
+              : `<div class="bg-gray-100 p-4 rounded-xl">目前沒有收入紀錄</div>`
+          }
         </div>
-      </div>
+      </section>
     </div>
-  `).join("")}
-</div>
   `;
+}
+
+function closeIncomeEditModal() {
+  document.getElementById("incomeEditModal")?.remove();
+}
+
+function editIncome(id) {
+  const i = incomes.find(x => String(x.id) === String(id));
+  if (!i) return;
+
+  document.getElementById("incomeEditModal")?.remove();
+
+  const modal = document.createElement("div");
+  modal.id = "incomeEditModal";
+  modal.className = "fixed inset-0 bg-black/50 z-50 p-3 overflow-y-auto";
+  modal.innerHTML = `
+    <div class="max-w-xl mx-auto bg-white rounded-2xl shadow-xl p-5">
+      <div class="flex justify-between gap-3 items-start mb-4">
+        <h2 class="text-2xl font-bold">修改收入</h2>
+        <button type="button" onclick="closeIncomeEditModal()"
+          class="mobile-action-btn bg-gray-700 text-white px-4 py-2 rounded-xl font-bold">
+          關閉
+        </button>
+      </div>
+
+      <div class="grid gap-3">
+        <input id="editIncomeDate" type="date" class="border p-3 rounded-xl" value="${escapeHtml(i.date || todayStr())}">
+        <input id="editIncomeItem" class="border p-3 rounded-xl" placeholder="品項" value="${escapeHtml(i.item || "")}">
+        <input id="editIncomeQty" type="number" class="border p-3 rounded-xl" placeholder="數量" value="${Number(i.qty || 0)}">
+        <input id="editIncomeAmount" type="number" class="border p-3 rounded-xl text-xl font-bold" placeholder="金額" value="${Number(i.amount || 0)}">
+
+        <select id="editIncomePayment" class="border p-3 rounded-xl">
+          ${["","現金","匯款","LINE Pay","其他"].map(x => `
+            <option value="${x}" ${String(i.payment_method || "") === x ? "selected" : ""}>${x || "付款方式"}</option>
+          `).join("")}
+        </select>
+
+        <input id="editIncomeNote" class="border p-3 rounded-xl" placeholder="備註" value="${escapeHtml(i.note || "")}">
+
+        <button type="button" onclick="saveIncomeEdit('${i.id}')"
+          class="mobile-action-btn bg-green-700 text-white px-6 py-3 rounded-xl font-bold text-lg">
+          儲存修改
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+}
+
+async function saveIncomeEdit(id) {
+  const item = document.getElementById("editIncomeItem").value.trim();
+  const amount = Number(document.getElementById("editIncomeAmount").value || 0);
+
+  if (!item) return alert("請輸入品項");
+  if (!amount || amount <= 0) return alert("請輸入正確金額");
+
+  const { error } = await db
+    .from("income_records")
+    .update({
+      date: document.getElementById("editIncomeDate").value,
+      item,
+      qty: Number(document.getElementById("editIncomeQty").value || 0),
+      amount,
+      payment_method: document.getElementById("editIncomePayment").value,
+      note: document.getElementById("editIncomeNote").value.trim()
+    })
+    .eq("id", id);
+
+  if (error) {
+    alert("修改失敗：" + error.message);
+    return;
+  }
+
+  alert("修改成功");
+  closeIncomeEditModal();
+  await refreshAdmin();
+  await loadIncome();
+  showAdminTab("income");
 }
 
 async function saveIncome() {
@@ -3544,36 +3631,6 @@ async function deleteIncome(id) {
   showAdminTab("income");
 }
 
-async function editIncome(id) {
-  const i = incomes.find(x => String(x.id) === String(id));
-  if (!i) return;
-
-  const newAmount = prompt("修改收入金額", i.amount);
-  if (newAmount === null) return;
-
-  const newNote = prompt("修改備註", i.note || "");
-
-  const { error } = await db
-    .from("income_records")
-    .update({
-      amount: Number(newAmount),
-      note: newNote
-    })
-    .eq("id", id);
-
-  if (error) {
-    alert("修改失敗：" + error.message);
-    return;
-  }
-
-  alert("修改成功");
-
-  await refreshAdmin();
-  await loadIncome();
-
-  showAdminTab("income");
-}
-  
 async function loadVendors() {
   const { data, error } = await db.from("vendors").select("*").order("name", { ascending: true });
 
