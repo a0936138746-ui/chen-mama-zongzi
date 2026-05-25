@@ -7,6 +7,14 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <style>
+    .mobile-action-btn {
+      min-height: 44px;
+      touch-action: manipulation;
+      position: relative;
+      z-index: 5;
+    }
+  </style>
 </head>
 
 <body class="bg-amber-50 min-h-screen">
@@ -1172,17 +1180,39 @@ function orderCard(o) {
           ${o.delivery === "宅配" ? `<div class="text-sm">應寄出日：${shipDate || "未填"}</div>` : ""}
           <div class="text-sm">地址：${o.address || ""}</div>
           <div class="text-sm">備註：${o.note || ""}</div>
-          <div class="mt-2 flex gap-2">
-  <button onclick="editOrder('${o.id}')"
-    class="bg-blue-600 text-white px-3 py-1 rounded-xl">
-    修改
-  </button>
+          <div class="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <button type="button" onclick="quickMarkPaid('${o.id}', 'orders')"
+              class="mobile-action-btn bg-emerald-700 text-white px-3 py-2 rounded-xl font-bold text-sm">
+              已收款
+            </button>
 
-  <button onclick="deleteOrder('${o.id}')"
-    class="bg-red-600 text-white px-3 py-1 rounded-xl">
-    刪除
-  </button>
-</div>
+            <button type="button" onclick="quickSetOrderStatus('${o.id}', '已取貨', 'orders')"
+              class="mobile-action-btn bg-lime-700 text-white px-3 py-2 rounded-xl font-bold text-sm">
+              已取貨
+            </button>
+
+            <button type="button" onclick="quickSetOrderStatus('${o.id}', '已宅配', 'orders')"
+              class="mobile-action-btn bg-blue-700 text-white px-3 py-2 rounded-xl font-bold text-sm">
+              已宅配
+            </button>
+
+            <button type="button" onclick="quickSetOrderStatus('${o.id}', '已取消', 'orders')"
+              class="mobile-action-btn bg-red-700 text-white px-3 py-2 rounded-xl font-bold text-sm">
+              取消訂單
+            </button>
+          </div>
+
+          <div class="mt-2 flex gap-2 flex-wrap">
+            <button type="button" onclick="editOrder('${o.id}')"
+              class="mobile-action-btn bg-blue-600 text-white px-4 py-2 rounded-xl">
+              修改
+            </button>
+
+            <button type="button" onclick="deleteOrder('${o.id}')"
+              class="mobile-action-btn bg-red-600 text-white px-4 py-2 rounded-xl">
+              刪除
+            </button>
+          </div>
 
 </div>
         </div>
@@ -1326,6 +1356,34 @@ async function markOrderPaid(id) {
   alert("已標記為已收款");
   await refreshAdmin();
   renderOrders();
+}
+
+async function quickSetOrderStatus(id, status, returnTab = "orders") {
+  const order = orders.find(o => String(o.id) === String(id));
+  if (!order) return;
+
+  if (!confirm(`確定將 ${order.name || "這筆訂單"} 標記為「${status}」？`)) {
+    return;
+  }
+
+  const { error } = await db
+    .from("orders")
+    .update({ status })
+    .eq("id", id);
+
+  if (error) {
+    alert("狀態更新失敗：" + error.message);
+    return;
+  }
+
+  alert("狀態已更新");
+  await refreshAdmin();
+
+  if (returnTab === "orders") {
+    renderOrders();
+  } else {
+    showAdminTab(returnTab);
+  }
 }
 
 async function quickCompleteOrder(id, returnTab = "war") {
@@ -1485,11 +1543,11 @@ function renderWarDashboard() {
               ${getPaymentStatus(o)}｜未收 NT$ ${money(unpaid)}
             </div>
             <div class="mt-2 flex gap-2 justify-end flex-wrap">
-              <button onclick="openOrderInOrders('${o.id}')" class="bg-blue-600 text-white px-3 py-1 rounded-xl text-xs">查看</button>
-              <button onclick="quickCompleteOrder('${o.id}', 'war')" class="bg-green-700 text-white px-3 py-1 rounded-xl text-xs">
+              <button type="button" onclick="openOrderInOrders('${o.id}')" class="mobile-action-btn bg-blue-600 text-white px-3 py-2 rounded-xl text-xs font-bold">查看</button>
+              <button type="button" onclick="quickCompleteOrder('${o.id}', 'war')" class="mobile-action-btn bg-green-700 text-white px-3 py-2 rounded-xl text-xs font-bold">
                 ${o.delivery === "宅配" ? "已宅配" : "已取貨"}
               </button>
-              ${unpaid > 0 ? `<button onclick="quickMarkPaid('${o.id}', 'war')" class="bg-amber-700 text-white px-3 py-1 rounded-xl text-xs">已收</button>` : ""}
+              ${unpaid > 0 ? `<button type="button" onclick="quickMarkPaid('${o.id}', 'war')" class="mobile-action-btn bg-amber-700 text-white px-3 py-2 rounded-xl text-xs font-bold">已收</button>` : ""}
             </div>
           </div>
         </div>
@@ -1969,13 +2027,13 @@ function renderShippingList() {
               </div>
 
               <div class="mt-3 text-right print:hidden">
-                <button onclick="openOrderInOrders('${o.id}')"
-                  class="bg-blue-600 text-white px-4 py-2 rounded-xl">
+                <button type="button" onclick="openOrderInOrders('${o.id}')"
+                  class="mobile-action-btn bg-blue-600 text-white px-4 py-2 rounded-xl">
                   查看訂單
                 </button>
 
-                <button onclick="completeShippingOrder('${o.id}')"
-                  class="bg-green-700 text-white px-4 py-2 rounded-xl ml-2">
+                <button type="button" onclick="completeShippingOrder('${o.id}')"
+                  class="mobile-action-btn bg-green-700 text-white px-4 py-2 rounded-xl ml-2">
                   ${o.delivery === "宅配" ? "標記已宅配" : "標記已取貨"}
                 </button>
               </div>
