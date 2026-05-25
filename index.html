@@ -2319,6 +2319,69 @@ function getShippingReminder(o) {
   return getShippingReminderList(o).join(" / ");
 }
 
+function getShippingTags(o) {
+  const tags = [];
+  const processDays = daysFromToday(getProcessDate(o));
+  const shipDays = daysFromToday(getShipDate(o));
+
+  if (hasNearStockShortage(o)) {
+    tags.push({
+      text: `缺貨：${getStockShortageInfo(o).text}`,
+      cls: "bg-red-100 text-red-800 border-red-400"
+    });
+  }
+
+  if (hasEggYolkRequest(o)) {
+    tags.push({
+      text: needsEggYolkPrep(o) ? "蛋黃先備料" : "加蛋黃 +10",
+      cls: "bg-yellow-100 text-yellow-800 border-yellow-400"
+    });
+  }
+
+  if (getUnpaidAmount(o) > 0) {
+    tags.push({
+      text: `未收 NT$ ${money(getUnpaidAmount(o))}`,
+      cls: "bg-rose-100 text-rose-800 border-rose-400"
+    });
+  }
+
+  if (
+    (processDays !== null && processDays < 0) ||
+    (o.delivery === "宅配" && shipDays !== null && shipDays < 0)
+  ) {
+    tags.push({ text: "逾期", cls: "bg-red-100 text-red-800 border-red-400" });
+  } else if (processDays === 0 || (o.delivery === "宅配" && shipDays === 0)) {
+    tags.push({ text: "今日", cls: "bg-blue-100 text-blue-800 border-blue-400" });
+  } else if (processDays === 1 || (o.delivery === "宅配" && shipDays === 1)) {
+    tags.push({ text: "明日", cls: "bg-orange-100 text-orange-800 border-orange-400" });
+  }
+
+  if (o.note && o.note.trim() !== "") {
+    tags.push({ text: "特殊備註", cls: "bg-purple-100 text-purple-800 border-purple-400" });
+  }
+
+  if (Number(o.total || 0) > 3000) {
+    tags.push({ text: "大單", cls: "bg-amber-100 text-amber-800 border-amber-400" });
+  }
+
+  return tags;
+}
+
+function renderShippingTags(o) {
+  const tags = getShippingTags(o);
+  if (!tags.length) return "";
+
+  return `
+    <div class="flex gap-2 flex-wrap mb-3">
+      ${tags.map(tag => `
+        <span class="inline-block border rounded-full px-3 py-1 text-sm font-bold ${tag.cls}">
+          ${tag.text}
+        </span>
+      `).join("")}
+    </div>
+  `;
+}
+
 function getShippingPriority(o) {
   const processDays = daysFromToday(getProcessDate(o));
   const shipDays = daysFromToday(getShipDate(o));
@@ -2502,6 +2565,7 @@ function renderShippingList() {
             <div class="bg-white border rounded-xl p-4 ${
               getUnpaidAmount(o) > 0 ? "border-red-200 bg-red-50" : ""
             }">
+              ${renderShippingTags(o)}
               ${hasEggYolkRequest(o) ? `
                 <div class="mb-3 bg-yellow-100 border-2 border-yellow-500 text-yellow-900 rounded-xl p-3 font-bold">
                   🥚 加蛋黃特殊單｜一顆 +10 元｜${needsEggYolkPrep(o) ? "請先備料，避免出貨前來不及加" : "請出貨前確認"}
@@ -2525,7 +2589,6 @@ function renderShippingList() {
 
                 <div class="text-sm font-bold text-red-700 text-right">
                   ${getShippingReminder(o)}
-                  ${getUnpaidAmount(o) > 0 ? `<div class="mt-1">未收 NT$ ${money(getUnpaidAmount(o))}</div>` : ""}
                 </div>
               </div>
 
@@ -2640,7 +2703,11 @@ function exportShippingExcel() {
     `${getShippingPriority(o)}\n${getShippingWorkDate(o) || ""}\n${o.delivery || ""}`,
     `${getShippingCustomerName(o)}\n${getShippingPhoneText(o)}\n${getShippingAddressText(o)}`,
     getShippingItemText(o),
-    getShippingReminder(o) + (getShippingNoteText(o) ? `\n${getShippingNoteText(o)}` : "")
+    [
+      getShippingTags(o).map(tag => tag.text).join(" / "),
+      getShippingReminder(o),
+      getShippingNoteText(o)
+    ].filter(Boolean).join("\n")
   ]);
 
   const printSheet = XLSX.utils.aoa_to_sheet([
