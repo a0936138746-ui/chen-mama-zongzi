@@ -1062,6 +1062,118 @@ function needsEggYolkPrep(o) {
   return hasEggYolkRequest(o) && days !== null && days <= 5;
 }
 
+function addDemandToMap(map, productId, qty) {
+  if (!productId || !qty) return;
+  const key = String(productId);
+  map[key] = (map[key] || 0) + Number(qty || 0);
+}
+
+function getOrderProductDemandMap(order) {
+  const map = {};
+
+  (order.items || []).forEach(item => {
+    const itemQty = Number(item.qty || 0);
+    const product = products.find(p => Number(p.id) === Number(item.id));
+
+    if (
+      product &&
+      product.type === "box" &&
+      Array.isArray(product.components)
+    ) {
+      product.components.forEach(comp => {
+        addDemandToMap(
+          map,
+          comp.productId,
+          Number(comp.qty || 0) * itemQty
+        );
+      });
+      return;
+    }
+
+    addDemandToMap(map, item.id, itemQty);
+  });
+
+  return map;
+}
+
+function getStockWorkDate(o) {
+  return getShippingWorkDate(o) || getProcessDate(o) || "9999-12-31";
+}
+
+function getStockShortageInfo(o) {
+  if (!o || isClosedOrder(o)) {
+    return { near: false, items: [], text: "" };
+  }
+
+  const workDate = getStockWorkDate(o);
+  const days = daysFromToday(workDate);
+  const near = days !== null && days <= 5;
+
+  if (!near) {
+    return { near, items: [], text: "" };
+  }
+
+  const sortedOrders = orders
+    .filter(order => !isClosedOrder(order))
+    .slice()
+    .sort((a, b) => {
+      const dateDiff = getStockWorkDate(a).localeCompare(getStockWorkDate(b));
+      if (dateDiff !== 0) return dateDiff;
+      return String(a.time || "").localeCompare(String(b.time || ""));
+    });
+
+  const demandBefore = {};
+
+  for (const order of sortedOrders) {
+    const demandMap = getOrderProductDemandMap(order);
+
+    if (String(order.id) === String(o.id)) {
+      const shortageItems = Object.entries(demandMap)
+        .map(([productId, qty]) => {
+          const product = products.find(p => Number(p.id) === Number(productId));
+          if (!product) return null;
+
+          const stock = Number(product.stock || 0);
+          const alreadyReserved = Number(demandBefore[productId] || 0);
+          const available = stock - alreadyReserved;
+          const shortage = Number(qty || 0) - Math.max(available, 0);
+
+          if (shortage <= 0) return null;
+
+          return {
+            productId,
+            name: product.name || productId,
+            need: Number(qty || 0),
+            available,
+            shortage
+          };
+        })
+        .filter(Boolean);
+
+      return {
+        near,
+        days,
+        workDate,
+        items: shortageItems,
+        text: shortageItems
+          .map(item => `${item.name} 缺 ${item.shortage}`)
+          .join("、")
+      };
+    }
+
+    Object.entries(demandMap).forEach(([productId, qty]) => {
+      demandBefore[productId] =
+        Number(demandBefore[productId] || 0) + Number(qty || 0);
+    });
+  }
+
+  return { near, days, workDate, items: [], text: "" };
+}
+
+function hasNearStockShortage(o) {
+  return getStockShortageInfo(o).items.length > 0;
+}
+
 function getOrderReminderBadges(o) {
   const badges = [];
   const isClosed = isClosedOrder(o);
@@ -1069,6 +1181,7 @@ function getOrderReminderBadges(o) {
   const processDays = daysFromToday(processDate);
   const shipDate = getShipDate(o);
   const shipDays = daysFromToday(shipDate);
+  const stockShortage = getStockShortageInfo(o);
 
   if (!isClosed && processDays !== null) {
     if (processDays < 0) {
@@ -1099,6 +1212,13 @@ function getOrderReminderBadges(o) {
     });
   }
 
+  if (!isClosed && stockShortage.items.length) {
+    badges.push({
+      text: "⚠️ 出貨近缺貨",
+      cls: "bg-red-100 text-red-800 border-red-400"
+    });
+  }
+
   if (o.note && o.note.trim() !== "") {
     badges.push({ text: "📝 特殊備註", cls: "bg-purple-100 text-purple-700 border-purple-300" });
   }
@@ -1121,6 +1241,7 @@ function getOrderAlert(o) {
   const processDays = daysFromToday(getProcessDate(o));
   const shipDate = getShipDate(o);
   const shipDays = daysFromToday(shipDate);
+  const stockShortage = getStockShortageInfo(o);
 
   if (dateDiffs.includes(0)) {
     badges.push({ text: "🔴 今日需處理", cls: "bg-red-100 text-red-700 border-red-300" });
@@ -1148,6 +1269,13 @@ function getOrderAlert(o) {
       cls: needsEggYolkPrep(o)
         ? "bg-red-100 text-red-800 border-red-400"
         : "bg-yellow-100 text-yellow-800 border-yellow-400"
+    });
+  }
+
+  if (stockShortage.items.length) {
+    badges.push({
+      text: `⚠️ 出貨近缺貨：${stockShortage.text}`,
+      cls: "bg-red-100 text-red-800 border-red-400"
     });
   }
 
@@ -1186,6 +1314,7 @@ function getOrderSortRank(o) {
   const shipDays = daysFromToday(getShipDate(o));
 
   if (processDays !== null && processDays < 0) return 1;
+  if (hasNearStockShortage(o)) return 1;
   if (processDays === 0) return 2;
   if (o.delivery === "宅配" && shipDays !== null && shipDays <= 0) return 3;
   if (processDays === 1) return 4;
@@ -1245,7 +1374,8 @@ function renderOrders() {
         (quickFilter === "shipping" && !isClosedOrder(o) && o.delivery === "宅配") ||
         (quickFilter === "pickup" && !isClosedOrder(o) && o.delivery === "自取") ||
         (quickFilter === "unpaid" && getUnpaidAmount(o) > 0) ||
-        (quickFilter === "eggYolk" && !isClosedOrder(o) && hasEggYolkRequest(o));
+        (quickFilter === "eggYolk" && !isClosedOrder(o) && hasEggYolkRequest(o)) ||
+        (quickFilter === "stockShortage" && !isClosedOrder(o) && hasNearStockShortage(o));
 
       return matchKeyword && matchPayment && matchStatus && matchDelivery && matchQuick;
     })
@@ -1322,6 +1452,7 @@ function renderOrders() {
       <button onclick="setOrderQuickFilter('pickup')" class="bg-lime-700 text-white px-4 py-2 rounded-xl">自取待取</button>
       <button onclick="setOrderQuickFilter('unpaid')" class="bg-amber-700 text-white px-4 py-2 rounded-xl">未結清 ${unpaidCount}</button>
       <button onclick="setOrderQuickFilter('eggYolk')" class="bg-yellow-600 text-white px-4 py-2 rounded-xl">加蛋黃 ${orders.filter(o => !isClosedOrder(o) && hasEggYolkRequest(o)).length}</button>
+      <button onclick="setOrderQuickFilter('stockShortage')" class="bg-red-700 text-white px-4 py-2 rounded-xl">出貨近缺貨 ${orders.filter(o => !isClosedOrder(o) && hasNearStockShortage(o)).length}</button>
       <button onclick="clearOrderFilters()" class="bg-gray-700 text-white px-4 py-2 rounded-xl">清除篩選</button>
       <button
         onclick="refreshAdmin().then(renderOrders)"
@@ -1408,6 +1539,11 @@ function orderCard(o) {
       ${hasEggYolkRequest(o) ? `
         <div class="mb-3 bg-yellow-100 border-2 border-yellow-500 text-yellow-900 rounded-xl p-3 font-bold">
           🥚 加蛋黃特殊單：一顆蛋黃 +10 元。${needsEggYolkPrep(o) ? "工作日前 5 天內，請先備料，避免出貨前來不及加。" : "請留意商品名稱可能仍顯示一般粽。"}
+        </div>
+      ` : ""}
+      ${hasNearStockShortage(o) ? `
+        <div class="mb-3 bg-red-100 border-2 border-red-500 text-red-900 rounded-xl p-3 font-bold">
+          ⚠️ 出貨近但庫存不足：${getStockShortageInfo(o).text}。請先補貨或調整出貨。
         </div>
       ` : ""}
       <div class="grid lg:grid-cols-[1fr_320px] gap-4 items-start">
@@ -1728,6 +1864,7 @@ function renderWarDashboard() {
   const shipOverdueList = unfinishedOrders.filter(o => o.delivery === "宅配" && daysFromToday(getShipDate(o)) < 0);
   const eggYolkList = unfinishedOrders.filter(o => hasEggYolkRequest(o));
   const eggYolkPrepList = unfinishedOrders.filter(o => needsEggYolkPrep(o));
+  const stockShortageList = unfinishedOrders.filter(o => hasNearStockShortage(o));
 
   const duplicateGroups = Object.values(activeOrders.reduce((groups, o) => {
     const phone = String(o.phone || "").trim();
@@ -1795,6 +1932,11 @@ function renderWarDashboard() {
         ${hasEggYolkRequest(o) ? `
           <div class="mb-3 bg-yellow-100 border-2 border-yellow-500 text-yellow-900 rounded-xl p-3 font-bold">
             🥚 加蛋黃特殊單｜一顆 +10 元｜${needsEggYolkPrep(o) ? "請先備料" : "請出貨前確認"}
+          </div>
+        ` : ""}
+        ${hasNearStockShortage(o) ? `
+          <div class="mb-3 bg-red-100 border-2 border-red-500 text-red-900 rounded-xl p-3 font-bold">
+            ⚠️ 出貨近缺貨｜${getStockShortageInfo(o).text}
           </div>
         ` : ""}
         <div class="grid lg:grid-cols-5 gap-3 items-start">
@@ -1940,6 +2082,11 @@ function renderWarDashboard() {
         <div class="text-2xl font-bold text-red-700">${abnormalWorkList.length}</div>
       </button>
 
+      <button onclick="setOrderQuickFilter('stockShortage'); showAdminTab('orders')" class="bg-red-50 border border-red-400 p-4 rounded-xl text-left">
+        <div class="font-bold">出貨近缺貨</div>
+        <div class="text-2xl font-bold text-red-700">${stockShortageList.length}</div>
+      </button>
+
       <button onclick="setOrderQuickFilter('eggYolk'); showAdminTab('orders')" class="bg-yellow-50 border border-yellow-300 p-4 rounded-xl text-left">
         <div class="font-bold">蛋黃預備</div>
         <div class="text-2xl font-bold text-yellow-700">${eggYolkPrepList.length}</div>
@@ -1952,6 +2099,9 @@ function renderWarDashboard() {
     </div>
 
     <div class="space-y-6">
+      ${renderSection("出貨近缺貨", stockShortageList, "目前沒有出貨近但缺貨的訂單", {
+        sort: sortByDashboardDate
+      })}
       ${renderSection("蛋黃預備", eggYolkList, "目前沒有加蛋黃訂單", {
         sort: sortByDashboardDate
       })}
@@ -2058,6 +2208,11 @@ function getShippingReminderList(o) {
     reminders.push(needsEggYolkPrep(o) ? "蛋黃單先備料" : "加蛋黃+10");
   }
 
+  const stockShortage = getStockShortageInfo(o);
+  if (stockShortage.items.length) {
+    reminders.push(`出貨近缺貨：${stockShortage.text}`);
+  }
+
   if (o.delivery === "宅配" && shipDays !== null) {
     if (shipDays < 0) {
       reminders.push("已超過寄出日");
@@ -2103,6 +2258,7 @@ function getShippingPriority(o) {
 
   if (processDays !== null && processDays < 0) return "A 逾期";
   if (o.delivery === "宅配" && shipDays !== null && shipDays < 0) return "A 逾期";
+  if (hasNearStockShortage(o)) return "A 出貨近缺貨";
   if (processDays === 0 || (o.delivery === "宅配" && shipDays === 0)) return "B 今日";
   if (processDays === 1 || (o.delivery === "宅配" && shipDays === 1)) return "C 明日";
   if (
@@ -2282,6 +2438,11 @@ function renderShippingList() {
               ${hasEggYolkRequest(o) ? `
                 <div class="mb-3 bg-yellow-100 border-2 border-yellow-500 text-yellow-900 rounded-xl p-3 font-bold">
                   🥚 加蛋黃特殊單｜一顆 +10 元｜${needsEggYolkPrep(o) ? "請先備料，避免出貨前來不及加" : "請出貨前確認"}
+                </div>
+              ` : ""}
+              ${hasNearStockShortage(o) ? `
+                <div class="mb-3 bg-red-100 border-2 border-red-500 text-red-900 rounded-xl p-3 font-bold">
+                  ⚠️ 出貨近但庫存不足｜${getStockShortageInfo(o).text}
                 </div>
               ` : ""}
               <div class="flex justify-between gap-3 flex-wrap">
@@ -4513,7 +4674,8 @@ function getStockRows() {
               id: order.id,
               name: order.name || "未填姓名",
               date: getProcessDate(order) || "未填日期",
-              qty: orderQty
+              qty: orderQty,
+              shortage: hasNearStockShortage(order)
             });
           }
         });
@@ -4656,8 +4818,8 @@ function renderStock() {
               row.relatedOrders.length
                 ? row.relatedOrders.slice(0, 4).map(order => `
                   <button onclick="openOrderInOrders('${order.id}')"
-                    class="block text-left w-full py-1 text-blue-700 hover:underline">
-                    ${order.date}｜${order.name}｜需求 ${order.qty}
+                    class="block text-left w-full py-1 ${order.shortage ? "text-red-700 font-bold" : "text-blue-700"} hover:underline">
+                    ${order.shortage ? "⚠️ " : ""}${order.date}｜${order.name}｜需求 ${order.qty}
                   </button>
                 `).join("")
                 : `<div class="text-gray-500">目前沒有未完成訂單需求</div>`
