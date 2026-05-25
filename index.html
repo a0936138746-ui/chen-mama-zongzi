@@ -2287,6 +2287,46 @@ function buildRowsFromWebsiteSheet(sheet) {
     });
 }
 
+function decodeWebsiteExcelText(buffer) {
+  const bytes = new Uint8Array(buffer);
+  const utf8Text = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+
+  if (/�/.test(utf8Text) || /<table/i.test(utf8Text)) {
+    try {
+      const big5Text = new TextDecoder("big5", { fatal: false }).decode(bytes);
+      if (!/�/.test(big5Text) && /<table/i.test(big5Text)) {
+        return big5Text;
+      }
+    } catch (e) {
+      return utf8Text;
+    }
+  }
+
+  return utf8Text;
+}
+
+function buildRowsFromWebsiteHtmlTable(htmlText) {
+  const doc = new DOMParser().parseFromString(htmlText, "text/html");
+  const table = doc.querySelector("table");
+  if (!table) return [];
+
+  const matrix = [...table.querySelectorAll("tr")].map(tr => {
+    return [...tr.querySelectorAll("th,td")].map(td => td.textContent.trim());
+  }).filter(row => row.some(cell => cell !== ""));
+
+  if (matrix.length < 2) return [];
+
+  const headers = matrix[0].map(normalizeWebsiteHeader);
+
+  return matrix.slice(1).map(row => {
+    const obj = {};
+    headers.forEach((header, index) => {
+      if (header) obj[header] = row[index] ?? "";
+    });
+    return obj;
+  });
+}
+
 function getWebsiteCell(row, candidates) {
   const keys = Object.keys(row || {});
   for (const candidate of candidates) {
@@ -2450,9 +2490,16 @@ async function previewWebsiteExcelImport() {
   }
 
   const buffer = await file.arrayBuffer();
-  const workbook = XLSX.read(buffer, { type: "array" });
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  const rows = buildRowsFromWebsiteSheet(sheet);
+  const text = decodeWebsiteExcelText(buffer);
+  let rows = [];
+
+  if (/<table/i.test(text)) {
+    rows = buildRowsFromWebsiteHtmlTable(text);
+  } else {
+    const workbook = XLSX.read(buffer, { type: "array" });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    rows = buildRowsFromWebsiteSheet(sheet);
+  }
 
   websiteExcelImportOrders = rows
     .map((row, index) => {
