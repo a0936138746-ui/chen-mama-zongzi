@@ -19,6 +19,17 @@
       overflow-wrap: anywhere;
       word-break: break-word;
     }
+
+    .quick-number-input {
+      cursor: pointer;
+      font-size: 1.15rem;
+      font-weight: 700;
+    }
+
+    .quick-number-input:focus {
+      outline: 3px solid rgba(245, 158, 11, 0.45);
+      outline-offset: 2px;
+    }
   </style>
 </head>
 
@@ -683,6 +694,131 @@ function syncPaperPaidAmount() {
   if (status === "未收款") {
     paidInput.value = "";
   }
+}
+
+let activeNumberInput = null;
+
+function openNumberKeypad(input) {
+  if (!input) return;
+
+  activeNumberInput = input;
+  document.getElementById("numberKeypad")?.remove();
+
+  const title = input.dataset.keypadTitle || "輸入數字";
+  const displayValue = input.value || "0";
+  const keypad = document.createElement("div");
+
+  keypad.id = "numberKeypad";
+  keypad.className = "fixed inset-0 bg-black/40 z-[100] p-4 flex items-end sm:items-center justify-center";
+  keypad.onclick = (event) => {
+    if (event.target.id === "numberKeypad") closeNumberKeypad();
+  };
+
+  keypad.innerHTML = `
+    <div class="bg-white rounded-2xl shadow-2xl p-4 w-full max-w-sm" onclick="event.stopPropagation()">
+      <div class="flex justify-between items-center gap-3 mb-3">
+        <div class="font-bold text-xl">${title}</div>
+        <button type="button" onclick="closeNumberKeypad()"
+          class="mobile-action-btn bg-gray-700 text-white px-4 py-2 rounded-xl font-bold">
+          關閉
+        </button>
+      </div>
+
+      <div id="numberKeypadDisplay"
+        class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-right text-4xl font-bold mb-3 min-h-[72px]">
+        ${displayValue}
+      </div>
+
+      <div class="grid grid-cols-3 gap-2">
+        ${["7","8","9","4","5","6","1","2","3"].map(n => `
+          <button type="button" onclick="numberKeypadPress('${n}')"
+            class="mobile-action-btn bg-gray-100 hover:bg-amber-100 text-2xl font-bold rounded-xl py-4">
+            ${n}
+          </button>
+        `).join("")}
+
+        <button type="button" onclick="numberKeypadClear()"
+          class="mobile-action-btn bg-red-100 text-red-700 text-lg font-bold rounded-xl py-4">
+          清除
+        </button>
+
+        <button type="button" onclick="numberKeypadPress('0')"
+          class="mobile-action-btn bg-gray-100 hover:bg-amber-100 text-2xl font-bold rounded-xl py-4">
+          0
+        </button>
+
+        <button type="button" onclick="numberKeypadBackspace()"
+          class="mobile-action-btn bg-blue-100 text-blue-700 text-lg font-bold rounded-xl py-4">
+          退格
+        </button>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2 mt-2">
+        <button type="button" onclick="numberKeypadPress('00')"
+          class="mobile-action-btn bg-gray-100 hover:bg-amber-100 text-2xl font-bold rounded-xl py-4">
+          00
+        </button>
+        <button type="button" onclick="confirmNumberKeypad()"
+          class="mobile-action-btn bg-green-700 text-white text-xl font-bold rounded-xl py-4">
+          套用
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(keypad);
+  updateNumberKeypadDisplay();
+}
+
+function updateNumberKeypadDisplay() {
+  const display = document.getElementById("numberKeypadDisplay");
+  if (!display || !activeNumberInput) return;
+
+  display.innerText = activeNumberInput.value || "0";
+}
+
+function triggerNumberInputEvents() {
+  if (!activeNumberInput) return;
+
+  activeNumberInput.dispatchEvent(new Event("input", { bubbles: true }));
+  activeNumberInput.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+function numberKeypadPress(value) {
+  if (!activeNumberInput) return;
+
+  const current = String(activeNumberInput.value || "");
+  const nextValue = current === "0" ? value : current + value;
+
+  activeNumberInput.value = nextValue.replace(/^0+(\d)/, "$1");
+  triggerNumberInputEvents();
+  updateNumberKeypadDisplay();
+}
+
+function numberKeypadBackspace() {
+  if (!activeNumberInput) return;
+
+  activeNumberInput.value = String(activeNumberInput.value || "").slice(0, -1);
+  triggerNumberInputEvents();
+  updateNumberKeypadDisplay();
+}
+
+function numberKeypadClear() {
+  if (!activeNumberInput) return;
+
+  activeNumberInput.value = "";
+  triggerNumberInputEvents();
+  updateNumberKeypadDisplay();
+}
+
+function confirmNumberKeypad() {
+  triggerNumberInputEvents();
+  closeNumberKeypad();
+}
+
+function closeNumberKeypad() {
+  document.getElementById("numberKeypad")?.remove();
+  activeNumberInput = null;
 }
 
 async function updateOrder(id, name, phone) {
@@ -3429,7 +3565,12 @@ function renderPaperOrder() {
               <option value="其他">其他</option>
             </select>
 
-            <input id="paperPaidAmount" type="number" class="border p-3 rounded-xl" placeholder="已收金額">
+            <input id="paperPaidAmount" type="number" inputmode="numeric"
+              class="quick-number-input border p-3 rounded-xl"
+              data-keypad-title="輸入已收金額"
+              onfocus="openNumberKeypad(this)"
+              onclick="openNumberKeypad(this)"
+              placeholder="已收金額">
             <input id="paperPaymentNote" class="border p-3 rounded-xl" placeholder="付款備註">
           </div>
         </section>
@@ -3458,15 +3599,23 @@ function addPaperRow() {
         <option value="${p.id}">${p.name}</option>
       `).join("")}
     </select>
-    <input class="paperQty border p-3 rounded-xl"
+    <input class="paperQty quick-number-input border p-3 rounded-xl"
        type="number"
+       inputmode="numeric"
        value="1"
        min="1"
+       data-keypad-title="輸入數量"
+       onfocus="openNumberKeypad(this)"
+       onclick="openNumberKeypad(this)"
        oninput="renderPaperTotal()">
 
-<input class="paperPrice border p-3 rounded-xl"
+<input class="paperPrice quick-number-input border p-3 rounded-xl"
        type="number"
+       inputmode="numeric"
+       data-keypad-title="輸入單價"
        placeholder="單價，可改"
+       onfocus="openNumberKeypad(this)"
+       onclick="openNumberKeypad(this)"
        oninput="renderPaperTotal()">
     <button type="button" onclick="this.parentElement.remove(); renderPaperTotal();"
       class="mobile-action-btn bg-red-600 text-white rounded-xl font-bold px-4 py-2">
