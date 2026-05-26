@@ -99,6 +99,16 @@
             <input id="address" class="border p-3 rounded-xl" placeholder="地址">
           </div>
 
+          <div class="grid grid-cols-[120px_1fr] gap-3 mb-3">
+            <select id="pickupTimeSlot" class="border p-3 rounded-xl">
+              <option value="">取貨時段</option>
+              <option value="早上">早上</option>
+              <option value="晚上">晚上</option>
+              <option value="其他">其他時間</option>
+            </select>
+            <input id="pickupTimeNote" class="border p-3 rounded-xl" placeholder="可加註幾點，例如 10:30、晚上 7 點">
+          </div>
+
           <textarea id="note" class="border p-3 rounded-xl w-full" rows="3" placeholder="備註，例如加蛋黃、送禮分裝、希望時段"></textarea>
         </section>
 
@@ -1219,16 +1229,36 @@ function updateFrontDeliveryHint() {
 
 function validateFrontOrder({ name, phone, delivery, pickupDate, address }) {
   const phoneDigits = normalizePhone(phone);
+  const timeSlot = document.getElementById("pickupTimeSlot")?.value || "";
 
   if (!name) return "請輸入姓名";
   if (!phoneDigits || phoneDigits.length < 8) return "請輸入正確電話，至少 8 碼";
   if (!pickupDate) return delivery === "宅配" ? "請選擇希望到貨日" : "請選擇取貨/外送日期";
+  if (!timeSlot) return "請選擇取貨/收貨時段";
   if ((delivery === "宅配" || delivery === "有限外送") && !address) {
     return `${delivery} 請填寫地址`;
   }
   if (cart.length === 0) return "請先加入商品";
 
   return "";
+}
+
+function getPickupTimeText(prefix = "取貨/收貨時段") {
+  const slot = document.getElementById("pickupTimeSlot")?.value || "";
+  const note = document.getElementById("pickupTimeNote")?.value.trim() || "";
+
+  if (!slot && !note) return "";
+
+  return `${prefix}：${slot || "未選"}${note ? "，" + note : ""}`;
+}
+
+function getPaperTimeText() {
+  const slot = document.getElementById("paperTimeSlot")?.value || "";
+  const note = document.getElementById("paperTimeNote")?.value.trim() || "";
+
+  if (!slot && !note) return "";
+
+  return `取貨/收貨時段：${slot || "未選"}${note ? "，" + note : ""}`;
 }
 
 function renderFrontOrderConfirm(order) {
@@ -1242,6 +1272,7 @@ function renderFrontOrderConfirm(order) {
     .map(item => `${item.name} x ${item.qty}`)
     .join("、");
   const customerNote = order.customer_note || "";
+  const pickupTimeText = order.pickup_time_text || "";
 
   box.classList.remove("hidden");
   box.innerHTML = `
@@ -1252,6 +1283,7 @@ function renderFrontOrderConfirm(order) {
         <div>姓名：${order.name}</div>
         <div>電話：${order.phone}</div>
         <div>方式：${order.delivery}｜日期：${processDate || "未填"}</div>
+        ${pickupTimeText ? `<div>${pickupTimeText}</div>` : ""}
         ${order.delivery === "宅配" ? `<div>預計寄出日：${order.ship_date || "待確認"}</div>` : ""}
         ${order.address ? `<div>地址：${order.address}</div>` : ""}
       </div>
@@ -1279,6 +1311,7 @@ async function submitOrder() {
   const pickupDate = document.getElementById("pickupDate").value;
   const address = document.getElementById("address").value.trim();
   const note = document.getElementById("note").value.trim();
+  const pickupTimeText = getPickupTimeText();
 
   const validationError = validateFrontOrder({ name, phone, delivery, pickupDate, address });
   if (validationError) return alert(validationError);
@@ -1296,6 +1329,7 @@ async function submitOrder() {
   const orderItems = [...cart, ...shippingItem];
   const stockWarnings = getCartStockWarnings();
   const backendNote = [
+    pickupTimeText,
     note,
     totals.shipping.fee > 0
       ? `宅配運費：${totals.shipping.details.join("；")}，共 NT$ ${money(totals.shipping.fee)}`
@@ -1332,7 +1366,7 @@ async function submitOrder() {
     return;
   }
 
-  renderFrontOrderConfirm({ ...order, customer_note: note });
+  renderFrontOrderConfirm({ ...order, customer_note: note, pickup_time_text: pickupTimeText });
   alert(stockWarnings.length
     ? "訂單送出成功！此訂單數量較大，後台會確認庫存後與您聯絡。"
     : "訂單送出成功！");
@@ -1341,6 +1375,8 @@ async function submitOrder() {
   document.getElementById("customerName").value = "";
   document.getElementById("customerPhone").value = "";
   document.getElementById("pickupDate").value = "";
+  document.getElementById("pickupTimeSlot").value = "";
+  document.getElementById("pickupTimeNote").value = "";
   document.getElementById("address").value = "";
   document.getElementById("note").value = "";
 }
@@ -3928,6 +3964,13 @@ function renderPaperOrder() {
             </select>
             <input id="paperDate" type="date" class="border p-3 rounded-xl">
             <input id="paperAddress" class="border p-3 rounded-xl md:col-span-2" placeholder="地址">
+            <select id="paperTimeSlot" class="border p-3 rounded-xl">
+              <option value="">取貨/收貨時段</option>
+              <option value="早上">早上</option>
+              <option value="晚上">晚上</option>
+              <option value="其他">其他時間</option>
+            </select>
+            <input id="paperTimeNote" class="border p-3 rounded-xl" placeholder="可加註幾點，例如 10:30、晚上 7 點">
           </div>
         </section>
 
@@ -4047,11 +4090,13 @@ async function savePaperOrder() {
   const date = document.getElementById("paperDate").value;
   const address = document.getElementById("paperAddress").value.trim();
   const note = document.getElementById("paperNote").value.trim();
+  const timeText = getPaperTimeText();
   const paymentStatus = document.getElementById("paperPaymentStatus").value;
   const paymentMethod = document.getElementById("paperPaymentMethod").value;
   const paymentNote = document.getElementById("paperPaymentNote").value.trim();
 
   if (!name) return alert("請填姓名");
+  if (!document.getElementById("paperTimeSlot").value) return alert("請選擇取貨/收貨時段");
 
   const rows = [...document.querySelectorAll("#paperRows > div")];
   const items = rows.map(r => {
@@ -4081,7 +4126,7 @@ async function savePaperOrder() {
     pickup_date: delivery === "宅配" ? null : (date || null),
     arrival_date: delivery === "宅配" ? (date || null) : null,
     ship_date: delivery === "宅配" && date ? addDays(date, -3) : null,
-    note,
+    note: [timeText, note].filter(Boolean).join("\n"),
     items,
     total,
     status: "未完成",
