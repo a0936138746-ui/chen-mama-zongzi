@@ -38,7 +38,17 @@
 
 <header class="bg-amber-800 text-white p-5 flex justify-between items-center">
   <h1 class="text-2xl font-bold">陳媽媽肉粽訂單系統</h1>
-  <div class="flex gap-3">
+  <div class="flex gap-3 items-center">
+    <button
+      id="adminUnlockButton"
+      type="button"
+      onclick="handleAdminUnlockTap()"
+      class="w-9 h-9 rounded-full text-amber-200/40 hover:text-white hover:bg-amber-700/60 text-lg"
+      aria-label="管理入口">
+      粽
+    </button>
+  </div>
+  <div id="adminNavButtons" class="hidden gap-3">
     <button onclick="showPage('front')" class="bg-white text-amber-800 px-4 py-2 rounded-xl font-bold">前台</button>
     <button onclick="showPage('admin')" class="bg-amber-600 px-4 py-2 rounded-xl font-bold">後台</button>
   </div>
@@ -899,6 +909,43 @@ function refreshPaperPrices() {
 function showPage(page) {
   document.getElementById("frontPage").classList.toggle("hidden", page !== "front");
   document.getElementById("adminPage").classList.toggle("hidden", page !== "admin");
+}
+
+let adminUnlockTapCount = 0;
+let adminUnlockTimer = null;
+
+function isAdminEntryUnlocked() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("admin") === "1" ||
+    localStorage.getItem("chenMamaAdminEntryUnlocked") === "1";
+}
+
+function setAdminEntryVisible(visible) {
+  const nav = document.getElementById("adminNavButtons");
+  if (!nav) return;
+
+  nav.classList.toggle("hidden", !visible);
+  nav.classList.toggle("flex", visible);
+}
+
+function initAdminEntry() {
+  setAdminEntryVisible(isAdminEntryUnlocked());
+}
+
+function handleAdminUnlockTap() {
+  adminUnlockTapCount += 1;
+
+  if (adminUnlockTimer) clearTimeout(adminUnlockTimer);
+  adminUnlockTimer = setTimeout(() => {
+    adminUnlockTapCount = 0;
+  }, 1200);
+
+  if (adminUnlockTapCount >= 3) {
+    adminUnlockTapCount = 0;
+    localStorage.setItem("chenMamaAdminEntryUnlocked", "1");
+    setAdminEntryVisible(true);
+    alert("管理入口已開啟");
+  }
 }
 
 function loginAdmin() {
@@ -5700,6 +5747,7 @@ async function refreshAdmin() {
   await loadProducts();
 }
 
+initAdminEntry();
 loadProducts();
 updateFrontDeliveryHint();
   function renderProductAdmin() {
