@@ -71,6 +71,7 @@
           <button onclick="loadProducts()" class="bg-amber-700 text-white px-4 py-2 rounded-xl font-bold">重新讀取商品</button>
         </div>
 
+        <div id="frontCategoryTabs" class="grid grid-cols-3 gap-2 mb-4"></div>
         <div id="productList" class="grid md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
       </main>
 
@@ -913,14 +914,44 @@ async function loadProducts() {
 
 function renderProducts() {
   const box = document.getElementById("productList");
+  const tabs = document.getElementById("frontCategoryTabs");
   box.innerHTML = "";
 
-  const frontProducts = products.filter(isFrontProductAvailable);
+  const categories = [
+    { key: "single", label: "單點區" },
+    { key: "gift", label: "禮盒區" },
+    { key: "bulk", label: "整數/大量" }
+  ];
+  const activeCategory = window.frontProductCategory || "single";
+  const frontProducts = products
+    .filter(isFrontProductAvailable)
+    .filter(p => getFrontProductCategory(p) === activeCategory);
+
+  if (tabs) {
+    tabs.innerHTML = categories.map(category => {
+      const count = products
+        .filter(isFrontProductAvailable)
+        .filter(p => getFrontProductCategory(p) === category.key)
+        .length;
+
+      return `
+        <button type="button" onclick="setFrontProductCategory('${category.key}')"
+          class="px-3 py-3 rounded-xl font-bold border ${
+            activeCategory === category.key
+              ? "bg-amber-700 text-white border-amber-700"
+              : "bg-white text-amber-800 border-amber-200"
+          }">
+          ${category.label}
+          <span class="block text-xs opacity-80">${count} 項</span>
+        </button>
+      `;
+    }).join("");
+  }
 
   if (!frontProducts.length) {
     box.innerHTML = `
       <div class="bg-white border rounded-2xl p-6 text-gray-500 md:col-span-2 xl:col-span-3">
-        目前沒有開放前台訂購的商品
+        目前這個分類沒有開放訂購的商品
       </div>
     `;
     return;
@@ -961,11 +992,36 @@ function renderProducts() {
   });
 }
 
+function setFrontProductCategory(category) {
+  window.frontProductCategory = category;
+  renderProducts();
+}
+
+function getFrontProductCategory(product) {
+  const name = String(product.name || "");
+  const lowerName = name.toLowerCase();
+
+  if (lowerName.includes("diy") || name.includes("DIY") || name.includes("材料包")) return "hidden";
+  if (product.type === "box" || name.includes("禮盒") || name.includes("盒")) return "gift";
+  if (
+    name.includes("整箱") ||
+    name.includes("整袋") ||
+    name.includes("大量") ||
+    name.includes("團購") ||
+    /\d+\s*(?:入|粒|顆)/.test(name)
+  ) {
+    return "bulk";
+  }
+
+  return "single";
+}
+
 function getFrontProductTag(product) {
   const name = String(product.name || "");
+  const category = getFrontProductCategory(product);
 
-  if (name.includes("DIY") || name.toLowerCase().includes("diy") || name.includes("材料包")) return "DIY/材料包";
-  if (product.type === "box" || name.includes("禮盒") || name.includes("盒")) return "禮盒";
+  if (category === "gift") return "禮盒";
+  if (category === "bulk") return "整數/大量";
   if (name.includes("素")) return "素食";
   if (name.includes("鹼") || name.includes("檢")) return "甜粽";
 
@@ -975,6 +1031,7 @@ function getFrontProductTag(product) {
 function isFrontProductAvailable(product) {
   return product.active !== false &&
     product.front_active !== false &&
+    getFrontProductCategory(product) !== "hidden" &&
     product.type !== "fee";
 }
 
