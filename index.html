@@ -45,45 +45,82 @@
 </header>
 
 <!-- 前台 -->
-<section id="frontPage" class="p-6">
-  <h2 class="text-2xl font-bold mb-4">前台下單</h2>
-
-  <div class="bg-white rounded-2xl shadow p-5 mb-6">
-    <div class="grid md:grid-cols-2 gap-4 mb-4">
-      <input id="customerName" class="border p-3 rounded-xl" placeholder="客戶姓名">
-      <input id="customerPhone" class="border p-3 rounded-xl" placeholder="客戶電話">
+<section id="frontPage" class="bg-stone-50">
+  <div class="bg-amber-900 text-white px-6 py-8">
+    <div class="max-w-6xl mx-auto">
+      <div class="text-sm font-bold text-amber-200 mb-2">手作肉粽預訂</div>
+      <h2 class="text-3xl md:text-4xl font-bold mb-3">陳媽媽肉粽訂購</h2>
+      <div class="grid md:grid-cols-3 gap-3 text-sm">
+        <div class="bg-white/10 rounded-xl p-3">自取、宅配、有限外送皆可登記</div>
+        <div class="bg-white/10 rounded-xl p-3">宅配請填希望到貨日與完整地址</div>
+        <div class="bg-white/10 rounded-xl p-3">送出後會產生訂單編號方便查詢</div>
+      </div>
     </div>
-
-    <select id="delivery" class="border p-3 rounded-xl w-full mb-2" onchange="updateFrontDeliveryHint()">
-      <option value="自取">自取</option>
-      <option value="宅配">宅配</option>
-      <option value="有限外送">有限外送</option>
-    </select>
-    <div id="frontDeliveryHint" class="bg-blue-50 text-blue-800 p-3 rounded-xl mb-4 text-sm">
-      自取請選擇取貨日期；宅配請填希望到貨日與地址。
-    </div>
-
-    <div class="grid md:grid-cols-2 gap-4 mb-4">
-      <input id="pickupDate" type="date" class="border p-3 rounded-xl">
-      <input id="address" class="border p-3 rounded-xl" placeholder="地址">
-    </div>
-
-    <textarea id="note" class="border p-3 rounded-xl w-full mb-4" placeholder="備註"></textarea>
-
-    <h3 class="font-bold mb-2">購物車</h3>
-    <div id="cartBox" class="bg-amber-50 p-4 rounded-xl mb-4">尚未加入商品</div>
-
-    <div class="text-xl font-bold mb-4">總金額：NT$ <span id="totalAmount">0</span></div>
-
-    <button onclick="submitOrder()" class="bg-green-700 text-white px-6 py-3 rounded-xl font-bold">
-      送出訂單
-    </button>
   </div>
 
-  <div id="frontOrderConfirm" class="hidden bg-green-50 border-2 border-green-300 rounded-2xl p-5 mb-6"></div>
+  <div class="max-w-6xl mx-auto p-4 md:p-6">
+    <div id="frontOrderConfirm" class="hidden bg-green-50 border-2 border-green-300 rounded-2xl p-5 mb-6"></div>
 
-  <button onclick="loadProducts()" class="bg-amber-700 text-white px-6 py-3 rounded-xl mb-5">重新讀取商品</button>
-  <div id="productList" class="grid md:grid-cols-3 gap-4"></div>
+    <div class="grid lg:grid-cols-[1fr_380px] gap-6 items-start">
+      <main>
+        <div class="flex justify-between items-center gap-3 flex-wrap mb-4">
+          <div>
+            <h3 class="text-2xl font-bold">選擇商品</h3>
+            <div class="text-sm text-gray-500">商品依後台上架設定顯示，庫存由後台確認。</div>
+          </div>
+          <button onclick="loadProducts()" class="bg-amber-700 text-white px-4 py-2 rounded-xl font-bold">重新讀取商品</button>
+        </div>
+
+        <div id="productList" class="grid md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+      </main>
+
+      <aside class="lg:sticky lg:top-4 space-y-4">
+        <section class="bg-white rounded-2xl shadow p-5 border">
+          <h3 class="font-bold text-xl mb-4">訂購資料</h3>
+
+          <div class="grid gap-3 mb-3">
+            <input id="customerName" class="border p-3 rounded-xl" placeholder="客戶姓名">
+            <input id="customerPhone" class="border p-3 rounded-xl" placeholder="客戶電話">
+          </div>
+
+          <select id="delivery" class="border p-3 rounded-xl w-full mb-2" onchange="updateFrontDeliveryHint()">
+            <option value="自取">自取</option>
+            <option value="宅配">宅配</option>
+            <option value="有限外送">有限外送</option>
+          </select>
+
+          <div id="frontDeliveryHint" class="bg-blue-50 text-blue-800 p-3 rounded-xl mb-3 text-sm">
+            自取請選擇取貨日期；宅配請填希望到貨日與地址。
+          </div>
+
+          <div class="grid gap-3 mb-3">
+            <input id="pickupDate" type="date" class="border p-3 rounded-xl">
+            <input id="address" class="border p-3 rounded-xl" placeholder="地址">
+          </div>
+
+          <textarea id="note" class="border p-3 rounded-xl w-full" rows="3" placeholder="備註，例如加蛋黃、送禮分裝、希望時段"></textarea>
+        </section>
+
+        <section class="bg-white rounded-2xl shadow p-5 border">
+          <div class="flex justify-between items-center mb-3">
+            <h3 class="font-bold text-xl">購物車</h3>
+            <span class="text-sm text-gray-500">確認品項與數量</span>
+          </div>
+
+          <div id="cartBox" class="bg-amber-50 p-4 rounded-xl mb-4">尚未加入商品</div>
+
+          <div class="flex justify-between items-end border-t pt-4 mb-4">
+            <div class="text-gray-500">總金額</div>
+            <div class="text-3xl font-bold text-amber-700">NT$ <span id="totalAmount">0</span></div>
+          </div>
+
+          <button onclick="submitOrder()" class="mobile-action-btn bg-green-700 text-white px-6 py-4 rounded-xl font-bold w-full text-lg">
+            送出訂單
+          </button>
+        </section>
+      </aside>
+    </div>
+  </div>
 </section>
 
 <!-- 後台 -->
@@ -878,23 +915,61 @@ function renderProducts() {
   const box = document.getElementById("productList");
   box.innerHTML = "";
 
-  products.filter(isFrontProductAvailable).forEach(p => {
+  const frontProducts = products.filter(isFrontProductAvailable);
+
+  if (!frontProducts.length) {
+    box.innerHTML = `
+      <div class="bg-white border rounded-2xl p-6 text-gray-500 md:col-span-2 xl:col-span-3">
+        目前沒有開放前台訂購的商品
+      </div>
+    `;
+    return;
+  }
+
+  frontProducts.forEach(p => {
     const card = document.createElement("div");
-    card.className = "bg-white p-5 rounded-2xl shadow";
+    const tag = getFrontProductTag(p);
+
+    card.className = "bg-white p-5 rounded-2xl shadow border hover:shadow-lg transition";
     card.innerHTML = `
-      <h3 class="text-xl font-bold">${p.name}</h3>
-      <p class="text-amber-700 font-bold text-lg">NT$ ${p.price}</p>
-      <div class="flex gap-2">
+      <div class="flex justify-between items-start gap-3 mb-3">
+        <div>
+          <span class="inline-block bg-amber-100 text-amber-800 rounded-full px-3 py-1 text-xs font-bold mb-2">
+            ${tag}
+          </span>
+          <h3 class="text-xl font-bold leading-snug">${p.name}</h3>
+        </div>
+        <div class="text-right">
+          <div class="text-xs text-gray-500">單價</div>
+          <div class="text-2xl font-bold text-amber-700">NT$ ${money(p.price)}</div>
+        </div>
+      </div>
+
+      <div class="bg-stone-50 rounded-xl p-3 flex gap-2 items-center">
+        <label class="text-sm text-gray-500 font-bold">數量</label>
         <input id="qty-${p.id}" type="number" inputmode="numeric" min="1" value="1"
           data-keypad-title="輸入數量"
           onfocus="openNumberKeypad(this)"
           onclick="openNumberKeypad(this)"
-          class="quick-number-input border p-3 rounded-xl w-24 text-center">
-        <button onclick="addToCart(${p.id})" class="bg-amber-700 text-white px-4 py-2 rounded-xl">加入</button>
+          class="quick-number-input border p-3 rounded-xl w-24 text-center bg-white">
+        <button onclick="addToCart(${p.id})" class="mobile-action-btn bg-amber-700 text-white px-4 py-3 rounded-xl font-bold flex-1">
+          加入購物車
+        </button>
       </div>
     `;
     box.appendChild(card);
   });
+}
+
+function getFrontProductTag(product) {
+  const name = String(product.name || "");
+
+  if (name.includes("DIY") || name.toLowerCase().includes("diy") || name.includes("材料包")) return "DIY/材料包";
+  if (product.type === "box" || name.includes("禮盒") || name.includes("盒")) return "禮盒";
+  if (name.includes("素")) return "素食";
+  if (name.includes("鹼") || name.includes("檢")) return "甜粽";
+
+  return "手作肉粽";
 }
 
 function isFrontProductAvailable(product) {
@@ -920,7 +995,7 @@ function renderCart() {
   const totalBox = document.getElementById("totalAmount");
 
   if (cart.length === 0) {
-    box.innerHTML = "尚未加入商品";
+    box.innerHTML = `<div class="text-gray-500 text-center py-6">尚未加入商品</div>`;
     totalBox.innerText = "0";
     return;
   }
@@ -930,11 +1005,15 @@ function renderCart() {
     const sub = item.price * item.qty;
     total += sub;
     return `
-      <div class="flex justify-between border-b py-2">
-        <span>${item.name} x ${item.qty}</span>
-        <span>NT$ ${money(sub)}
-          <button onclick="removeCart(${i})" class="text-red-600 ml-3">刪除</button>
-        </span>
+      <div class="flex justify-between gap-3 border-b border-amber-100 py-3">
+        <div>
+          <div class="font-bold">${item.name}</div>
+          <div class="text-sm text-gray-500">${item.qty} 份 x NT$ ${money(item.price)}</div>
+        </div>
+        <div class="text-right">
+          <div class="font-bold text-amber-700">NT$ ${money(sub)}</div>
+          <button onclick="removeCart(${i})" class="text-red-600 text-sm mt-1">刪除</button>
+        </div>
       </div>
     `;
   }).join("");
