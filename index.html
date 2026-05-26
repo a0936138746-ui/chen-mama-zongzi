@@ -1058,6 +1058,12 @@ function setOrderQuickFilter(type) {
   renderOrders();
 }
 
+function setOrderStatusFilter(value) {
+  window.orderStatusFilter = value;
+  window.orderQuickFilter = "";
+  renderOrders();
+}
+
 function clearOrderFilters() {
   window.orderSearchKeyword = "";
   window.highlightOrderId = "";
@@ -1568,7 +1574,10 @@ function renderOrders() {
         !paymentFilter ||
         (paymentFilter === "未結清" && getUnpaidAmount(o) > 0) ||
         getPaymentStatus(o) === paymentFilter;
-      const matchStatus = !statusFilter || o.status === statusFilter;
+      const matchStatus =
+        !statusFilter ||
+        o.status === statusFilter ||
+        (statusFilter === "已完成" && (o.status === "已取貨" || o.status === "已宅配"));
       const matchDelivery = !deliveryFilter || o.delivery === deliveryFilter;
       const matchQuick =
         !quickFilter ||
@@ -1578,6 +1587,8 @@ function renderOrders() {
         (quickFilter === "shipping" && !isClosedOrder(o) && o.delivery === "宅配") ||
         (quickFilter === "pickup" && !isClosedOrder(o) && o.delivery === "自取") ||
         (quickFilter === "unpaid" && getUnpaidAmount(o) > 0) ||
+        (quickFilter === "completed" && (o.status === "已取貨" || o.status === "已宅配")) ||
+        (quickFilter === "cancelled" && o.status === "已取消") ||
         (quickFilter === "eggYolk" && !isClosedOrder(o) && hasEggYolkRequest(o)) ||
         (quickFilter === "stockShortage" && !isClosedOrder(o) && hasNearStockShortage(o));
 
@@ -1599,6 +1610,8 @@ function renderOrders() {
   const tomorrowCount = orders.filter(o => !isClosedOrder(o) && daysFromToday(getProcessDate(o)) === 1).length;
   const overdueCount = orders.filter(o => !isClosedOrder(o) && daysFromToday(getProcessDate(o)) < 0).length;
   const unpaidCount = orders.filter(o => getUnpaidAmount(o) > 0).length;
+  const completedCount = orders.filter(o => o.status === "已取貨" || o.status === "已宅配").length;
+  const cancelledCount = orders.filter(o => o.status === "已取消").length;
 
   panel.innerHTML = `
     <h2 class="text-2xl font-bold mb-4">訂單管理</h2>
@@ -1617,8 +1630,8 @@ function renderOrders() {
       <select
         id="orderStatusFilter"
         class="border p-3 rounded-xl"
-        onchange="window.orderStatusFilter=this.value; renderOrders()">
-        ${["","未完成","已取貨","已宅配","已取消"].map(s => `
+        onchange="setOrderStatusFilter(this.value)">
+        ${["","未完成","已完成","已取貨","已宅配","已取消"].map(s => `
           <option value="${s}" ${statusFilter === s ? "selected" : ""}>
             ${s || "狀態篩選"}
           </option>
@@ -1655,6 +1668,8 @@ function renderOrders() {
       <button onclick="setOrderQuickFilter('shipping')" class="bg-blue-600 text-white px-4 py-2 rounded-xl">宅配待寄</button>
       <button onclick="setOrderQuickFilter('pickup')" class="bg-lime-700 text-white px-4 py-2 rounded-xl">自取待取</button>
       <button onclick="setOrderQuickFilter('unpaid')" class="bg-amber-700 text-white px-4 py-2 rounded-xl">未結清 ${unpaidCount}</button>
+      <button onclick="setOrderQuickFilter('completed')" class="bg-green-700 text-white px-4 py-2 rounded-xl">已完成 ${completedCount}</button>
+      <button onclick="setOrderQuickFilter('cancelled')" class="bg-gray-600 text-white px-4 py-2 rounded-xl">已取消 ${cancelledCount}</button>
       <button onclick="setOrderQuickFilter('eggYolk')" class="bg-yellow-600 text-white px-4 py-2 rounded-xl">加蛋黃 ${orders.filter(o => !isClosedOrder(o) && hasEggYolkRequest(o)).length}</button>
       <button onclick="setOrderQuickFilter('stockShortage')" class="bg-red-700 text-white px-4 py-2 rounded-xl">出貨近缺貨 ${orders.filter(o => !isClosedOrder(o) && hasNearStockShortage(o)).length}</button>
       <button onclick="clearOrderFilters()" class="bg-gray-700 text-white px-4 py-2 rounded-xl">清除篩選</button>
