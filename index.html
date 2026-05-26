@@ -54,11 +54,14 @@
       <input id="customerPhone" class="border p-3 rounded-xl" placeholder="客戶電話">
     </div>
 
-    <select id="delivery" class="border p-3 rounded-xl w-full mb-4">
+    <select id="delivery" class="border p-3 rounded-xl w-full mb-2" onchange="updateFrontDeliveryHint()">
       <option value="自取">自取</option>
       <option value="宅配">宅配</option>
       <option value="有限外送">有限外送</option>
     </select>
+    <div id="frontDeliveryHint" class="bg-blue-50 text-blue-800 p-3 rounded-xl mb-4 text-sm">
+      自取請選擇取貨日期；宅配請填希望到貨日與地址。
+    </div>
 
     <div class="grid md:grid-cols-2 gap-4 mb-4">
       <input id="pickupDate" type="date" class="border p-3 rounded-xl">
@@ -76,6 +79,8 @@
       送出訂單
     </button>
   </div>
+
+  <div id="frontOrderConfirm" class="hidden bg-green-50 border-2 border-green-300 rounded-2xl p-5 mb-6"></div>
 
   <button onclick="loadProducts()" class="bg-amber-700 text-white px-6 py-3 rounded-xl mb-5">重新讀取商品</button>
   <div id="productList" class="grid md:grid-cols-3 gap-4"></div>
@@ -933,6 +938,91 @@ function removeCart(i) {
   renderCart();
 }
 
+function normalizePhone(value) {
+  return String(value || "").replace(/[^\d]/g, "");
+}
+
+function updateFrontDeliveryHint() {
+  const delivery = document.getElementById("delivery")?.value || "自取";
+  const hint = document.getElementById("frontDeliveryHint");
+  const address = document.getElementById("address");
+  const date = document.getElementById("pickupDate");
+
+  if (!hint) return;
+
+  if (delivery === "宅配") {
+    hint.innerHTML = "宅配請填「希望到貨日」與完整地址；系統會自動推算應寄出日。";
+    if (address) address.placeholder = "宅配地址（必填）";
+    if (date) date.title = "希望到貨日";
+    return;
+  }
+
+  if (delivery === "有限外送") {
+    hint.innerHTML = "有限外送請填外送日期與地址，若地址不在可外送範圍，請改自取或宅配。";
+    if (address) address.placeholder = "外送地址（必填）";
+    if (date) date.title = "外送日期";
+    return;
+  }
+
+  hint.innerHTML = "自取請選擇取貨日期；地址可不填。";
+  if (address) address.placeholder = "地址（自取可不填）";
+  if (date) date.title = "取貨日期";
+}
+
+function validateFrontOrder({ name, phone, delivery, pickupDate, address }) {
+  const phoneDigits = normalizePhone(phone);
+
+  if (!name) return "請輸入姓名";
+  if (!phoneDigits || phoneDigits.length < 8) return "請輸入正確電話，至少 8 碼";
+  if (!pickupDate) return delivery === "宅配" ? "請選擇希望到貨日" : "請選擇取貨/外送日期";
+  if ((delivery === "宅配" || delivery === "有限外送") && !address) {
+    return `${delivery} 請填寫地址`;
+  }
+  if (cart.length === 0) return "請先加入商品";
+
+  return "";
+}
+
+function renderFrontOrderConfirm(order) {
+  const box = document.getElementById("frontOrderConfirm");
+  if (!box) return;
+
+  const processDate = order.delivery === "宅配"
+    ? order.arrival_date
+    : order.pickup_date;
+  const itemText = (order.items || [])
+    .map(item => `${item.name} x ${item.qty}`)
+    .join("、");
+
+  box.classList.remove("hidden");
+  box.innerHTML = `
+    <div class="flex justify-between gap-3 flex-wrap">
+      <div>
+        <h3 class="text-2xl font-bold text-green-800 mb-2">訂單已送出</h3>
+        <div class="font-bold">訂單編號：${order.id}</div>
+        <div>姓名：${order.name}</div>
+        <div>電話：${order.phone}</div>
+        <div>方式：${order.delivery}｜日期：${processDate || "未填"}</div>
+        ${order.delivery === "宅配" ? `<div>預計寄出日：${order.ship_date || "待確認"}</div>` : ""}
+        ${order.address ? `<div>地址：${order.address}</div>` : ""}
+      </div>
+
+      <div class="text-right">
+        <div class="text-sm text-green-700 font-bold">應付金額</div>
+        <div class="text-3xl font-bold text-green-800">NT$ ${money(order.total)}</div>
+      </div>
+    </div>
+
+    <div class="mt-3 bg-white/80 rounded-xl p-3">
+      <div class="font-bold mb-1">商品</div>
+      <div>${itemText}</div>
+      ${order.note ? `<div class="mt-2 text-sm text-gray-600">備註：${order.note}</div>` : ""}
+    </div>
+  `;
+
+  box.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 async function submitOrder() {
   const name = document.getElementById("customerName").value.trim();
   const phone = document.getElementById("customerPhone").value.trim();
@@ -941,8 +1031,8 @@ async function submitOrder() {
   const address = document.getElementById("address").value.trim();
   const note = document.getElementById("note").value.trim();
 
-  if (!name) return alert("請輸入姓名");
-  if (cart.length === 0) return alert("請先加入商品");
+  const validationError = validateFrontOrder({ name, phone, delivery, pickupDate, address });
+  if (validationError) return alert(validationError);
 
   const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
 
@@ -957,7 +1047,7 @@ async function submitOrder() {
     arrival_date: delivery === "宅配" ? (pickupDate || null) : null,
     ship_date: delivery === "宅配" && pickupDate ? addDays(pickupDate, -3) : null,
     note,
-    items: cart,
+    items: [...cart],
     total,
     status: "未完成",
     payment_status: "未收款",
@@ -973,11 +1063,13 @@ async function submitOrder() {
     return;
   }
 
+  renderFrontOrderConfirm(order);
   alert("訂單送出成功！");
   cart = [];
   renderCart();
   document.getElementById("customerName").value = "";
   document.getElementById("customerPhone").value = "";
+  document.getElementById("pickupDate").value = "";
   document.getElementById("address").value = "";
   document.getElementById("note").value = "";
 }
@@ -5293,6 +5385,7 @@ async function refreshAdmin() {
 }
 
 loadProducts();
+updateFrontDeliveryHint();
   function renderProductAdmin() {
   const panel = document.getElementById("adminPanel");
   const productCards = products.map(p => `
