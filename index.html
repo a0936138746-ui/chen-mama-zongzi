@@ -878,20 +878,29 @@ function renderProducts() {
   const box = document.getElementById("productList");
   box.innerHTML = "";
 
-  products.filter(p => p.active !== false && p.type !== "fee").forEach(p => {
+  products.filter(isFrontProductAvailable).forEach(p => {
     const card = document.createElement("div");
     card.className = "bg-white p-5 rounded-2xl shadow";
     card.innerHTML = `
       <h3 class="text-xl font-bold">${p.name}</h3>
       <p class="text-amber-700 font-bold text-lg">NT$ ${p.price}</p>
-      <p class="text-sm text-gray-500 mb-3">庫存：${p.stock ?? 0}</p>
       <div class="flex gap-2">
-        <input id="qty-${p.id}" type="number" min="1" value="1" class="border p-2 rounded-xl w-20">
+        <input id="qty-${p.id}" type="number" inputmode="numeric" min="1" value="1"
+          data-keypad-title="輸入數量"
+          onfocus="openNumberKeypad(this)"
+          onclick="openNumberKeypad(this)"
+          class="quick-number-input border p-3 rounded-xl w-24 text-center">
         <button onclick="addToCart(${p.id})" class="bg-amber-700 text-white px-4 py-2 rounded-xl">加入</button>
       </div>
     `;
     box.appendChild(card);
   });
+}
+
+function isFrontProductAvailable(product) {
+  return product.active !== false &&
+    product.front_active !== false &&
+    product.type !== "fee";
 }
 
 function addToCart(id) {
@@ -936,6 +945,40 @@ function renderCart() {
 function removeCart(i) {
   cart.splice(i, 1);
   renderCart();
+}
+
+function getCartStockWarnings() {
+  const warnings = [];
+
+  cart.forEach(item => {
+    const product = products.find(p => Number(p.id) === Number(item.id));
+    if (!product) return;
+
+    if (product.type === "box" && Array.isArray(product.components)) {
+      product.components.forEach(comp => {
+        const baseProduct = products.find(p => Number(p.id) === Number(comp.productId));
+        if (!baseProduct) return;
+
+        const needed = Number(comp.qty || 0) * Number(item.qty || 0);
+        const stock = Number(baseProduct.stock || 0);
+
+        if (needed > stock) {
+          warnings.push(`${item.name} 需要 ${baseProduct.name} ${needed}，目前庫存 ${stock}`);
+        }
+      });
+
+      return;
+    }
+
+    const stock = Number(product.stock || 0);
+    const qty = Number(item.qty || 0);
+
+    if (qty > stock) {
+      warnings.push(`${item.name} 下單 ${qty}，目前庫存 ${stock}`);
+    }
+  });
+
+  return warnings;
 }
 
 function normalizePhone(value) {
@@ -993,6 +1036,7 @@ function renderFrontOrderConfirm(order) {
   const itemText = (order.items || [])
     .map(item => `${item.name} x ${item.qty}`)
     .join("、");
+  const customerNote = order.customer_note || "";
 
   box.classList.remove("hidden");
   box.innerHTML = `
@@ -1016,7 +1060,7 @@ function renderFrontOrderConfirm(order) {
     <div class="mt-3 bg-white/80 rounded-xl p-3">
       <div class="font-bold mb-1">商品</div>
       <div>${itemText}</div>
-      ${order.note ? `<div class="mt-2 text-sm text-gray-600">備註：${order.note}</div>` : ""}
+      ${customerNote ? `<div class="mt-2 text-sm text-gray-600">備註：${customerNote}</div>` : ""}
     </div>
   `;
 
@@ -1035,6 +1079,13 @@ async function submitOrder() {
   if (validationError) return alert(validationError);
 
   const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
+  const stockWarnings = getCartStockWarnings();
+  const backendNote = [
+    note,
+    stockWarnings.length
+      ? `⚠️ 前台庫存不足提醒：\n${stockWarnings.join("\n")}`
+      : ""
+  ].filter(Boolean).join("\n");
 
   const order = {
     id: "ORD" + Date.now(),
@@ -1046,7 +1097,7 @@ async function submitOrder() {
     pickup_date: delivery === "宅配" ? null : (pickupDate || null),
     arrival_date: delivery === "宅配" ? (pickupDate || null) : null,
     ship_date: delivery === "宅配" && pickupDate ? addDays(pickupDate, -3) : null,
-    note,
+    note: backendNote,
     items: [...cart],
     total,
     status: "未完成",
@@ -1063,8 +1114,10 @@ async function submitOrder() {
     return;
   }
 
-  renderFrontOrderConfirm(order);
-  alert("訂單送出成功！");
+  renderFrontOrderConfirm({ ...order, customer_note: note });
+  alert(stockWarnings.length
+    ? "訂單送出成功！此訂單數量較大，後台會確認庫存後與您聯絡。"
+    : "訂單送出成功！");
   cart = [];
   renderCart();
   document.getElementById("customerName").value = "";
@@ -5401,7 +5454,13 @@ updateFrontDeliveryHint();
         <label class="bg-gray-50 border rounded-xl px-4 py-3 flex items-center gap-2">
           <input type="checkbox" ${p.active ? "checked" : ""}
             onchange="updateProduct(${p.id}, 'active', this.checked)">
-          <span class="font-bold">${p.active ? "啟用中" : "未啟用"}</span>
+          <span class="font-bold">後台${p.active ? "啟用" : "停用"}</span>
+        </label>
+
+        <label class="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center gap-2">
+          <input type="checkbox" ${p.front_active !== false ? "checked" : ""}
+            onchange="updateProduct(${p.id}, 'front_active', this.checked)">
+          <span class="font-bold text-green-800">前台${p.front_active !== false ? "上架" : "下架"}</span>
         </label>
       </div>
 
@@ -5522,7 +5581,8 @@ updateFrontDeliveryHint();
     </section>
 
     <div class="bg-amber-50 p-3 rounded-xl mb-4 text-sm text-amber-900">
-      目前共 ${products.length} 項商品。價格或庫存欄位修改後會自動儲存。
+      目前共 ${products.length} 項商品。後台啟用控制內部管理；前台上架控制客人是否看得到。
+      若前台上架開關跳出欄位尚未建立，請先到 Supabase 新增 front_active 欄位。
     </div>
 
     ${productCards}
@@ -5541,6 +5601,11 @@ async function updateProduct(id, field, value) {
     .eq("id", id);
 
   if (error) {
+    if (field === "front_active" && error.message.includes("front_active")) {
+      alert("前台上架欄位尚未建立。請先到 Supabase SQL Editor 執行：ALTER TABLE products ADD COLUMN IF NOT EXISTS front_active BOOLEAN DEFAULT true;");
+      return;
+    }
+
     alert("更新失敗：" + error.message);
     return;
   }
@@ -5578,10 +5643,18 @@ async function addNewProduct() {
     stock: type === "single" ? (stock || 0) : 0,
     type: type,
     components: type === "box" ? components : null,
-    active: true
+    active: true,
+    front_active: true
   };
 
-  const { error } = await db.from("products").insert([newProduct]);
+  let { error } = await db.from("products").insert([newProduct]);
+
+  if (error && error.message.includes("front_active")) {
+    const fallbackProduct = { ...newProduct };
+    delete fallbackProduct.front_active;
+    const retry = await db.from("products").insert([fallbackProduct]);
+    error = retry.error;
+  }
 
   if (error) {
     alert("新增失敗：" + error.message);
