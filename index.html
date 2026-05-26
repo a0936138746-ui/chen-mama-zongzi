@@ -39,10 +39,10 @@
 
     .front-hero {
       background-image:
-        linear-gradient(90deg, rgba(67, 20, 7, 0.92) 0%, rgba(92, 37, 11, 0.76) 48%, rgba(92, 37, 11, 0.18) 100%),
-        url("https://commons.wikimedia.org/wiki/Special:FilePath/Zongzi.jpg");
+        linear-gradient(90deg, rgba(67, 20, 7, 0.94) 0%, rgba(92, 37, 11, 0.78) 48%, rgba(92, 37, 11, 0.32) 100%),
+        url("assets/chen-mama-poster.jpg");
       background-size: cover;
-      background-position: center;
+      background-position: center top;
     }
 
     .front-glass {
@@ -1079,6 +1079,7 @@ function renderProducts() {
   frontProducts.forEach(p => {
     const card = document.createElement("div");
     const tag = getFrontProductTag(p);
+    const description = getFrontProductDescription(p);
 
     card.className = "front-card bg-white p-5 rounded-2xl transition";
     card.innerHTML = `
@@ -1088,7 +1089,7 @@ function renderProducts() {
             ${tag}
           </span>
           <h3 class="text-xl font-bold leading-snug text-stone-900">${p.name}</h3>
-          <div class="text-xs text-stone-400 mt-1">後台確認庫存後安排製作</div>
+          <div class="text-xs text-stone-400 mt-1">${description || "後台確認庫存後安排製作"}</div>
         </div>
         <div class="text-right">
           <div class="text-xs text-stone-500">單價</div>
@@ -1110,6 +1111,19 @@ function renderProducts() {
     `;
     box.appendChild(card);
   });
+}
+
+function getFrontProductDescription(product) {
+  const name = String(product.name || "");
+
+  if (name.includes("南部")) return "水煮工法，軟Q濕潤，古早味。配料：瘦肉、肥肉、花生、香菇絲、金勾蝦、自製油蔥酥。";
+  if (name.includes("北部")) return "先炒後蒸，粒粒分明，香氣濃郁。配料：菜脯、瘦肉、香菇絲、金勾蝦、自製油蔥酥。";
+  if (name.includes("素")) return "清爽不油，自然風味。配料：素火腿、素茶鵝、豆皮、香菇絲、薑末、麻油。";
+  if (name.includes("豪華")) return "含蛋黃，用料升級，送禮首選。";
+  if (name.includes("紅豆")) return "紅豆餡包在粽子裡，淡淡甜香。";
+  if (name.includes("鹼") || name.includes("檢")) return "簡單純粹，傳統風味。";
+
+  return "";
 }
 
 function setFrontProductCategory(category) {
