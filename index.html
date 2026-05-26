@@ -84,7 +84,7 @@
             <input id="customerPhone" class="border p-3 rounded-xl" placeholder="客戶電話">
           </div>
 
-          <select id="delivery" class="border p-3 rounded-xl w-full mb-2" onchange="updateFrontDeliveryHint()">
+          <select id="delivery" class="border p-3 rounded-xl w-full mb-2" onchange="updateFrontDeliveryHint(); renderCart();">
             <option value="自取">自取</option>
             <option value="宅配">宅配</option>
             <option value="有限外送">有限外送</option>
@@ -1047,6 +1047,58 @@ function addToCart(id) {
   renderCart();
 }
 
+function getFrontCartSubtotal() {
+  return cart.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.qty || 0), 0);
+}
+
+function getFrontShippingInfo() {
+  const delivery = document.getElementById("delivery")?.value || "自取";
+  if (delivery !== "宅配" || cart.length === 0) {
+    return { units: 0, fee: 0, details: [] };
+  }
+
+  let regularPieces = 0;
+  let giftBoxes = 0;
+
+  cart.forEach(item => {
+    const product = products.find(p => Number(p.id) === Number(item.id));
+    const qty = Number(item.qty || 0);
+    const text = `${item.name || ""} ${product?.name || ""}`;
+
+    if (getFrontProductCategory(product || item) === "gift") {
+      giftBoxes += qty;
+      return;
+    }
+
+    regularPieces += qty * getPackMultiplierFromText(text);
+  });
+
+  const regularUnits = Math.ceil(regularPieces / 40);
+  const giftUnits = Math.ceil(giftBoxes / 2);
+  const units = regularUnits + giftUnits;
+  const details = [];
+
+  if (regularPieces > 0) details.push(`一般粽 ${regularPieces} 顆 / 每件 40 顆 = ${regularUnits} 件`);
+  if (giftBoxes > 0) details.push(`禮盒 ${giftBoxes} 盒 / 每件 2 盒 = ${giftUnits} 件`);
+
+  return {
+    units,
+    fee: units * 260,
+    details
+  };
+}
+
+function getFrontOrderTotals() {
+  const subtotal = getFrontCartSubtotal();
+  const shipping = getFrontShippingInfo();
+
+  return {
+    subtotal,
+    shipping,
+    total: subtotal + shipping.fee
+  };
+}
+
 function renderCart() {
   const box = document.getElementById("cartBox");
   const totalBox = document.getElementById("totalAmount");
@@ -1057,10 +1109,9 @@ function renderCart() {
     return;
   }
 
-  let total = 0;
+  const totals = getFrontOrderTotals();
   box.innerHTML = cart.map((item, i) => {
     const sub = item.price * item.qty;
-    total += sub;
     return `
       <div class="flex justify-between gap-3 border-b border-amber-100 py-3">
         <div>
@@ -1073,9 +1124,27 @@ function renderCart() {
         </div>
       </div>
     `;
-  }).join("");
+  }).join("") + `
+    <div class="pt-3 space-y-2">
+      <div class="flex justify-between text-sm text-gray-600">
+        <span>商品小計</span>
+        <span>NT$ ${money(totals.subtotal)}</span>
+      </div>
+      ${
+        totals.shipping.fee > 0
+          ? `<div class="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm text-blue-900">
+              <div class="flex justify-between font-bold">
+                <span>宅配運費 ${totals.shipping.units} 件 x NT$ 260</span>
+                <span>NT$ ${money(totals.shipping.fee)}</span>
+              </div>
+              <div class="mt-1 text-xs">${totals.shipping.details.join("；")}</div>
+            </div>`
+          : `<div class="text-xs text-gray-500">選擇宅配會自動計算運費：一般粽每 40 顆一件，禮盒每 2 盒一件，每件 NT$ 260。</div>`
+      }
+    </div>
+  `;
 
-  totalBox.innerText = money(total);
+  totalBox.innerText = money(totals.total);
 }
 
 function removeCart(i) {
@@ -1130,7 +1199,7 @@ function updateFrontDeliveryHint() {
   if (!hint) return;
 
   if (delivery === "宅配") {
-    hint.innerHTML = "宅配請填「希望到貨日」與完整地址；系統會自動推算應寄出日。";
+    hint.innerHTML = "宅配請填「希望到貨日」與完整地址；運費每件 NT$260，一般粽 40 顆一件，禮盒 2 盒一件。";
     if (address) address.placeholder = "宅配地址（必填）";
     if (date) date.title = "希望到貨日";
     return;
@@ -1214,10 +1283,23 @@ async function submitOrder() {
   const validationError = validateFrontOrder({ name, phone, delivery, pickupDate, address });
   if (validationError) return alert(validationError);
 
-  const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
+  const totals = getFrontOrderTotals();
+  const shippingItem = totals.shipping.fee > 0
+    ? [{
+        id: "front-shipping-fee",
+        name: `宅配運費（${totals.shipping.units}件）`,
+        price: 260,
+        qty: totals.shipping.units,
+        type: "fee"
+      }]
+    : [];
+  const orderItems = [...cart, ...shippingItem];
   const stockWarnings = getCartStockWarnings();
   const backendNote = [
     note,
+    totals.shipping.fee > 0
+      ? `宅配運費：${totals.shipping.details.join("；")}，共 NT$ ${money(totals.shipping.fee)}`
+      : "",
     stockWarnings.length
       ? `⚠️ 前台庫存不足提醒：\n${stockWarnings.join("\n")}`
       : ""
@@ -1234,8 +1316,8 @@ async function submitOrder() {
     arrival_date: delivery === "宅配" ? (pickupDate || null) : null,
     ship_date: delivery === "宅配" && pickupDate ? addDays(pickupDate, -3) : null,
     note: backendNote,
-    items: [...cart],
-    total,
+    items: orderItems,
+    total: totals.total,
     status: "未完成",
     payment_status: "未收款",
     payment_method: "",
