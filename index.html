@@ -2304,8 +2304,9 @@ function orderCard(o) {
             <div class="bg-gray-50 rounded-xl p-2">方式：${o.delivery || ""}</div>
             <div class="bg-gray-50 rounded-xl p-2">日期：${processDate || "未填"}</div>
           </div>
+          <div class="mt-2">${renderTimeSlotBadge(o)}</div>
           ${o.delivery === "宅配" ? `<div class="text-sm mt-2 text-blue-700">應寄出日：${shipDate || "未填"}</div>` : ""}
-          ${o.note ? `<div class="text-sm mt-2 text-purple-700 break-words">備註：${o.note}</div>` : ""}
+          ${getShippingNoteText(o) ? `<div class="text-sm mt-2 text-purple-700 break-words">備註：${getShippingNoteText(o)}</div>` : ""}
           <div class="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
             <button type="button" onclick="quickMarkPaid('${o.id}', 'orders')"
               class="mobile-action-btn bg-emerald-700 text-white px-3 py-2 rounded-xl font-bold text-sm">
@@ -2692,6 +2693,7 @@ function renderWarDashboard() {
 
           <div class="text-sm">
             <div class="font-bold">${getDashboardDate(o) || "未填日期"}</div>
+            <div class="mt-1">${renderTimeSlotBadge(o)}</div>
             <div class="text-gray-500">${o.delivery || ""}｜${o.status || ""}</div>
             ${o.delivery === "宅配" ? `<div class="text-blue-700">寄出：${getShipDate(o) || "未填"}</div>` : ""}
           </div>
@@ -2700,7 +2702,7 @@ function renderWarDashboard() {
             ${(o.items || [])
               .map(i => `${i.raw_name || i.name} x ${i.qty}${i.unit ? " " + i.unit : ""}`)
               .join("、") || "沒有商品明細"}
-            ${o.note ? `<div class="text-purple-700 mt-1">備註：${o.note}</div>` : ""}
+            ${getShippingNoteText(o) ? `<div class="text-purple-700 mt-1">備註：${getShippingNoteText(o)}</div>` : ""}
           </div>
 
           <div class="text-right">
@@ -2936,9 +2938,41 @@ function getShippingNoteText(o) {
     .split("\n")
     .map(line => line.trim())
     .filter(Boolean)
+    .filter(line => !/^取貨\/收貨時段\s*[:：]/.test(line))
     .filter(line => !/^(收件人姓名|訂購人姓名|收件人姓別|訂購人姓別|姓別|收件人地址|訂購人地址|訂購人行動電話|訂購人聯絡電話)\s*[:：]/.test(line));
 
   return lines.join("\n");
+}
+
+function getOrderTimeSlotInfo(o) {
+  const text = cleanShippingText(o.note);
+  const match = text.match(/取貨\/收貨時段\s*[:：]\s*([^\n]+)/);
+  const raw = match ? match[1].trim() : "";
+
+  if (!raw) {
+    return { raw: "", slot: "未填時段", note: "", cls: "bg-gray-100 text-gray-700 border-gray-300" };
+  }
+
+  const [slotPart, ...noteParts] = raw.split(/[，,]/).map(x => x.trim()).filter(Boolean);
+  const slot = slotPart || "未填時段";
+  const note = noteParts.join("，");
+  let cls = "bg-gray-100 text-gray-700 border-gray-300";
+
+  if (slot.includes("早")) cls = "bg-orange-100 text-orange-800 border-orange-300";
+  if (slot.includes("晚")) cls = "bg-indigo-100 text-indigo-800 border-indigo-300";
+  if (slot.includes("其他")) cls = "bg-purple-100 text-purple-800 border-purple-300";
+
+  return { raw, slot, note, cls };
+}
+
+function renderTimeSlotBadge(o) {
+  const info = getOrderTimeSlotInfo(o);
+
+  return `
+    <span class="inline-block border rounded-full px-3 py-1 text-sm font-bold ${info.cls}">
+      ${info.slot}${info.note ? "｜" + info.note : ""}
+    </span>
+  `;
 }
 
 function getShippingReminderList(o) {
@@ -3261,6 +3295,7 @@ function renderShippingList() {
     <div class="bg-yellow-50 p-4 rounded-xl mb-4">
       目前顯示 ${list.length} 筆，Excel 會依照上方模式與日期篩選輸出「A4列印版」與「完整資料」。
       一般出貨會排除 DIY/材料包；DIY 請切到「DIY/材料包」獨立準備。
+      時段會獨立顯示，方便早上/晚上分批準備。
       排序依照逾期、今日、明日、三天內、蛋黃預備、特殊備註、大單。
     </div>
 
@@ -3291,6 +3326,7 @@ function renderShippingList() {
                     交付日：${getShippingDeliveryDate(o) || "未填"}
                     ${o.delivery === "宅配" ? `｜應寄出日：${getShipDate(o) || "未填"}` : ""}
                   </div>
+                  <div class="mt-2">${renderTimeSlotBadge(o)}</div>
                 </div>
 
                 <div class="text-sm font-bold text-red-700 text-right">
@@ -3308,7 +3344,7 @@ function renderShippingList() {
               </div>
               <div>電話：${o.phone || ""}</div>
               <div>地址：${o.address || ""}</div>
-              <div>備註：${o.note || ""}</div>
+              <div>備註：${getShippingNoteText(o) || ""}</div>
               <div class="mt-1 text-sm">
                 收款：
                 <span class="font-bold ${getUnpaidAmount(o) > 0 ? "text-red-700" : "text-green-700"}">
@@ -3365,6 +3401,7 @@ function exportShippingExcel() {
     "工作日期",
     "交付日期",
     "應寄出日",
+    "時段",
     "方式",
     "姓名",
     "電話",
@@ -3384,6 +3421,7 @@ function exportShippingExcel() {
     getShippingWorkDate(o) || "",
     getShippingDeliveryDate(o) || "",
     o.delivery === "宅配" ? (getShipDate(o) || "") : "",
+    getOrderTimeSlotInfo(o).raw || "",
     o.delivery || "",
     getShippingCustomerName(o),
     getShippingPhoneText(o),
@@ -3399,6 +3437,7 @@ function exportShippingExcel() {
   const printHeaders = [
     "#",
     "處理",
+    "時段",
     "客戶 / 地址",
     "商品",
     "備註"
@@ -3407,6 +3446,7 @@ function exportShippingExcel() {
   const printRows = list.map((o, index) => [
     index + 1,
     `${getShippingPriority(o)}\n${getShippingWorkDate(o) || ""}\n${o.delivery || ""}`,
+    getOrderTimeSlotInfo(o).raw || "未填",
     `${getShippingCustomerName(o)}\n${getShippingPhoneText(o)}\n${getShippingAddressText(o)}`,
     getShippingItemText(o),
     [
@@ -3431,6 +3471,7 @@ function exportShippingExcel() {
   printSheet["!cols"] = [
     { wch: 4 },
     { wch: 14 },
+    { wch: 16 },
     { wch: 30 },
     { wch: 32 },
     { wch: 24 }
@@ -3442,9 +3483,9 @@ function exportShippingExcel() {
     { hpt: 22 },
     ...printRows.map(row => {
       const processLines = String(row[1] || "").split("\n").length;
-      const customerLines = String(row[2] || "").split("\n").length;
-      const itemLines = String(row[3] || "").split("\n").length;
-      const noteLines = String(row[4] || "").split("\n").length;
+      const customerLines = String(row[3] || "").split("\n").length;
+      const itemLines = String(row[4] || "").split("\n").length;
+      const noteLines = String(row[5] || "").split("\n").length;
       const maxLines = Math.max(processLines, customerLines, itemLines, noteLines, 2);
       return { hpt: Math.max(42, Math.min(95, maxLines * 16)) };
     })
@@ -3488,6 +3529,7 @@ function exportShippingExcel() {
     { wch: 12 },
     { wch: 12 },
     { wch: 12 },
+    { wch: 16 },
     { wch: 10 },
     { wch: 12 },
     { wch: 15 },
@@ -3503,7 +3545,7 @@ function exportShippingExcel() {
   detailSheet["!rows"] = [
     { hpt: 24 },
     ...rows.map(row => ({
-      hpt: Math.max(36, Math.min(120, String(row[10] || "").split("\n").length * 18))
+      hpt: Math.max(36, Math.min(120, String(row[11] || "").split("\n").length * 18))
     }))
   ];
 
