@@ -1218,6 +1218,7 @@ const BASE_ZONGZI_NAMES = [
 function normalizeZongziName(value) {
   return String(value || "")
     .replace(/\s+/g, "")
+    .replace(/素粽/g, "素食粽")
     .replace(/檢粽/g, "鹼粽")
     .replace(/紅豆檢粽/g, "紅豆鹼粽");
 }
@@ -2455,10 +2456,31 @@ function getShippingReminder(o) {
   return getShippingReminderList(o).join(" / ");
 }
 
+function isDiyOrder(o) {
+  const text = [
+    o.type || "",
+    o.note || "",
+    ...(o.items || []).flatMap(item => [
+      item.name || "",
+      item.raw_name || "",
+      item.unit || ""
+    ])
+  ].join(" ").toLowerCase();
+
+  return /diy|材料包|手作/.test(text);
+}
+
 function getShippingTags(o) {
   const tags = [];
   const processDays = daysFromToday(getProcessDate(o));
   const shipDays = daysFromToday(getShipDate(o));
+
+  if (isDiyOrder(o)) {
+    tags.push({
+      text: "DIY/材料包",
+      cls: "bg-indigo-100 text-indigo-800 border-indigo-400"
+    });
+  }
 
   if (hasNearStockShortage(o)) {
     tags.push({
@@ -2522,6 +2544,7 @@ function getShippingPriority(o) {
   const processDays = daysFromToday(getProcessDate(o));
   const shipDays = daysFromToday(getShipDate(o));
 
+  if (isDiyOrder(o)) return "A DIY/材料包";
   if (processDays !== null && processDays < 0) return "A 逾期";
   if (o.delivery === "宅配" && shipDays !== null && shipDays < 0) return "A 逾期";
   if (hasNearStockShortage(o)) return "A 出貨近缺貨";
@@ -2560,7 +2583,7 @@ function getShippingSortRank(o) {
 function getFilteredShippingOrders() {
   const startDate = document.getElementById("shipStart")?.value || "";
   const endDate = document.getElementById("shipEnd")?.value || "";
-  const mode = window.shippingMode || "all";
+  const mode = window.shippingMode || "normal";
 
   return orders
     .filter(o => {
@@ -2569,10 +2592,14 @@ function getFilteredShippingOrders() {
       const workDate = getShippingWorkDate(o);
       const processDays = daysFromToday(getProcessDate(o));
       const shipDays = daysFromToday(getShipDate(o));
+      const isDiy = isDiyOrder(o);
 
       if (startDate && workDate < startDate) return false;
       if (endDate && workDate > endDate) return false;
 
+      if (mode === "normal" && isDiy) return false;
+      if (mode === "diy" && !isDiy) return false;
+      if (!["all", "diy"].includes(mode) && isDiy) return false;
       if (mode === "delivery" && o.delivery !== "宅配") return false;
       if (mode === "pickup" && o.delivery !== "自取") return false;
       if (mode === "today" && processDays !== 0 && !(o.delivery === "宅配" && shipDays === 0)) return false;
@@ -2631,9 +2658,11 @@ async function completeShippingOrder(id) {
 function renderShippingList() {
   const startDate = document.getElementById("shipStart")?.value || "";
   const endDate = document.getElementById("shipEnd")?.value || "";
-  const mode = window.shippingMode || "all";
+  const mode = window.shippingMode || "normal";
   const list = getFilteredShippingOrders();
   const openOrders = orders.filter(o => !isClosedOrder(o));
+  const normalOrders = openOrders.filter(o => !isDiyOrder(o));
+  const diyOrders = openOrders.filter(o => isDiyOrder(o));
   const shippingModeButton = (key, label, count, cls) => `
     <button
       onclick="setShippingMode('${key}')"
@@ -2646,13 +2675,15 @@ function renderShippingList() {
     <h2 class="text-2xl font-bold mb-4">出貨 / 取貨清單</h2>
 
     <div class="flex gap-2 mb-4 print:hidden flex-wrap">
-      ${shippingModeButton("all", "全部", openOrders.length, "bg-gray-700")}
-      ${shippingModeButton("delivery", "宅配", openOrders.filter(o => o.delivery === "宅配").length, "bg-blue-700")}
-      ${shippingModeButton("pickup", "自取", openOrders.filter(o => o.delivery === "自取").length, "bg-lime-700")}
-      ${shippingModeButton("today", "今日", openOrders.filter(o => daysFromToday(getProcessDate(o)) === 0 || (o.delivery === "宅配" && daysFromToday(getShipDate(o)) === 0)).length, "bg-red-600")}
-      ${shippingModeButton("tomorrow", "明日", openOrders.filter(o => daysFromToday(getProcessDate(o)) === 1 || (o.delivery === "宅配" && daysFromToday(getShipDate(o)) === 1)).length, "bg-orange-600")}
-      ${shippingModeButton("overdue", "逾期", openOrders.filter(o => daysFromToday(getProcessDate(o)) < 0 || (o.delivery === "宅配" && daysFromToday(getShipDate(o)) < 0)).length, "bg-rose-700")}
-      ${shippingModeButton("unpaid", "未收款", openOrders.filter(o => getUnpaidAmount(o) > 0).length, "bg-amber-700")}
+      ${shippingModeButton("normal", "一般出貨", normalOrders.length, "bg-gray-700")}
+      ${shippingModeButton("diy", "DIY/材料包", diyOrders.length, "bg-indigo-700")}
+      ${shippingModeButton("all", "全部", openOrders.length, "bg-slate-700")}
+      ${shippingModeButton("delivery", "宅配", normalOrders.filter(o => o.delivery === "宅配").length, "bg-blue-700")}
+      ${shippingModeButton("pickup", "自取", normalOrders.filter(o => o.delivery === "自取").length, "bg-lime-700")}
+      ${shippingModeButton("today", "今日", normalOrders.filter(o => daysFromToday(getProcessDate(o)) === 0 || (o.delivery === "宅配" && daysFromToday(getShipDate(o)) === 0)).length, "bg-red-600")}
+      ${shippingModeButton("tomorrow", "明日", normalOrders.filter(o => daysFromToday(getProcessDate(o)) === 1 || (o.delivery === "宅配" && daysFromToday(getShipDate(o)) === 1)).length, "bg-orange-600")}
+      ${shippingModeButton("overdue", "逾期", normalOrders.filter(o => daysFromToday(getProcessDate(o)) < 0 || (o.delivery === "宅配" && daysFromToday(getShipDate(o)) < 0)).length, "bg-rose-700")}
+      ${shippingModeButton("unpaid", "未收款", normalOrders.filter(o => getUnpaidAmount(o) > 0).length, "bg-amber-700")}
     </div>
 
     <div class="flex gap-2 mb-4 print:hidden flex-wrap">
@@ -2691,6 +2722,7 @@ function renderShippingList() {
 
     <div class="bg-yellow-50 p-4 rounded-xl mb-4">
       目前顯示 ${list.length} 筆，Excel 會依照上方模式與日期篩選輸出「A4列印版」與「完整資料」。
+      一般出貨會排除 DIY/材料包；DIY 請切到「DIY/材料包」獨立準備。
       排序依照逾期、今日、明日、三天內、蛋黃預備、特殊備註、大單。
     </div>
 
