@@ -30,6 +30,46 @@
       outline: 3px solid rgba(245, 158, 11, 0.45);
       outline-offset: 2px;
     }
+
+    .front-shell {
+      background:
+        radial-gradient(circle at 12% 8%, rgba(180, 83, 9, 0.08), transparent 28%),
+        linear-gradient(180deg, #fffaf0 0%, #f8f5ee 48%, #f4efe6 100%);
+    }
+
+    .front-hero {
+      background-image:
+        linear-gradient(90deg, rgba(67, 20, 7, 0.92) 0%, rgba(92, 37, 11, 0.76) 48%, rgba(92, 37, 11, 0.18) 100%),
+        url("https://commons.wikimedia.org/wiki/Special:FilePath/Zongzi.jpg");
+      background-size: cover;
+      background-position: center;
+    }
+
+    .front-glass {
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      backdrop-filter: blur(10px);
+    }
+
+    .front-card {
+      border: 1px solid rgba(146, 64, 14, 0.12);
+      box-shadow: 0 16px 36px rgba(67, 20, 7, 0.08);
+    }
+
+    .front-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 22px 48px rgba(67, 20, 7, 0.14);
+    }
+
+    .front-input {
+      border-color: #e7d8c5;
+      background: #fffdfa;
+    }
+
+    .front-input:focus {
+      outline: 3px solid rgba(217, 119, 6, 0.18);
+      border-color: #d97706;
+    }
   </style>
 </head>
 
@@ -55,15 +95,36 @@
 </header>
 
 <!-- 前台 -->
-<section id="frontPage" class="bg-stone-50">
-  <div class="bg-amber-900 text-white px-6 py-8">
-    <div class="max-w-6xl mx-auto">
-      <div class="text-sm font-bold text-amber-200 mb-2">手作肉粽預訂</div>
-      <h2 class="text-3xl md:text-4xl font-bold mb-3">陳媽媽肉粽訂購</h2>
-      <div class="grid md:grid-cols-3 gap-3 text-sm">
-        <div class="bg-white/10 rounded-xl p-3">自取、宅配、有限外送皆可登記</div>
-        <div class="bg-white/10 rounded-xl p-3">宅配請填希望到貨日與完整地址</div>
-        <div class="bg-white/10 rounded-xl p-3">送出後會產生訂單編號方便查詢</div>
+<section id="frontPage" class="front-shell">
+  <div class="front-hero text-white px-6 py-10 md:py-14">
+    <div class="max-w-6xl mx-auto grid lg:grid-cols-[1fr_330px] gap-8 items-end">
+      <div>
+        <div class="inline-flex items-center gap-2 text-sm font-bold text-amber-100 bg-white/10 rounded-full px-4 py-2 mb-4">
+          <span class="w-2 h-2 bg-amber-300 rounded-full"></span>
+          端午肉粽預訂服務
+        </div>
+        <h2 class="text-4xl md:text-5xl font-bold mb-4 leading-tight">陳媽媽手作肉粽</h2>
+        <p class="text-lg text-amber-50 max-w-2xl leading-relaxed">
+          現包現煮、依訂單備貨。請選擇商品、交付方式與時段，送出後會產生訂單編號方便後續核對。
+        </p>
+      </div>
+
+      <div class="front-glass rounded-2xl p-5">
+        <div class="text-sm text-amber-100 font-bold mb-3">訂購流程</div>
+        <div class="space-y-3 text-sm">
+          <div class="flex gap-3">
+            <span class="bg-amber-300 text-amber-950 rounded-full w-7 h-7 flex items-center justify-center font-bold">1</span>
+            <div>選擇單點、禮盒或大量商品</div>
+          </div>
+          <div class="flex gap-3">
+            <span class="bg-amber-300 text-amber-950 rounded-full w-7 h-7 flex items-center justify-center font-bold">2</span>
+            <div>填寫取貨/收貨日期與時段</div>
+          </div>
+          <div class="flex gap-3">
+            <span class="bg-amber-300 text-amber-950 rounded-full w-7 h-7 flex items-center justify-center font-bold">3</span>
+            <div>確認金額並送出訂單</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -75,10 +136,10 @@
       <main>
         <div class="flex justify-between items-center gap-3 flex-wrap mb-4">
           <div>
-            <h3 class="text-2xl font-bold">選擇商品</h3>
-            <div class="text-sm text-gray-500">商品依後台上架設定顯示，庫存由後台確認。</div>
+            <h3 class="text-2xl font-bold text-stone-900">選擇商品</h3>
+            <div class="text-sm text-stone-500">商品依後台上架設定顯示，庫存由後台確認。</div>
           </div>
-          <button onclick="loadProducts()" class="bg-amber-700 text-white px-4 py-2 rounded-xl font-bold">重新讀取商品</button>
+          <button onclick="loadProducts()" class="bg-stone-900 text-white px-4 py-2 rounded-xl font-bold">重新讀取商品</button>
         </div>
 
         <div id="frontCategoryTabs" class="grid grid-cols-3 gap-2 mb-4"></div>
@@ -86,15 +147,16 @@
       </main>
 
       <aside class="lg:sticky lg:top-4 space-y-4">
-        <section class="bg-white rounded-2xl shadow p-5 border">
-          <h3 class="font-bold text-xl mb-4">訂購資料</h3>
+        <section class="front-card bg-white rounded-2xl p-5">
+          <h3 class="font-bold text-xl mb-1">訂購資料</h3>
+          <div class="text-sm text-stone-500 mb-4">請留下可聯絡資訊與交付時間</div>
 
           <div class="grid gap-3 mb-3">
-            <input id="customerName" class="border p-3 rounded-xl" placeholder="客戶姓名">
-            <input id="customerPhone" class="border p-3 rounded-xl" placeholder="客戶電話">
+            <input id="customerName" class="front-input border p-3 rounded-xl" placeholder="客戶姓名">
+            <input id="customerPhone" class="front-input border p-3 rounded-xl" placeholder="客戶電話">
           </div>
 
-          <select id="delivery" class="border p-3 rounded-xl w-full mb-2" onchange="updateFrontDeliveryHint(); renderCart();">
+          <select id="delivery" class="front-input border p-3 rounded-xl w-full mb-2" onchange="updateFrontDeliveryHint(); renderCart();">
             <option value="自取">自取</option>
             <option value="宅配">宅配</option>
             <option value="有限外送">有限外送</option>
@@ -105,37 +167,37 @@
           </div>
 
           <div class="grid gap-3 mb-3">
-            <input id="pickupDate" type="date" class="border p-3 rounded-xl">
-            <input id="address" class="border p-3 rounded-xl" placeholder="地址">
+            <input id="pickupDate" type="date" class="front-input border p-3 rounded-xl">
+            <input id="address" class="front-input border p-3 rounded-xl" placeholder="地址">
           </div>
 
           <div class="grid grid-cols-[120px_1fr] gap-3 mb-3">
-            <select id="pickupTimeSlot" class="border p-3 rounded-xl">
+            <select id="pickupTimeSlot" class="front-input border p-3 rounded-xl">
               <option value="">取貨時段</option>
               <option value="早上">早上</option>
               <option value="晚上">晚上</option>
               <option value="其他">其他時間</option>
             </select>
-            <input id="pickupTimeNote" class="border p-3 rounded-xl" placeholder="可加註幾點，例如 10:30、晚上 7 點">
+            <input id="pickupTimeNote" class="front-input border p-3 rounded-xl" placeholder="可加註幾點，例如 10:30、晚上 7 點">
           </div>
 
-          <textarea id="note" class="border p-3 rounded-xl w-full" rows="3" placeholder="備註，例如加蛋黃、送禮分裝、希望時段"></textarea>
+          <textarea id="note" class="front-input border p-3 rounded-xl w-full" rows="3" placeholder="備註，例如加蛋黃、送禮分裝、希望時段"></textarea>
         </section>
 
-        <section class="bg-white rounded-2xl shadow p-5 border">
+        <section class="front-card bg-white rounded-2xl p-5">
           <div class="flex justify-between items-center mb-3">
             <h3 class="font-bold text-xl">購物車</h3>
             <span class="text-sm text-gray-500">確認品項與數量</span>
           </div>
 
-          <div id="cartBox" class="bg-amber-50 p-4 rounded-xl mb-4">尚未加入商品</div>
+          <div id="cartBox" class="bg-[#fff8ed] p-4 rounded-2xl mb-4 border border-amber-100">尚未加入商品</div>
 
           <div class="flex justify-between items-end border-t pt-4 mb-4">
             <div class="text-gray-500">總金額</div>
             <div class="text-3xl font-bold text-amber-700">NT$ <span id="totalAmount">0</span></div>
           </div>
 
-          <button onclick="submitOrder()" class="mobile-action-btn bg-green-700 text-white px-6 py-4 rounded-xl font-bold w-full text-lg">
+          <button onclick="submitOrder()" class="mobile-action-btn bg-green-700 hover:bg-green-800 text-white px-6 py-4 rounded-xl font-bold w-full text-lg shadow-lg shadow-green-900/10">
             送出訂單
           </button>
         </section>
@@ -993,10 +1055,10 @@ function renderProducts() {
 
       return `
         <button type="button" onclick="setFrontProductCategory('${category.key}')"
-          class="px-3 py-3 rounded-xl font-bold border ${
+          class="px-3 py-4 rounded-2xl font-bold border transition ${
             activeCategory === category.key
-              ? "bg-amber-700 text-white border-amber-700"
-              : "bg-white text-amber-800 border-amber-200"
+              ? "bg-stone-900 text-white border-stone-900 shadow-lg"
+              : "bg-white text-stone-700 border-amber-100 hover:border-amber-400"
           }">
           ${category.label}
           <span class="block text-xs opacity-80">${count} 項</span>
@@ -1018,29 +1080,30 @@ function renderProducts() {
     const card = document.createElement("div");
     const tag = getFrontProductTag(p);
 
-    card.className = "bg-white p-5 rounded-2xl shadow border hover:shadow-lg transition";
+    card.className = "front-card bg-white p-5 rounded-2xl transition";
     card.innerHTML = `
-      <div class="flex justify-between items-start gap-3 mb-3">
+      <div class="flex justify-between items-start gap-3 mb-4">
         <div>
-          <span class="inline-block bg-amber-100 text-amber-800 rounded-full px-3 py-1 text-xs font-bold mb-2">
+          <span class="inline-block bg-amber-100 text-amber-900 rounded-full px-3 py-1 text-xs font-bold mb-3">
             ${tag}
           </span>
-          <h3 class="text-xl font-bold leading-snug">${p.name}</h3>
+          <h3 class="text-xl font-bold leading-snug text-stone-900">${p.name}</h3>
+          <div class="text-xs text-stone-400 mt-1">後台確認庫存後安排製作</div>
         </div>
         <div class="text-right">
-          <div class="text-xs text-gray-500">單價</div>
-          <div class="text-2xl font-bold text-amber-700">NT$ ${money(p.price)}</div>
+          <div class="text-xs text-stone-500">單價</div>
+          <div class="text-2xl font-bold text-amber-800">NT$ ${money(p.price)}</div>
         </div>
       </div>
 
-      <div class="bg-stone-50 rounded-xl p-3 flex gap-2 items-center">
-        <label class="text-sm text-gray-500 font-bold">數量</label>
+      <div class="bg-stone-50 rounded-2xl p-3 flex gap-2 items-center border border-stone-100">
+        <label class="text-sm text-stone-500 font-bold">數量</label>
         <input id="qty-${p.id}" type="number" inputmode="numeric" min="1" value="1"
           data-keypad-title="輸入數量"
           onfocus="openNumberKeypad(this)"
           onclick="openNumberKeypad(this)"
-          class="quick-number-input border p-3 rounded-xl w-24 text-center bg-white">
-        <button onclick="addToCart(${p.id})" class="mobile-action-btn bg-amber-700 text-white px-4 py-3 rounded-xl font-bold flex-1">
+          class="quick-number-input front-input border p-3 rounded-xl w-24 text-center bg-white">
+        <button onclick="addToCart(${p.id})" class="mobile-action-btn bg-amber-700 hover:bg-amber-800 text-white px-4 py-3 rounded-xl font-bold flex-1">
           加入購物車
         </button>
       </div>
