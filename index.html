@@ -40,10 +40,17 @@
 
     .front-hero {
       background-image:
-        linear-gradient(90deg, rgba(67, 20, 7, 0.94) 0%, rgba(92, 37, 11, 0.78) 48%, rgba(92, 37, 11, 0.32) 100%),
+        linear-gradient(90deg, rgba(49, 20, 9, 0.96) 0%, rgba(75, 35, 14, 0.82) 50%, rgba(24, 66, 38, 0.28) 100%),
         url("assets/chen-mama-poster.jpg");
       background-size: cover;
       background-position: center top;
+    }
+
+    @media (max-width: 768px) {
+      .front-hero {
+        min-height: 620px;
+        background-position: center top;
+      }
     }
 
     .front-glass {
@@ -60,6 +67,17 @@
     .front-card:hover {
       transform: translateY(-2px);
       box-shadow: 0 22px 48px rgba(67, 20, 7, 0.14);
+    }
+
+    .front-product-img {
+      aspect-ratio: 4 / 3;
+      background: #fff7ed;
+    }
+
+    @media (max-width: 768px) {
+      .front-product-img {
+        aspect-ratio: 1 / 1;
+      }
     }
 
     .front-input {
@@ -97,18 +115,11 @@
 <body class="bg-amber-50 min-h-screen">
 <div class="max-w-7xl mx-auto bg-white min-h-screen shadow-xl">
 
-<header class="bg-amber-800 text-white p-5 flex justify-between items-center">
-  <h1 class="text-2xl font-bold">陳媽媽肉粽訂單系統</h1>
-  <div class="flex gap-3 items-center">
-    <button
-      id="adminUnlockButton"
-      type="button"
-      onclick="handleAdminUnlockTap()"
-      class="w-9 h-9 rounded-full text-amber-200/40 hover:text-white hover:bg-amber-700/60 text-lg"
-      aria-label="管理入口">
-      粽
-    </button>
-  </div>
+<header class="bg-[#4b230e] text-white px-5 py-4 flex justify-between items-center">
+  <button type="button" onclick="showPage('front')" class="text-left">
+    <div class="text-2xl font-bold">陳媽媽肉粽</div>
+    <div class="text-xs text-amber-100">桃園在地古早味</div>
+  </button>
   <div id="adminNavButtons" class="hidden gap-3">
     <button onclick="showPage('front')" class="bg-white text-amber-800 px-4 py-2 rounded-xl font-bold">前台</button>
     <button onclick="showPage('admin')" class="bg-amber-600 px-4 py-2 rounded-xl font-bold">後台</button>
@@ -117,33 +128,62 @@
 
 <!-- 前台 -->
 <section id="frontPage" class="front-shell">
-  <div class="front-hero text-white px-6 py-10 md:py-14">
-    <div class="max-w-6xl mx-auto grid lg:grid-cols-[1fr_330px] gap-8 items-end">
-      <div>
-        <div class="inline-flex items-center gap-2 text-sm font-bold text-amber-100 bg-white/10 rounded-full px-4 py-2 mb-4">
-          <span class="w-2 h-2 bg-amber-300 rounded-full"></span>
-          端午肉粽預訂服務
+  <div id="lineBrowserNotice" class="hidden bg-yellow-50 border-b-2 border-yellow-300 px-4 py-3">
+    <div class="max-w-6xl mx-auto flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+      <div class="font-bold text-yellow-900">若 LINE 內開啟畫面不正常，建議用手機預設瀏覽器開啟。</div>
+      <button type="button" onclick="openExternalBrowser()"
+        class="bg-yellow-600 text-white px-5 py-3 rounded-xl font-bold">
+        用瀏覽器開啟
+      </button>
+    </div>
+  </div>
+
+  <div class="front-hero text-white px-5 py-12 md:py-20">
+    <div class="max-w-6xl mx-auto grid lg:grid-cols-[1fr_360px] gap-8 items-end min-h-[560px] md:min-h-[620px]">
+      <div class="pb-4">
+        <div class="flex gap-2 flex-wrap mb-5">
+          <span class="bg-amber-300 text-amber-950 rounded-full px-4 py-2 text-sm font-bold">端午節預訂中</span>
+          <span class="bg-white/15 border border-white/30 rounded-full px-4 py-2 text-sm font-bold">可宅配／自取</span>
+          <span class="bg-white/15 border border-white/30 rounded-full px-4 py-2 text-sm font-bold">公司團購可預約</span>
         </div>
-        <h2 class="text-4xl md:text-5xl font-bold mb-4 leading-tight">陳媽媽手作肉粽</h2>
-        <p class="text-lg text-amber-50 max-w-2xl leading-relaxed">
-          現包現煮、依訂單備貨。請選擇商品、交付方式與時段，送出後會產生訂單編號方便後續核對。
+        <h2 class="text-5xl md:text-7xl font-bold mb-4 leading-tight">陳媽媽肉粽</h2>
+        <div class="text-2xl md:text-3xl font-bold text-amber-100 mb-4">桃園在地古早味</div>
+        <p class="text-xl md:text-2xl text-amber-50 max-w-2xl leading-relaxed font-bold">
+          北部粽｜南部粽｜素食粽｜豪華粽
         </p>
+        <p class="text-base md:text-lg text-amber-50/90 max-w-xl mt-4 leading-relaxed">
+          使用桂竹葉包製，依訂單現場備料。端午節前訂單較多，建議提早預訂。
+        </p>
+        <div class="grid sm:grid-cols-2 gap-3 mt-7 max-w-xl">
+          <button type="button" onclick="scrollToFrontOrder()"
+            class="bg-amber-400 text-stone-950 px-7 py-5 rounded-2xl font-bold text-xl shadow-xl">
+            立即訂購
+          </button>
+          <button type="button" onclick="openLineContact()"
+            class="bg-green-700 text-white px-7 py-5 rounded-2xl font-bold text-xl shadow-xl">
+            加入 LINE 官方
+          </button>
+        </div>
       </div>
 
-      <div class="front-glass rounded-2xl p-5">
-        <div class="text-sm text-amber-100 font-bold mb-3">訂購流程</div>
-        <div class="space-y-3 text-sm">
+      <div class="front-glass rounded-2xl p-5 md:p-6">
+        <div class="text-lg text-amber-100 font-bold mb-4">簡單 4 步驟完成預訂</div>
+        <div class="space-y-4 text-base">
           <div class="flex gap-3">
-            <span class="bg-amber-300 text-amber-950 rounded-full w-7 h-7 flex items-center justify-center font-bold">1</span>
-            <div>選擇單點、禮盒或大量商品</div>
+            <span class="bg-amber-300 text-amber-950 rounded-full w-8 h-8 flex items-center justify-center font-bold">1</span>
+            <div><b>選商品</b><br><span class="text-amber-50/80">單點、禮盒、公司大量訂購</span></div>
           </div>
           <div class="flex gap-3">
-            <span class="bg-amber-300 text-amber-950 rounded-full w-7 h-7 flex items-center justify-center font-bold">2</span>
-            <div>填寫取貨/收貨日期與時段</div>
+            <span class="bg-amber-300 text-amber-950 rounded-full w-8 h-8 flex items-center justify-center font-bold">2</span>
+            <div><b>選配送</b><br><span class="text-amber-50/80">自取、宅配、有限外送</span></div>
           </div>
           <div class="flex gap-3">
-            <span class="bg-amber-300 text-amber-950 rounded-full w-7 h-7 flex items-center justify-center font-bold">3</span>
-            <div>確認金額並送出訂單</div>
+            <span class="bg-amber-300 text-amber-950 rounded-full w-8 h-8 flex items-center justify-center font-bold">3</span>
+            <div><b>填資料</b><br><span class="text-amber-50/80">留下姓名電話與日期時段</span></div>
+          </div>
+          <div class="flex gap-3">
+            <span class="bg-amber-300 text-amber-950 rounded-full w-8 h-8 flex items-center justify-center font-bold">4</span>
+            <div><b>完成訂購</b><br><span class="text-amber-50/80">我們會盡快與您確認</span></div>
           </div>
         </div>
       </div>
@@ -154,7 +194,7 @@
     <div id="frontOrderConfirm" class="hidden bg-green-50 border-2 border-green-300 rounded-2xl p-5 mb-6"></div>
 
     <div class="grid lg:grid-cols-[1fr_380px] gap-6 items-start">
-      <main>
+      <main id="frontOrderSection">
         <div class="flex justify-between items-center gap-3 flex-wrap mb-4">
           <div>
             <h3 class="text-2xl font-bold text-stone-900">選擇商品</h3>
@@ -165,6 +205,28 @@
 
         <div id="frontCategoryTabs" class="grid grid-cols-3 gap-2 mb-4"></div>
         <div id="productList" class="grid md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+
+        <section class="mt-8 grid md:grid-cols-2 gap-4">
+          <div class="front-card bg-white rounded-2xl p-6">
+            <h3 class="text-2xl font-bold text-stone-900 mb-3">為什麼大家都選陳媽媽肉粽？</h3>
+            <div class="grid gap-3 text-stone-700 leading-relaxed">
+              <div>桃園在地老味道，真材實料每日備料。</div>
+              <div>公司團購、社區團購、端午送禮都能預約。</div>
+              <div>很多客人從小吃到大，現在換幫孩子訂。</div>
+              <div>不做過度浮誇照片，重點放在粽子的味道。</div>
+            </div>
+          </div>
+          <div id="frontGroupOrder" class="front-card bg-[#1f4d2e] text-white rounded-2xl p-6">
+            <h3 class="text-2xl font-bold mb-3">公司團購／大量訂購</h3>
+            <p class="text-green-50 leading-relaxed mb-4">
+              公司福委、學校活動、社區團購可先洽詢數量與日期。端午節前訂單較多，建議提早預訂。
+            </p>
+            <div class="grid grid-cols-2 gap-3">
+              <button type="button" onclick="openLineContact()" class="bg-green-500 text-white px-4 py-4 rounded-xl font-bold">LINE 聯絡</button>
+              <a href="tel:0936138746" class="bg-white text-green-900 px-4 py-4 rounded-xl font-bold text-center">電話聯絡</a>
+            </div>
+          </div>
+        </section>
       </main>
 
       <aside class="lg:sticky lg:top-4 space-y-4">
@@ -225,6 +287,12 @@
       </aside>
     </div>
   </div>
+
+  <footer class="max-w-6xl mx-auto px-5 py-8 text-center text-sm text-stone-500">
+    <button type="button" onclick="handleAdminUnlockTap()" class="underline underline-offset-4">
+      管理員登入
+    </button>
+  </footer>
 </section>
 
 <!-- 後台 -->
@@ -1102,33 +1170,59 @@ function renderProducts() {
     const card = document.createElement("div");
     const tag = getFrontProductTag(p);
     const description = getFrontProductDescription(p);
+    const features = getFrontProductFeatures(p);
+    const badges = getFrontProductBadges(p);
 
-    card.className = "front-card bg-white p-5 rounded-2xl transition";
+    card.className = "front-card bg-white rounded-2xl transition overflow-hidden";
     card.innerHTML = `
-      <div class="flex justify-between items-start gap-3 mb-4">
-        <div>
-          <span class="inline-block bg-amber-100 text-amber-900 rounded-full px-3 py-1 text-xs font-bold mb-3">
-            ${tag}
-          </span>
-          <h3 class="text-xl font-bold leading-snug text-stone-900">${p.name}</h3>
-          <div class="text-xs text-stone-400 mt-1">${description || "後台確認庫存後安排製作"}</div>
-        </div>
-        <div class="text-right">
-          <div class="text-xs text-stone-500">單價</div>
-          <div class="text-2xl font-bold text-amber-800">NT$ ${money(p.price)}</div>
-        </div>
+      <div class="front-product-img overflow-hidden">
+        <img src="assets/chen-mama-poster.jpg" alt="${escapeHtml(p.name)}"
+          class="w-full h-full object-cover object-center">
       </div>
 
-      <div class="bg-stone-50 rounded-2xl p-3 flex gap-2 items-center border border-stone-100">
-        <label class="text-sm text-stone-500 font-bold">數量</label>
-        <input id="qty-${p.id}" type="number" inputmode="numeric" min="1" value="1"
-          data-keypad-title="輸入數量"
-          onfocus="openNumberKeypad(this)"
-          onclick="openNumberKeypad(this)"
-          class="quick-number-input front-input border p-3 rounded-xl w-24 text-center bg-white">
-        <button onclick="addToCart(${p.id})" class="mobile-action-btn bg-amber-700 hover:bg-amber-800 text-white px-4 py-3 rounded-xl font-bold flex-1">
-          加入購物車
-        </button>
+      <div class="p-5">
+        <div class="flex gap-2 flex-wrap mb-3">
+          ${badges.map(badge => `
+            <span class="inline-block bg-amber-100 text-amber-900 rounded-full px-3 py-1 text-xs font-bold">
+              ${badge}
+            </span>
+          `).join("")}
+        </div>
+
+        <div class="flex justify-between items-start gap-3 mb-3">
+          <div>
+            <h3 class="text-2xl font-bold leading-snug text-stone-900">${p.name}</h3>
+            <div class="text-3xl font-bold text-amber-800 mt-1">NT$ ${money(p.price)}</div>
+          </div>
+          <span class="bg-[#1f4d2e] text-white rounded-full px-3 py-1 text-xs font-bold shrink-0">
+            ${tag}
+          </span>
+        </div>
+
+        <div class="text-base text-stone-700 leading-relaxed min-h-[72px]">
+          ${description || "後台確認庫存後安排製作"}
+        </div>
+
+        <div class="mt-4 grid gap-2 text-sm text-stone-600">
+          ${features.map(feature => `
+            <div class="flex gap-2">
+              <span class="text-green-700 font-bold">✓</span>
+              <span>${feature}</span>
+            </div>
+          `).join("")}
+        </div>
+
+        <div class="bg-stone-50 rounded-2xl p-3 flex gap-2 items-center border border-stone-100 mt-5">
+          <label class="text-sm text-stone-500 font-bold">數量</label>
+          <input id="qty-${p.id}" type="number" inputmode="numeric" min="1" value="1"
+            data-keypad-title="輸入數量"
+            onfocus="openNumberKeypad(this)"
+            onclick="openNumberKeypad(this)"
+            class="quick-number-input front-input border p-3 rounded-xl w-24 text-center bg-white">
+          <button onclick="addToCart(${p.id})" class="mobile-action-btn bg-amber-700 hover:bg-amber-800 text-white px-5 py-4 rounded-xl font-bold flex-1 text-base">
+            加入購物車
+          </button>
+        </div>
       </div>
     `;
     box.appendChild(card);
@@ -1146,6 +1240,32 @@ function getFrontProductDescription(product) {
   if (name.includes("鹼") || name.includes("檢")) return "簡單純粹，傳統風味。";
 
   return "";
+}
+
+function getFrontProductFeatures(product) {
+  const name = String(product.name || "");
+
+  if (name.includes("北部")) return ["使用桂竹葉包製", "米粒Q香、先炒後蒸", "傳統北部粽香氣"];
+  if (name.includes("南部")) return ["使用桂竹葉包製", "水煮軟Q、濕潤古早味", "花生與油蔥酥香氣"];
+  if (name.includes("素")) return ["清爽不油", "素料與香菇麻油香", "素食客人安心選擇"];
+  if (name.includes("豪華")) return ["含蛋黃，用料升級", "送禮首選", "端午節熱門預訂"];
+  if (name.includes("紅豆")) return ["紅豆餡在裡面", "淡淡甜香", "飯後甜粽好選擇"];
+  if (name.includes("鹼") || name.includes("檢")) return ["簡單純粹", "傳統鹼粽風味", "可搭配糖或蜂蜜"];
+
+  return ["使用桂竹葉包製", "依訂單備料", "公司團購可預約"];
+}
+
+function getFrontProductBadges(product) {
+  const name = String(product.name || "");
+
+  if (name.includes("北部")) return ["熱門", "回購推薦", "古早味"];
+  if (name.includes("南部")) return ["古早味", "長輩喜歡", "回購推薦"];
+  if (name.includes("素")) return ["素食", "清爽", "回購推薦"];
+  if (name.includes("豪華")) return ["送禮", "含蛋黃", "熱門"];
+  if (name.includes("紅豆")) return ["甜粽", "紅豆餡", "古早味"];
+  if (name.includes("鹼") || name.includes("檢")) return ["甜粽", "傳統", "古早味"];
+
+  return ["手作", "預訂", "古早味"];
 }
 
 function setFrontProductCategory(category) {
@@ -1346,6 +1466,34 @@ function normalizePhone(value) {
   return String(value || "").replace(/[^\d]/g, "");
 }
 
+function scrollToFrontOrder() {
+  document.getElementById("frontOrderSection")?.scrollIntoView({
+    behavior: "smooth",
+    block: "start"
+  });
+}
+
+function openLineContact() {
+  alert("請用 LINE 搜尋訂購專線 0936-138-746，或直接來電洽詢。取得官方 LINE 連結後，這顆按鈕可以改成直接加入。");
+}
+
+function isLineInAppBrowser() {
+  return /Line\//i.test(navigator.userAgent || "");
+}
+
+function openExternalBrowser() {
+  const url = new URL(window.location.href);
+  url.searchParams.set("openExternalBrowser", "1");
+  window.location.href = url.toString();
+}
+
+function initLineBrowserNotice() {
+  const notice = document.getElementById("lineBrowserNotice");
+  if (notice && isLineInAppBrowser()) {
+    notice.classList.remove("hidden");
+  }
+}
+
 function updateFrontDeliveryHint() {
   const delivery = document.getElementById("delivery")?.value || "自取";
   const hint = document.getElementById("frontDeliveryHint");
@@ -1424,7 +1572,8 @@ function renderFrontOrderConfirm(order) {
   box.innerHTML = `
     <div class="flex justify-between gap-3 flex-wrap">
       <div>
-        <h3 class="text-2xl font-bold text-green-800 mb-2">訂單已送出</h3>
+        <h3 class="text-2xl font-bold text-green-800 mb-2">已收到您的訂單</h3>
+        <div class="text-green-900 font-bold mb-3">我們會盡快與您確認。</div>
         <div class="font-bold">訂單編號：${order.id}</div>
         <div>姓名：${order.name}</div>
         <div>電話：${order.phone}</div>
@@ -6600,6 +6749,7 @@ async function refreshAdmin() {
 }
 
 initAdminEntry();
+initLineBrowserNotice();
 loadProducts();
 updateFrontDeliveryHint();
   function renderProductAdmin() {
