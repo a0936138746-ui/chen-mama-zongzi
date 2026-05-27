@@ -7,6 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <style>
     .mobile-action-btn {
       min-height: 44px;
@@ -4379,9 +4380,12 @@ function renderQuoteOrder() {
         <textarea id="quoteNote" class="border p-3 rounded-xl w-full mt-4" rows="3"
           placeholder="注意事項 / 客戶備註" oninput="renderQuotePreview()"></textarea>
 
-        <div class="grid sm:grid-cols-2 gap-3 mt-4">
+        <div class="grid sm:grid-cols-3 gap-3 mt-4">
           <button type="button" onclick="printQuote()" class="bg-blue-700 text-white px-4 py-3 rounded-xl font-bold">
             列印報價單
+          </button>
+          <button type="button" onclick="downloadQuoteImage()" class="bg-purple-700 text-white px-4 py-3 rounded-xl font-bold">
+            下載報價圖檔
           </button>
           <button type="button" onclick="saveQuoteAsOrder()" class="bg-green-700 text-white px-4 py-3 rounded-xl font-bold">
             確認儲存成訂單
@@ -4400,13 +4404,16 @@ function renderQuoteOrder() {
 
 function addQuoteRow() {
   const row = document.createElement("div");
-  row.className = "grid md:grid-cols-[1fr_90px_110px_1fr_auto] gap-2 bg-gray-50 p-3 rounded-xl";
+  row.className = "quoteRow grid md:grid-cols-[1fr_1fr_90px_110px_1fr_auto] gap-2 bg-gray-50 p-3 rounded-xl";
   row.innerHTML = `
     <select class="quoteProduct border p-3 rounded-xl" onchange="onQuoteProductChange(this)">
       ${products.filter(p => p.active !== false && p.type !== "fee").map(p => `
         <option value="${p.id}">${escapeHtml(p.name)}</option>
       `).join("")}
+      <option value="__custom__">特殊訂單 / 公益 / 客製</option>
     </select>
+    <input class="quoteCustomName hidden border p-3 rounded-xl" placeholder="特殊品項，例如 DIY材料包 / 加蛋黃 / 包花生 / 公益贈送"
+      oninput="renderQuotePreview()">
     <input class="quoteQty quick-number-input border p-3 rounded-xl" type="number" inputmode="numeric"
       value="1" min="1" data-keypad-title="輸入數量"
       onfocus="openNumberKeypad(this)" onclick="openNumberKeypad(this)" oninput="renderQuotePreview()">
@@ -4423,11 +4430,21 @@ function addQuoteRow() {
 }
 
 function onQuoteProductChange(select) {
+  const isCustom = select.value === "__custom__";
   const product = products.find(p => String(p.id) === String(select.value));
-  const row = select.closest("div");
+  const row = select.closest(".quoteRow");
   const priceInput = row?.querySelector(".quotePrice");
+  const customInput = row?.querySelector(".quoteCustomName");
 
-  if (product && priceInput && !priceInput.value) {
+  if (customInput) {
+    customInput.classList.toggle("hidden", !isCustom);
+  }
+
+  if (isCustom && priceInput && !priceInput.value) {
+    priceInput.value = 0;
+  }
+
+  if (product && priceInput) {
     priceInput.value = product.price || 0;
   }
 
@@ -4435,20 +4452,23 @@ function onQuoteProductChange(select) {
 }
 
 function getQuoteItems() {
-  return [...document.querySelectorAll("#quoteRows > div")]
-    .map(row => {
+  return [...document.querySelectorAll("#quoteRows > .quoteRow")]
+    .map((row, index) => {
       const select = row.querySelector(".quoteProduct");
+      const isCustom = select.value === "__custom__";
       const product = products.find(p => String(p.id) === String(select.value));
+      const customName = row.querySelector(".quoteCustomName")?.value.trim() || "";
       const qty = Number(row.querySelector(".quoteQty").value || 0);
       const price = Number(row.querySelector(".quotePrice").value || product?.price || 0);
       const note = row.querySelector(".quoteItemNote").value.trim();
 
       return {
-        id: product?.id || "quote-" + Date.now(),
-        name: product?.name || "未選商品",
+        id: product?.id || "quote-custom-" + Date.now() + "-" + index,
+        name: isCustom ? (customName || "特殊訂單") : (product?.name || "未選商品"),
         qty,
         price,
-        note
+        note,
+        type: isCustom ? "custom" : (product?.type || "single")
       };
     })
     .filter(item => item.qty > 0);
@@ -4481,7 +4501,9 @@ function renderQuotePreview() {
   const q = getQuoteData();
 
   box.innerHTML = `
-    <div class="bg-[#fffaf2] p-6 md:p-8 text-stone-900">
+    <div class="relative bg-[#fffaf2] p-6 md:p-8 text-stone-900">
+      <img src="assets/quote-stamp.jpg" alt="陳媽媽肉粽店章"
+        class="absolute right-5 top-5 w-24 md:w-32 opacity-75 mix-blend-multiply rotate-[-7deg]">
       <div class="text-center border-b-4 border-green-900 pb-5 mb-5">
         <div class="text-4xl font-bold tracking-wide mb-2">陳媽媽肉粽店</div>
         <div class="text-green-900 text-4xl font-bold tracking-[0.35em]">報價單</div>
@@ -4528,7 +4550,7 @@ function renderQuotePreview() {
                 <tr>
                   <td class="p-3 border text-center font-bold">${escapeHtml(item.name)}</td>
                   <td class="p-3 border text-center">${money(item.price)}元</td>
-                  <td class="p-3 border text-center">${item.qty} 顆</td>
+                  <td class="p-3 border text-center">${item.qty} 份</td>
                   <td class="p-3 border text-center">${money(item.price * item.qty)}元</td>
                   <td class="p-3 border text-center">${escapeHtml(item.note || "")}</td>
                 </tr>
@@ -4569,6 +4591,32 @@ function renderQuotePreview() {
       </div>
     </div>
   `;
+}
+
+async function downloadQuoteImage() {
+  if (!window.html2canvas) {
+    alert("圖檔匯出套件尚未載入，請重新整理後再試一次");
+    return;
+  }
+
+  const target = document.getElementById("quotePreview");
+  if (!target) return;
+
+  const q = getQuoteData();
+  const fileNameBase = (q.company || q.contact || "客戶")
+    .replace(/[\\/:*?"<>|]/g, "")
+    .trim() || "客戶";
+
+  const canvas = await html2canvas(target, {
+    scale: 2,
+    backgroundColor: "#fffaf2",
+    useCORS: true
+  });
+
+  const link = document.createElement("a");
+  link.download = `陳媽媽報價單_${fileNameBase}_${todayStr()}.png`;
+  link.href = canvas.toDataURL("image/png");
+  link.click();
 }
 
 function printQuote() {
