@@ -4345,7 +4345,15 @@ function renderQuoteOrder() {
 
     <div class="grid xl:grid-cols-[420px_1fr] gap-5 items-start">
       <section class="bg-white p-5 rounded-2xl shadow border print:hidden">
-        <h3 class="font-bold text-xl mb-4">報價資料</h3>
+        <div class="flex justify-between items-start gap-3 mb-4">
+          <div>
+            <h3 class="font-bold text-xl">報價資料</h3>
+            <div id="quoteDraftStatus" class="text-sm text-green-700 mt-1">會自動暫存</div>
+          </div>
+          <button type="button" onclick="clearQuoteDraft()" class="bg-gray-700 text-white px-3 py-2 rounded-xl font-bold">
+            清除暫存
+          </button>
+        </div>
 
         <div class="grid gap-3">
           <input id="quoteCompany" class="border p-3 rounded-xl" placeholder="公司 / 客戶名稱" oninput="renderQuotePreview()">
@@ -4402,12 +4410,14 @@ function renderQuoteOrder() {
     </div>
   `;
 
-  addQuoteRow();
-  addQuoteRow();
-  renderQuotePreview();
+  if (!loadQuoteDraft()) {
+    addQuoteRow();
+    addQuoteRow();
+    renderQuotePreview();
+  }
 }
 
-function addQuoteRow() {
+function addQuoteRow(item = null) {
   const row = document.createElement("div");
   row.className = "quoteRow grid grid-cols-1 gap-2 bg-gray-50 p-3 rounded-xl";
   row.innerHTML = `
@@ -4433,10 +4443,26 @@ function addQuoteRow() {
   `;
 
   document.getElementById("quoteRows").appendChild(row);
-  onQuoteProductChange(row.querySelector(".quoteProduct"));
+
+  if (item) {
+    const select = row.querySelector(".quoteProduct");
+    const selectedValue = item.selectValue || item.productId || item.id || "";
+    const shouldUseCustom =
+      item.type === "custom" ||
+      String(selectedValue).startsWith("quote-custom") ||
+      !products.some(p => String(p.id) === String(selectedValue));
+
+    select.value = shouldUseCustom ? "__custom__" : String(selectedValue);
+    row.querySelector(".quoteCustomName").value = item.customName || item.name || "";
+    row.querySelector(".quoteQty").value = item.qty || 1;
+    row.querySelector(".quotePrice").value = item.price ?? "";
+    row.querySelector(".quoteItemNote").value = item.note || "";
+  }
+
+  onQuoteProductChange(row.querySelector(".quoteProduct"), Boolean(item));
 }
 
-function onQuoteProductChange(select) {
+function onQuoteProductChange(select, keepPrice = false) {
   const isCustom = select.value === "__custom__";
   const product = products.find(p => String(p.id) === String(select.value));
   const row = select.closest(".quoteRow");
@@ -4451,7 +4477,7 @@ function onQuoteProductChange(select) {
     priceInput.value = 0;
   }
 
-  if (product && priceInput) {
+  if (product && priceInput && !keepPrice) {
     priceInput.value = product.price || 0;
   }
 
@@ -4471,6 +4497,9 @@ function getQuoteItems() {
 
       return {
         id: product?.id || "quote-custom-" + Date.now() + "-" + index,
+        productId: product?.id || null,
+        selectValue: isCustom ? "__custom__" : String(product?.id || ""),
+        customName,
         name: isCustom ? (customName || "特殊訂單") : (product?.name || "未選商品"),
         qty,
         price,
@@ -4505,6 +4534,77 @@ function getQuoteData() {
     total: finalTotal,
     hasManualTotal: finalTotalInput !== "" && finalTotalInput !== undefined
   };
+}
+
+function saveQuoteDraft(q = null) {
+  try {
+    const draft = q || getQuoteData();
+    localStorage.setItem("chenMamaQuoteDraft", JSON.stringify({
+      ...draft,
+      savedAt: new Date().toISOString()
+    }));
+
+    const status = document.getElementById("quoteDraftStatus");
+    if (status) {
+      status.textContent = "已自動暫存";
+      status.className = "text-sm text-green-700 mt-1";
+    }
+  } catch (error) {
+    const status = document.getElementById("quoteDraftStatus");
+    if (status) {
+      status.textContent = "暫存失敗，請先不要關閉頁面";
+      status.className = "text-sm text-red-700 mt-1";
+    }
+  }
+}
+
+function loadQuoteDraft() {
+  try {
+    const raw = localStorage.getItem("chenMamaQuoteDraft");
+    if (!raw) return false;
+
+    const draft = JSON.parse(raw);
+
+    document.getElementById("quoteCompany").value = draft.company || "";
+    document.getElementById("quoteContact").value = draft.contact || "";
+    document.getElementById("quotePhone").value = draft.phone || "";
+    document.getElementById("quoteAddress").value = draft.address || "";
+    document.getElementById("quoteDate").value = draft.quoteDate || todayStr();
+    document.getElementById("quoteDelivery").value = draft.delivery || "有限外送";
+    document.getElementById("quoteDeliveryDate").value = draft.deliveryDate || "";
+    document.getElementById("quoteDeliveryTime").value = draft.deliveryTime || "";
+    document.getElementById("quoteDeliveryNote").value = draft.deliveryNote || "";
+    document.getElementById("quoteFinalTotal").value = draft.hasManualTotal ? (draft.total ?? "") : "";
+    document.getElementById("quoteNote").value = draft.note || "";
+
+    const rows = document.getElementById("quoteRows");
+    rows.innerHTML = "";
+
+    if (Array.isArray(draft.items) && draft.items.length) {
+      draft.items.forEach(item => addQuoteRow(item));
+    } else {
+      addQuoteRow();
+      addQuoteRow();
+    }
+
+    const status = document.getElementById("quoteDraftStatus");
+    if (status) {
+      status.textContent = "已載入上次暫存";
+      status.className = "text-sm text-amber-700 mt-1";
+    }
+
+    renderQuotePreview();
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+function clearQuoteDraft() {
+  if (!confirm("確定清除目前報價單暫存？")) return;
+
+  localStorage.removeItem("chenMamaQuoteDraft");
+  renderQuoteOrder();
 }
 
 function renderQuotePreview() {
@@ -4621,6 +4721,8 @@ function renderQuotePreview() {
       </div>
     </div>
   `;
+
+  saveQuoteDraft(q);
 }
 
 async function downloadQuoteImage() {
@@ -4705,6 +4807,7 @@ async function saveQuoteAsOrder() {
   }
 
   alert("已儲存成訂單");
+  localStorage.removeItem("chenMamaQuoteDraft");
   await refreshAdmin();
   showAdminTab("orders");
 }
