@@ -4502,8 +4502,6 @@ function renderQuotePreview() {
 
   box.innerHTML = `
     <div class="relative bg-[#fffaf2] p-6 md:p-8 text-stone-900">
-      <img src="assets/quote-stamp.jpg" alt="陳媽媽肉粽店章"
-        class="absolute right-5 top-5 w-24 md:w-32 opacity-75 mix-blend-multiply rotate-[-7deg]">
       <div class="text-center border-b-4 border-green-900 pb-5 mb-5">
         <div class="text-4xl font-bold tracking-wide mb-2">陳媽媽肉粽店</div>
         <div class="text-green-900 text-4xl font-bold tracking-[0.35em]">報價單</div>
@@ -4511,11 +4509,23 @@ function renderQuotePreview() {
       </div>
 
       <div class="grid md:grid-cols-[1fr_370px] gap-6 mb-6">
-        <div class="space-y-3 text-lg">
-          <div>公司：${escapeHtml(q.company || "未填")}</div>
-          <div>聯絡人：${escapeHtml(q.contact || "未填")}</div>
-          <div>電話：${escapeHtml(q.phone || "未填")}</div>
-          <div>地址：${escapeHtml(q.address || "未填")}</div>
+        <div class="space-y-4">
+          <div class="space-y-3 text-lg">
+            <div>公司：${escapeHtml(q.company || "未填")}</div>
+            <div>聯絡人：${escapeHtml(q.contact || "未填")}</div>
+            <div>電話：${escapeHtml(q.phone || "未填")}</div>
+            <div>地址：${escapeHtml(q.address || "未填")}</div>
+          </div>
+
+          <div class="border-2 border-blue-700 rounded-xl bg-blue-50/70 overflow-hidden max-w-md">
+            <div class="bg-blue-700 text-white font-bold text-center py-2">店章 / 免用發票資訊</div>
+            <div class="p-3 text-sm leading-7">
+              <div class="font-bold text-blue-900 text-lg">陳媽媽肉粽店</div>
+              <div>免用發票專用章｜統一編號：01257909</div>
+              <div>負責人：謝春桃｜電話：03-3224609</div>
+              <div>地址：桃園市蘆竹區錦興里聯福街76巷8號</div>
+            </div>
+          </div>
         </div>
 
         <div class="border-2 border-green-900 rounded-xl overflow-hidden">
