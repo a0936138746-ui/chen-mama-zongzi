@@ -265,36 +265,60 @@
           <div class="text-sm text-stone-500 mb-4">請留下可聯絡資訊與交付時間</div>
 
           <div class="grid gap-3 mb-3">
-            <input id="customerName" class="front-input border p-3 rounded-xl" placeholder="客戶姓名">
-            <input id="customerPhone" class="front-input border p-3 rounded-xl" placeholder="客戶電話">
+            <label class="block">
+              <span class="block text-sm font-bold text-stone-700 mb-1">姓名</span>
+              <input id="customerName" class="front-input border p-3 rounded-xl w-full" placeholder="請輸入訂購人姓名">
+            </label>
+            <label class="block">
+              <span class="block text-sm font-bold text-stone-700 mb-1">電話</span>
+              <input id="customerPhone" class="front-input border p-3 rounded-xl w-full" inputmode="tel" placeholder="手機或市話皆可">
+            </label>
           </div>
 
-          <select id="delivery" class="front-input border p-3 rounded-xl w-full mb-2" onchange="updateFrontDeliveryHint(); renderCart();">
-            <option value="自取">自取</option>
-            <option value="宅配">宅配</option>
-            <option value="有限外送">有限外送</option>
-          </select>
+          <label class="block mb-2">
+            <span class="block text-sm font-bold text-stone-700 mb-1">交付方式</span>
+            <select id="delivery" class="front-input border p-3 rounded-xl w-full" onchange="updateFrontDeliveryHint(); renderCart();">
+              <option value="自取">自取</option>
+              <option value="宅配">宅配</option>
+              <option value="有限外送">有限外送</option>
+            </select>
+          </label>
 
           <div id="frontDeliveryHint" class="bg-blue-50 text-blue-800 p-3 rounded-xl mb-3 text-sm">
             自取請選擇取貨日期；宅配請填希望到貨日與地址。
           </div>
 
           <div class="grid gap-3 mb-3">
-            <input id="pickupDate" type="date" class="front-input border p-3 rounded-xl">
-            <input id="address" class="front-input border p-3 rounded-xl" placeholder="地址">
+            <label class="block">
+              <span id="frontDateLabel" class="block text-sm font-bold text-stone-700 mb-1">取貨日期</span>
+              <input id="pickupDate" type="date" class="front-input border p-3 rounded-xl w-full">
+            </label>
+            <label class="block">
+              <span id="frontAddressLabel" class="block text-sm font-bold text-stone-700 mb-1">地址</span>
+              <input id="address" class="front-input border p-3 rounded-xl w-full" placeholder="地址（自取可不填）">
+            </label>
           </div>
 
           <div class="grid grid-cols-[120px_1fr] gap-3 mb-3">
-            <select id="pickupTimeSlot" class="front-input border p-3 rounded-xl">
-              <option value="">取貨時段</option>
-              <option value="早上">早上</option>
-              <option value="晚上">晚上</option>
-              <option value="其他">其他時間</option>
-            </select>
-            <input id="pickupTimeNote" class="front-input border p-3 rounded-xl" placeholder="可加註幾點，例如 10:30、晚上 7 點">
+            <label class="block">
+              <span id="frontTimeLabel" class="block text-sm font-bold text-stone-700 mb-1">時段</span>
+              <select id="pickupTimeSlot" class="front-input border p-3 rounded-xl w-full">
+                <option value="">請選擇</option>
+                <option value="早上">早上</option>
+                <option value="晚上">晚上</option>
+                <option value="其他">其他時間</option>
+              </select>
+            </label>
+            <label class="block">
+              <span class="block text-sm font-bold text-stone-700 mb-1">時間備註</span>
+              <input id="pickupTimeNote" class="front-input border p-3 rounded-xl w-full" placeholder="例如 10:30、晚上 7 點">
+            </label>
           </div>
 
-          <textarea id="note" class="front-input border p-3 rounded-xl w-full" rows="3" placeholder="備註，例如加蛋黃、送禮分裝、希望時段"></textarea>
+          <label class="block">
+            <span class="block text-sm font-bold text-stone-700 mb-1">備註</span>
+            <textarea id="note" class="front-input border p-3 rounded-xl w-full" rows="3" placeholder="例如加蛋黃、送禮分裝、其他需求"></textarea>
+          </label>
         </section>
 
         <section class="front-card bg-white rounded-2xl p-5">
@@ -1697,24 +1721,45 @@ function updateFrontDeliveryHint() {
   const hint = document.getElementById("frontDeliveryHint");
   const address = document.getElementById("address");
   const date = document.getElementById("pickupDate");
+  const dateLabel = document.getElementById("frontDateLabel");
+  const addressLabel = document.getElementById("frontAddressLabel");
+  const timeLabel = document.getElementById("frontTimeLabel");
 
   if (!hint) return;
 
   if (delivery === "宅配") {
-    hint.innerHTML = "宅配請填「希望到貨日」與完整地址；運費每件 NT$260，一般粽 40 顆一件，禮盒 2 盒一件。";
+    hint.innerHTML = `
+      <div class="font-bold mb-1">宅配提醒</div>
+      <div>請填希望到貨日與完整地址；運費每件 NT$260，一般粽 40 顆一件，禮盒 2 盒一件。</div>
+    `;
+    if (dateLabel) dateLabel.innerText = "希望到貨日";
+    if (addressLabel) addressLabel.innerText = "宅配地址";
+    if (timeLabel) timeLabel.innerText = "收貨時段";
     if (address) address.placeholder = "宅配地址（必填）";
     if (date) date.title = "希望到貨日";
     return;
   }
 
   if (delivery === "有限外送") {
-    hint.innerHTML = "有限外送請填外送日期與地址，若地址不在可外送範圍，請改自取或宅配。";
+    hint.innerHTML = `
+      <div class="font-bold mb-1">有限外送提醒</div>
+      <div>請填外送日期與地址；若地址不在可外送範圍，我們會再聯絡調整。</div>
+    `;
+    if (dateLabel) dateLabel.innerText = "外送日期";
+    if (addressLabel) addressLabel.innerText = "外送地址";
+    if (timeLabel) timeLabel.innerText = "外送時段";
     if (address) address.placeholder = "外送地址（必填）";
     if (date) date.title = "外送日期";
     return;
   }
 
-  hint.innerHTML = "自取請選擇取貨日期；地址可不填。";
+  hint.innerHTML = `
+    <div class="font-bold mb-1">自取提醒</div>
+    <div>請選擇取貨日期與時段；地址可不填。</div>
+  `;
+  if (dateLabel) dateLabel.innerText = "取貨日期";
+  if (addressLabel) addressLabel.innerText = "地址";
+  if (timeLabel) timeLabel.innerText = "取貨時段";
   if (address) address.placeholder = "地址（自取可不填）";
   if (date) date.title = "取貨日期";
 }
