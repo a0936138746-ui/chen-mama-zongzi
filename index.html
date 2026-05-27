@@ -1343,13 +1343,22 @@ function getFrontProductDisplayName(product) {
   return baseName || rawName;
 }
 
+function parseFrontProductTextList(value) {
+  return String(value || "")
+    .split(/[,，、\n]/)
+    .map(x => x.trim())
+    .filter(Boolean);
+}
+
 function getFrontProductDescription(product) {
+  if (product.front_description) return product.front_description;
+
   const name = normalizeFrontProductName(product.name);
 
   if (name.includes("南部")) return "水煮工法，軟Q濕潤，古早味。配料：瘦肉、肥肉、花生、香菇絲、金勾蝦、自製油蔥酥。";
   if (name.includes("北部")) return "先炒後蒸，粒粒分明，香氣濃郁。配料：菜脯、瘦肉、香菇絲、金勾蝦、自製油蔥酥。";
   if (name.includes("素")) return "清爽不油，自然風味。配料：素火腿、素茶鵝、豆皮、香菇絲、薑末、麻油。";
-  if (name.includes("豪華")) return "含蛋黃，用料升級，送禮首選。";
+  if (name.includes("豪華")) return "用料升級，送禮首選。配料：蛋黃、栗子、干貝、瘦肉、三層肉、香菇、金勾蝦、油蔥酥。";
   if (name.includes("紅豆")) return "紅豆餡包在粽子裡，淡淡甜香。";
   if (name.includes("鹼") || name.includes("檢")) return "簡單純粹，傳統風味。";
 
@@ -1379,6 +1388,8 @@ function getFrontProductIcon(product) {
 }
 
 function getFrontProductMoodText(product) {
+  if (product.front_subtitle) return product.front_subtitle;
+
   const name = normalizeFrontProductName(product.name);
   if (name.includes("豪華")) return "用料升級，送禮首選";
   if (name.includes("南部")) return "水煮軟Q，古早味";
@@ -1403,12 +1414,15 @@ function getFrontProductVisualClass(product) {
 }
 
 function getFrontProductFeatures(product) {
+  const customFeatures = parseFrontProductTextList(product.front_features);
+  if (customFeatures.length) return customFeatures;
+
   const name = normalizeFrontProductName(product.name);
 
   if (name.includes("北部")) return ["使用桂竹葉包製", "米粒Q香、先炒後蒸", "傳統北部粽香氣"];
   if (name.includes("南部")) return ["使用桂竹葉包製", "水煮軟Q、濕潤古早味", "花生與油蔥酥香氣"];
   if (name.includes("素")) return ["清爽不油", "素料與香菇麻油香", "素食客人安心選擇"];
-  if (name.includes("豪華")) return ["含蛋黃，用料升級", "送禮首選", "端午節熱門預訂"];
+  if (name.includes("豪華")) return ["蛋黃栗子干貝", "送禮首選", "端午節熱門預訂"];
   if (name.includes("紅豆")) return ["紅豆餡在裡面", "淡淡甜香", "飯後甜粽好選擇"];
   if (name.includes("鹼") || name.includes("檢")) return ["簡單純粹", "傳統鹼粽風味", "可搭配糖或蜂蜜"];
 
@@ -1416,6 +1430,9 @@ function getFrontProductFeatures(product) {
 }
 
 function getFrontProductBadges(product) {
+  const customBadges = parseFrontProductTextList(product.front_badges);
+  if (customBadges.length) return customBadges;
+
   const name = normalizeFrontProductName(product.name);
 
   if (name.includes("北部")) return ["熱門", "回購推薦", "古早味"];
@@ -7495,6 +7512,43 @@ updateFrontDeliveryHint();
         </label>
       </div>
 
+      <div class="bg-green-50 border border-green-200 rounded-2xl p-4 mb-4">
+        <div class="font-bold text-green-900 mb-2">前台商品文案</div>
+        <div class="grid gap-3">
+          <label class="block">
+            <span class="text-sm text-gray-500">前台短句</span>
+            <input value="${escapeHtml(p.front_subtitle || "")}"
+              onchange="updateProduct(${p.id}, 'front_subtitle', this.value)"
+              class="border p-3 rounded-xl w-full"
+              placeholder="例如：用料升級，送禮首選">
+          </label>
+
+          <label class="block">
+            <span class="text-sm text-gray-500">前台說明 / 配料</span>
+            <textarea onchange="updateProduct(${p.id}, 'front_description', this.value)"
+              class="border p-3 rounded-xl w-full"
+              rows="3"
+              placeholder="例如：配料、葉子、特色說明">${escapeHtml(p.front_description || "")}</textarea>
+          </label>
+
+          <label class="block">
+            <span class="text-sm text-gray-500">前台特色標籤（用逗號或換行分隔）</span>
+            <textarea onchange="updateProduct(${p.id}, 'front_features', this.value)"
+              class="border p-3 rounded-xl w-full"
+              rows="2"
+              placeholder="例如：使用桂竹葉包製、米粒Q香、端午節熱門預訂">${escapeHtml(p.front_features || "")}</textarea>
+          </label>
+
+          <label class="block">
+            <span class="text-sm text-gray-500">商品小標籤（用逗號或換行分隔）</span>
+            <input value="${escapeHtml(p.front_badges || "")}"
+              onchange="updateProduct(${p.id}, 'front_badges', this.value)"
+              class="border p-3 rounded-xl w-full"
+              placeholder="例如：熱門、回購推薦、古早味">
+          </label>
+        </div>
+      </div>
+
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <button type="button" onclick="toggleStockIn(${p.id})"
           class="mobile-action-btn bg-blue-600 text-white px-3 py-2 rounded-xl font-bold">
@@ -7611,6 +7665,11 @@ async function updateProduct(id, field, value) {
   if (error) {
     if (field === "front_active" && error.message.includes("front_active")) {
       alert("前台上架欄位尚未建立。請先到 Supabase SQL Editor 執行：ALTER TABLE products ADD COLUMN IF NOT EXISTS front_active BOOLEAN DEFAULT true;");
+      return;
+    }
+
+    if (field.startsWith("front_")) {
+      alert("前台文案欄位尚未建立。請先到 Supabase SQL Editor 執行新增欄位，我會在這次回覆提供 SQL。");
       return;
     }
 
