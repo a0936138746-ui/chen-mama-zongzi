@@ -346,7 +346,7 @@
             </div>
           </div>
 
-          <button onclick="submitOrder()" class="mobile-action-btn bg-green-700 hover:bg-green-800 text-white px-6 py-4 rounded-xl font-bold w-full text-lg shadow-lg shadow-green-900/10">
+          <button id="frontSubmitOrderBtn" onclick="submitOrder()" class="mobile-action-btn bg-green-700 hover:bg-green-800 text-white px-6 py-4 rounded-xl font-bold w-full text-lg shadow-lg shadow-green-900/10">
             送出訂單
           </button>
         </section>
@@ -372,6 +372,7 @@
   </div>
 
   <div id="adminContent" class="hidden">
+    <div id="adminOrderNotice" class="hidden mb-5"></div>
             <div class="flex flex-wrap gap-3 mb-6">
       <button onclick="showAdminTab('orders')" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">訂單管理</button>
       <button onclick="showAdminTab('war')" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">作戰看板</button>
@@ -402,6 +403,11 @@ let orders = [];
 let expenses = [];
 let incomes = [];
 let cart = [];
+let isSubmittingFrontOrder = false;
+let adminOrderWatchTimer = null;
+let adminKnownLatestOrderTime = "";
+let adminUnseenNewOrders = [];
+let currentAdminTab = "orders";
 
 function money(n) {
   return Number(n || 0).toLocaleString("zh-TW");
@@ -1175,6 +1181,7 @@ function loginAdmin() {
   document.getElementById("loginBox").classList.add("hidden");
   document.getElementById("adminContent").classList.remove("hidden");
   loadAdminData();
+  startAdminOrderWatcher();
 }
 
 async function loadProducts() {
@@ -1789,6 +1796,44 @@ function getPickupTimeText(prefix = "取貨/收貨時段") {
   return `${prefix}：${slot || "未選"}${note ? "，" + note : ""}`;
 }
 
+function setFrontSubmitLoading(isLoading) {
+  const button = document.getElementById("frontSubmitOrderBtn");
+  if (!button) return;
+
+  button.disabled = isLoading;
+  button.classList.toggle("opacity-60", isLoading);
+  button.classList.toggle("cursor-not-allowed", isLoading);
+  button.innerText = isLoading ? "送出中，請稍候..." : "送出訂單";
+}
+
+function confirmFrontOrderBeforeSubmit({ name, phone, delivery, pickupDate, address, note, pickupTimeText, totals }) {
+  const itemLines = cart.map(item => {
+    return `${item.name} x ${item.qty}｜NT$ ${money(Number(item.price || 0) * Number(item.qty || 0))}`;
+  });
+  const shippingLine = totals.shipping.fee > 0
+    ? `宅配運費：NT$ ${money(totals.shipping.fee)}（${totals.shipping.units} 件）`
+    : "宅配運費：NT$ 0";
+
+  return confirm([
+    "請確認訂單內容是否正確：",
+    "",
+    `姓名：${name}`,
+    `電話：${phone}`,
+    `方式：${delivery}`,
+    `日期：${pickupDate}`,
+    pickupTimeText,
+    address ? `地址：${address}` : "",
+    "",
+    "商品：",
+    ...itemLines,
+    shippingLine,
+    `應付總金額：NT$ ${money(totals.total)}`,
+    note ? `備註：${note}` : "",
+    "",
+    "送出後我們會人工確認，不會立即扣款。"
+  ].filter(line => line !== "").join("\n"));
+}
+
 function getPaperTimeText() {
   const slot = document.getElementById("paperTimeSlot")?.value || "";
   const note = document.getElementById("paperTimeNote")?.value.trim() || "";
@@ -1914,6 +1959,8 @@ async function copyFrontOrderInfo() {
 }
 
 async function submitOrder() {
+  if (isSubmittingFrontOrder) return;
+
   const name = document.getElementById("customerName").value.trim();
   const phone = document.getElementById("customerPhone").value.trim();
   const delivery = document.getElementById("delivery").value;
@@ -1926,6 +1973,23 @@ async function submitOrder() {
   if (validationError) return alert(validationError);
 
   const totals = getFrontOrderTotals();
+
+  const confirmed = confirmFrontOrderBeforeSubmit({
+    name,
+    phone,
+    delivery,
+    pickupDate,
+    address,
+    note,
+    pickupTimeText,
+    totals
+  });
+
+  if (!confirmed) return;
+
+  isSubmittingFrontOrder = true;
+  setFrontSubmitLoading(true);
+
   const shippingItem = totals.shipping.fee > 0
     ? [{
         id: "front-shipping-fee",
@@ -1971,6 +2035,8 @@ async function submitOrder() {
 
   const { error } = await db.from("orders").insert([order]);
   if (error) {
+    isSubmittingFrontOrder = false;
+    setFrontSubmitLoading(false);
     alert("訂單送出失敗：" + error.message);
     return;
   }
@@ -1988,6 +2054,8 @@ async function submitOrder() {
   document.getElementById("pickupTimeNote").value = "";
   document.getElementById("address").value = "";
   document.getElementById("note").value = "";
+  isSubmittingFrontOrder = false;
+  setFrontSubmitLoading(false);
 }
 
 async function loadAdminData() {
@@ -1995,6 +2063,8 @@ async function loadAdminData() {
   await loadExpenses();
   await loadIncome();
   await loadProducts();
+  setAdminOrderWatchBaseline();
+  renderAdminOrderNotice();
   showAdminTab("orders");
 }
 
@@ -2005,6 +2075,169 @@ async function loadOrders() {
     return;
   }
   orders = data || [];
+}
+
+function getLatestOrderTime(list = orders) {
+  return (list || []).reduce((latest, order) => {
+    const time = String(order.time || "");
+    return time > latest ? time : latest;
+  }, "");
+}
+
+function setAdminOrderWatchBaseline() {
+  adminKnownLatestOrderTime = getLatestOrderTime(orders);
+}
+
+function startAdminOrderWatcher() {
+  if (adminOrderWatchTimer) clearInterval(adminOrderWatchTimer);
+
+  renderAdminOrderNotice();
+  adminOrderWatchTimer = setInterval(checkNewFrontOrders, 60000);
+}
+
+async function checkNewFrontOrders() {
+  const { data, error } = await db
+    .from("orders")
+    .select("id,time,name,phone,total,delivery,type,status")
+    .order("time", { ascending: false })
+    .limit(12);
+
+  if (error || !data) return;
+
+  const latestTime = getLatestOrderTime(data);
+  const newOrders = data.filter(order => {
+    const isFrontOrder = String(order.id || "").startsWith("ORD") || order.type === "normal";
+    return isFrontOrder &&
+      adminKnownLatestOrderTime &&
+      String(order.time || "") > adminKnownLatestOrderTime;
+  });
+
+  if (newOrders.length > 0) {
+    adminUnseenNewOrders = [...newOrders, ...adminUnseenNewOrders]
+      .filter((order, index, list) => list.findIndex(x => x.id === order.id) === index)
+      .slice(0, 10);
+
+    await loadOrders();
+    renderAdminOrderNotice();
+    notifyAdminNewOrders(newOrders);
+
+    if (currentAdminTab === "orders") renderOrders();
+    if (currentAdminTab === "war") renderWarDashboard();
+    if (currentAdminTab === "stats") renderStats();
+  }
+
+  adminKnownLatestOrderTime = latestTime || adminKnownLatestOrderTime;
+}
+
+function renderAdminOrderNotice() {
+  const box = document.getElementById("adminOrderNotice");
+  if (!box) return;
+
+  const permissionText = "Notification" in window
+    ? (Notification.permission === "granted" ? "桌面提醒已開啟" : "可啟用桌面提醒")
+    : "此瀏覽器不支援桌面提醒";
+
+  box.classList.remove("hidden");
+
+  if (!adminUnseenNewOrders.length) {
+    box.innerHTML = `
+      <div class="bg-green-50 border border-green-200 text-green-800 rounded-2xl p-4 flex justify-between gap-3 flex-wrap items-center">
+        <div>
+          <div class="font-bold">後台新訂單提醒已啟動</div>
+          <div class="text-sm">開著後台時，每 1 分鐘會自動檢查前台新訂單。${permissionText}</div>
+        </div>
+        <button type="button" onclick="enableAdminDesktopNotification()"
+          class="bg-green-700 text-white px-4 py-2 rounded-xl font-bold">
+          啟用桌面提醒
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  const latest = adminUnseenNewOrders[0];
+  box.innerHTML = `
+    <div class="bg-red-50 border-2 border-red-400 text-red-900 rounded-2xl p-4">
+      <div class="flex justify-between gap-3 flex-wrap items-start">
+        <div>
+          <div class="text-xl font-bold">有 ${adminUnseenNewOrders.length} 筆前台新訂單</div>
+          <div class="mt-1">
+            最新：${escapeHtml(latest.name || "未填姓名")}｜${escapeHtml(latest.phone || "")}｜
+            ${escapeHtml(latest.delivery || "")}｜NT$ ${money(latest.total)}
+          </div>
+        </div>
+        <div class="flex gap-2 flex-wrap">
+          <button type="button" onclick="openLatestAdminNewOrder()"
+            class="bg-red-700 text-white px-4 py-2 rounded-xl font-bold">
+            查看新訂單
+          </button>
+          <button type="button" onclick="clearAdminNewOrderNotice()"
+            class="bg-white text-red-700 border border-red-300 px-4 py-2 rounded-xl font-bold">
+            已知道
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function enableAdminDesktopNotification() {
+  if (!("Notification" in window)) {
+    alert("這個瀏覽器不支援桌面提醒");
+    return;
+  }
+
+  const permission = await Notification.requestPermission();
+  alert(permission === "granted" ? "桌面提醒已開啟" : "桌面提醒未開啟");
+  renderAdminOrderNotice();
+}
+
+function notifyAdminNewOrders(newOrders) {
+  const first = newOrders[0];
+  const title = `陳媽媽肉粽：${newOrders.length} 筆新訂單`;
+  const body = `${first.name || "未填姓名"}｜${first.delivery || ""}｜NT$ ${money(first.total)}`;
+
+  if ("Notification" in window && Notification.permission === "granted") {
+    new Notification(title, { body });
+  }
+
+  playAdminNoticeSound();
+}
+
+function playAdminNoticeSound() {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+
+    const context = new AudioContext();
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+
+    oscillator.type = "sine";
+    oscillator.frequency.value = 880;
+    gain.gain.value = 0.08;
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start();
+    oscillator.stop(context.currentTime + 0.22);
+  } catch (error) {
+    // Some browsers block sound until the user interacts with the page.
+  }
+}
+
+function openLatestAdminNewOrder() {
+  const latest = adminUnseenNewOrders[0];
+  if (!latest) return;
+
+  const id = latest.id;
+  adminUnseenNewOrders = adminUnseenNewOrders.filter(order => order.id !== id);
+  renderAdminOrderNotice();
+  openOrderInOrders(id);
+}
+
+function clearAdminNewOrderNotice() {
+  adminUnseenNewOrders = [];
+  renderAdminOrderNotice();
 }
 
 async function loadExpenses() {
@@ -2031,6 +2264,7 @@ async function loadIncome() {
 }  
 
 function showAdminTab(tab) {
+  currentAdminTab = tab;
   if (tab === "orders") renderOrders();
   if (tab === "war") renderWarDashboard();
   if (tab === "paper") renderPaperOrder();
