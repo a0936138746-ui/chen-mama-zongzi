@@ -2329,6 +2329,7 @@ function openOrderInOrders(orderId) {
   window.expandedOrderIds[String(orderId || "")] = true;
   window.orderStatusFilter = "";
   window.orderDeliveryFilter = "";
+  window.orderSourceFilter = "";
   window.orderQuickFilter = "";
   showAdminTab("orders");
 }
@@ -2338,6 +2339,7 @@ function setOrderQuickFilter(type) {
   window.highlightOrderId = "";
   window.orderStatusFilter = "";
   window.orderDeliveryFilter = "";
+  window.orderSourceFilter = "";
   window.orderQuickFilter = type;
 
   const payment = document.getElementById("orderPaymentFilter");
@@ -2358,12 +2360,15 @@ function clearOrderFilters() {
   window.highlightOrderId = "";
   window.orderStatusFilter = "";
   window.orderDeliveryFilter = "";
+  window.orderSourceFilter = "";
   window.orderQuickFilter = "";
 
   const search = document.getElementById("orderSearch");
   if (search) search.value = "";
   const payment = document.getElementById("orderPaymentFilter");
   if (payment) payment.value = "";
+  const source = document.getElementById("orderSourceFilter");
+  if (source) source.value = "";
 
   renderOrders();
 }
@@ -2823,6 +2828,37 @@ function renderOrderBadges(o) {
   `;
 }
 
+function getOrderSourceBadge(o) {
+  const sourceMap = {
+    normal: {
+      text: "前台訂單",
+      cls: "bg-blue-100 text-blue-700 border-blue-300"
+    },
+    paper: {
+      text: "紙本/電話",
+      cls: "bg-amber-100 text-amber-800 border-amber-300"
+    },
+    web: {
+      text: "官網匯入",
+      cls: "bg-purple-100 text-purple-700 border-purple-300"
+    },
+    project: {
+      text: "專案/特殊訂單",
+      cls: "bg-indigo-100 text-indigo-700 border-indigo-300"
+    },
+    quote: {
+      text: "報價單轉訂單",
+      cls: "bg-emerald-100 text-emerald-700 border-emerald-300"
+    }
+  };
+  const source = sourceMap[o.type] || {
+    text: "未分類訂單",
+    cls: "bg-gray-100 text-gray-700 border-gray-300"
+  };
+
+  return `<span class="inline-block border rounded-full px-3 py-1 text-sm font-bold ${source.cls}">${source.text}</span>`;
+}
+
 function getOrderSortRank(o) {
   if (isClosedOrder(o)) return 7;
 
@@ -2856,11 +2892,13 @@ function renderOrders() {
   const paymentFilter = document.getElementById("orderPaymentFilter")?.value || "";
   const statusFilter = document.getElementById("orderStatusFilter")?.value || window.orderStatusFilter || "";
   const deliveryFilter = document.getElementById("orderDeliveryFilter")?.value || window.orderDeliveryFilter || "";
+  const sourceFilter = document.getElementById("orderSourceFilter")?.value || window.orderSourceFilter || "";
   const quickFilter = window.orderQuickFilter || "";
 
   window.orderSearchKeyword = keyword;
   window.orderStatusFilter = statusFilter;
   window.orderDeliveryFilter = deliveryFilter;
+  window.orderSourceFilter = sourceFilter;
 
   const filteredOrders = orders
     .filter(o => {
@@ -2883,6 +2921,9 @@ function renderOrders() {
         o.status === statusFilter ||
         (statusFilter === "已完成" && (o.status === "已取貨" || o.status === "已宅配"));
       const matchDelivery = !deliveryFilter || o.delivery === deliveryFilter;
+      const matchSource = !sourceFilter ||
+        (sourceFilter === "normal" && isFrontOrder(o)) ||
+        o.type === sourceFilter;
       const matchQuick =
         !quickFilter ||
         (quickFilter === "today" && !isClosedOrder(o) && daysFromToday(getProcessDate(o)) === 0) ||
@@ -2896,7 +2937,7 @@ function renderOrders() {
         (quickFilter === "eggYolk" && !isClosedOrder(o) && hasEggYolkRequest(o)) ||
         (quickFilter === "stockShortage" && !isClosedOrder(o) && hasNearStockShortage(o));
 
-      return matchKeyword && matchPayment && matchStatus && matchDelivery && matchQuick;
+      return matchKeyword && matchPayment && matchStatus && matchDelivery && matchSource && matchQuick;
     })
     .sort((a, b) => {
       const rankDiff = getOrderSortRank(a) - getOrderSortRank(b);
@@ -2920,7 +2961,7 @@ function renderOrders() {
   panel.innerHTML = `
     <h2 class="text-2xl font-bold mb-4">訂單管理</h2>
 
-    <div class="grid md:grid-cols-6 gap-3 mb-4">
+    <div class="grid md:grid-cols-7 gap-3 mb-4">
       <input
         id="orderSearch"
         placeholder="搜尋姓名 / 電話 / 訂單編號 / 地址 / 商品"
@@ -2969,6 +3010,22 @@ function renderOrders() {
           <option value="${s}" ${paymentFilter === s ? "selected" : ""}>
             ${s || "付款篩選"}
           </option>
+        `).join("")}
+      </select>
+
+      <select
+        id="orderSourceFilter"
+        class="border p-3 rounded-xl"
+        onchange="window.orderSourceFilter=this.value; renderOrders()">
+        ${[
+          ["", "來源篩選"],
+          ["normal", "前台訂單"],
+          ["paper", "紙本/電話"],
+          ["web", "官網匯入"],
+          ["project", "專案/特殊"],
+          ["quote", "報價轉單"]
+        ].map(([value, label]) => `
+          <option value="${value}" ${sourceFilter === value ? "selected" : ""}>${label}</option>
         `).join("")}
       </select>
     </div>
@@ -3074,8 +3131,10 @@ function orderCard(o) {
       : ""
   }
 ">
-      ${isProject ? `<div class="mb-3 inline-block bg-indigo-100 text-indigo-700 border border-indigo-300 rounded-full px-3 py-1 text-sm font-bold">🧪 專案/特殊訂單</div>` : ""}
-      ${isQuote ? `<div class="mb-3 inline-block bg-emerald-100 text-emerald-700 border border-emerald-300 rounded-full px-3 py-1 text-sm font-bold">報價單轉訂單</div>` : ""}
+      <div class="mb-3 flex gap-2 flex-wrap">
+        ${getOrderSourceBadge(o)}
+        ${isFrontOrder(o) && !isClosedOrder(o) ? `<span class="inline-block border rounded-full px-3 py-1 text-sm font-bold bg-red-100 text-red-700 border-red-300">前台待處理</span>` : ""}
+      </div>
       ${renderOrderBadges(o)}
       ${hasEggYolkRequest(o) ? `
         <div class="mb-3 bg-yellow-100 border-2 border-yellow-500 text-yellow-900 rounded-xl p-3 font-bold">
