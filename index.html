@@ -4377,8 +4377,13 @@ function renderQuoteOrder() {
 
         <div id="quoteRows" class="space-y-3 mt-3"></div>
 
+        <input id="quoteFinalTotal" class="quick-number-input border p-3 rounded-xl w-full mt-4 text-xl font-bold"
+          type="number" inputmode="numeric" placeholder="最終報價金額，可留空自動加總"
+          data-keypad-title="輸入最終報價金額"
+          onfocus="openNumberKeypad(this)" onclick="openNumberKeypad(this)" oninput="renderQuotePreview()">
+
         <textarea id="quoteNote" class="border p-3 rounded-xl w-full mt-4" rows="3"
-          placeholder="注意事項 / 客戶備註" oninput="renderQuotePreview()"></textarea>
+          placeholder="注意事項 / 客戶備註，例如優惠、贈送、公益不收費、需加熱" oninput="renderQuotePreview()"></textarea>
 
         <div class="grid sm:grid-cols-3 gap-3 mt-4">
           <button type="button" onclick="printQuote()" class="bg-blue-700 text-white px-4 py-3 rounded-xl font-bold">
@@ -4404,25 +4409,27 @@ function renderQuoteOrder() {
 
 function addQuoteRow() {
   const row = document.createElement("div");
-  row.className = "quoteRow grid md:grid-cols-[1fr_1fr_90px_110px_1fr_auto] gap-2 bg-gray-50 p-3 rounded-xl";
+  row.className = "quoteRow grid grid-cols-1 gap-2 bg-gray-50 p-3 rounded-xl";
   row.innerHTML = `
-    <select class="quoteProduct border p-3 rounded-xl" onchange="onQuoteProductChange(this)">
+    <select class="quoteProduct border p-3 rounded-xl w-full" onchange="onQuoteProductChange(this)">
       ${products.filter(p => p.active !== false && p.type !== "fee").map(p => `
         <option value="${p.id}">${escapeHtml(p.name)}</option>
       `).join("")}
       <option value="__custom__">特殊訂單 / 公益 / 客製</option>
     </select>
-    <input class="quoteCustomName hidden border p-3 rounded-xl" placeholder="特殊品項，例如 DIY材料包 / 加蛋黃 / 包花生 / 公益贈送"
+    <input class="quoteCustomName hidden border p-3 rounded-xl w-full" placeholder="特殊品項，例如 DIY材料包 / 加蛋黃 / 包花生 / 公益贈送"
       oninput="renderQuotePreview()">
-    <input class="quoteQty quick-number-input border p-3 rounded-xl" type="number" inputmode="numeric"
-      value="1" min="1" data-keypad-title="輸入數量"
-      onfocus="openNumberKeypad(this)" onclick="openNumberKeypad(this)" oninput="renderQuotePreview()">
-    <input class="quotePrice quick-number-input border p-3 rounded-xl" type="number" inputmode="numeric"
-      placeholder="單價" data-keypad-title="輸入單價"
-      onfocus="openNumberKeypad(this)" onclick="openNumberKeypad(this)" oninput="renderQuotePreview()">
-    <input class="quoteItemNote border p-3 rounded-xl" placeholder="備註，例如需要加熱" oninput="renderQuotePreview()">
+    <div class="grid grid-cols-2 gap-2">
+      <input class="quoteQty quick-number-input border p-3 rounded-xl" type="number" inputmode="numeric"
+        value="1" min="1" data-keypad-title="輸入數量"
+        onfocus="openNumberKeypad(this)" onclick="openNumberKeypad(this)" oninput="renderQuotePreview()">
+      <input class="quotePrice quick-number-input border p-3 rounded-xl" type="number" inputmode="numeric"
+        placeholder="單價" data-keypad-title="輸入單價"
+        onfocus="openNumberKeypad(this)" onclick="openNumberKeypad(this)" oninput="renderQuotePreview()">
+    </div>
+    <input class="quoteItemNote border p-3 rounded-xl w-full" placeholder="單項備註，例如贈送、優惠、需要加熱" oninput="renderQuotePreview()">
     <button type="button" onclick="this.parentElement.remove(); renderQuotePreview();"
-      class="bg-red-600 text-white px-3 py-2 rounded-xl font-bold">刪除</button>
+      class="bg-red-600 text-white px-3 py-2 rounded-xl font-bold">刪除此品項</button>
   `;
 
   document.getElementById("quoteRows").appendChild(row);
@@ -4476,7 +4483,11 @@ function getQuoteItems() {
 
 function getQuoteData() {
   const items = getQuoteItems();
-  const total = items.reduce((sum, item) => sum + item.qty * item.price, 0);
+  const subtotal = items.reduce((sum, item) => sum + item.qty * item.price, 0);
+  const finalTotalInput = document.getElementById("quoteFinalTotal")?.value;
+  const finalTotal = finalTotalInput !== "" && finalTotalInput !== undefined
+    ? Number(finalTotalInput || 0)
+    : subtotal;
 
   return {
     company: document.getElementById("quoteCompany")?.value.trim() || "",
@@ -4490,7 +4501,9 @@ function getQuoteData() {
     deliveryNote: document.getElementById("quoteDeliveryNote")?.value.trim() || "",
     note: document.getElementById("quoteNote")?.value.trim() || "",
     items,
-    total
+    subtotal,
+    total: finalTotal,
+    hasManualTotal: finalTotalInput !== "" && finalTotalInput !== undefined
   };
 }
 
@@ -4571,6 +4584,13 @@ function renderQuotePreview() {
             <td class="p-4 border text-center font-bold text-2xl" colspan="3">總合計</td>
             <td class="p-4 border text-center font-bold text-3xl" colspan="2">${money(q.total)}元</td>
           </tr>
+          ${q.hasManualTotal ? `
+            <tr>
+              <td class="p-3 border text-right text-sm text-stone-600" colspan="5">
+                品項原始小計 ${money(q.subtotal)} 元，最終報價依優惠 / 贈送 / 公益方案調整。
+              </td>
+            </tr>
+          ` : ""}
         </tbody>
       </table>
 
@@ -4651,6 +4671,7 @@ async function saveQuoteAsOrder() {
     `公司：${q.company || "未填"}`,
     `聯絡人：${q.contact || "未填"}`,
     `取貨/收貨時段：${q.deliveryTime}`,
+    q.hasManualTotal ? `報價金額調整：品項小計 NT$ ${money(q.subtotal)}，最終報價 NT$ ${money(q.total)}` : "",
     q.deliveryNote ? `送達備註：${q.deliveryNote}` : "",
     q.note ? `報價備註：${q.note}` : ""
   ].filter(Boolean).join("\n");
