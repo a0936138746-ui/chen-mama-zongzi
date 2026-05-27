@@ -305,9 +305,21 @@
 
           <div id="cartBox" class="bg-[#fff8ed] p-4 rounded-2xl mb-4 border border-amber-100">尚未加入商品</div>
 
-          <div class="flex justify-between items-end border-t pt-4 mb-4">
-            <div class="text-gray-500">總金額</div>
-            <div class="text-3xl font-bold text-amber-700">NT$ <span id="totalAmount">0</span></div>
+          <div id="frontShippingSummary" class="hidden bg-blue-50 border border-blue-200 text-blue-900 rounded-2xl p-3 mb-4 text-sm"></div>
+
+          <div class="space-y-2 border-t pt-4 mb-4">
+            <div class="flex justify-between text-stone-600">
+              <span>商品小計</span>
+              <span>NT$ <span id="subtotalAmount">0</span></span>
+            </div>
+            <div class="flex justify-between text-stone-600">
+              <span>宅配運費</span>
+              <span id="shippingFeeText">NT$ 0</span>
+            </div>
+            <div class="flex justify-between items-end pt-2 border-t border-amber-100">
+              <div class="text-gray-500">應付總金額</div>
+              <div class="text-3xl font-bold text-amber-700">NT$ <span id="totalAmount">0</span></div>
+            </div>
           </div>
 
           <button onclick="submitOrder()" class="mobile-action-btn bg-green-700 hover:bg-green-800 text-white px-6 py-4 rounded-xl font-bold w-full text-lg shadow-lg shadow-green-900/10">
@@ -1504,14 +1516,19 @@ function getFrontOrderTotals() {
 function renderCart() {
   const box = document.getElementById("cartBox");
   const totalBox = document.getElementById("totalAmount");
+  const subtotalBox = document.getElementById("subtotalAmount");
+  const shippingFeeText = document.getElementById("shippingFeeText");
+  const totals = getFrontOrderTotals();
 
   if (cart.length === 0) {
     box.innerHTML = `<div class="text-gray-500 text-center py-6">尚未加入商品</div>`;
+    if (subtotalBox) subtotalBox.innerText = "0";
+    if (shippingFeeText) shippingFeeText.innerText = "NT$ 0";
     totalBox.innerText = "0";
+    renderFrontShippingSummary(totals.shipping);
     return;
   }
 
-  const totals = getFrontOrderTotals();
   box.innerHTML = cart.map((item, i) => {
     const sub = item.price * item.qty;
     return `
@@ -1546,7 +1563,46 @@ function renderCart() {
     </div>
   `;
 
+  if (subtotalBox) subtotalBox.innerText = money(totals.subtotal);
+  if (shippingFeeText) {
+    shippingFeeText.innerHTML = totals.shipping.fee > 0
+      ? `<span class="font-bold text-blue-700">NT$ ${money(totals.shipping.fee)}</span>`
+      : "NT$ 0";
+  }
+  renderFrontShippingSummary(totals.shipping);
   totalBox.innerText = money(totals.total);
+}
+
+function renderFrontShippingSummary(shipping) {
+  const shippingSummary = document.getElementById("frontShippingSummary");
+  const delivery = document.getElementById("delivery")?.value || "自取";
+  if (!shippingSummary) return;
+
+  if (delivery !== "宅配") {
+    shippingSummary.classList.add("hidden");
+    shippingSummary.innerHTML = "";
+    return;
+  }
+
+  shippingSummary.classList.remove("hidden");
+
+  if (cart.length === 0) {
+    shippingSummary.innerHTML = `
+      <div class="font-bold mb-1">宅配運費說明</div>
+      <div>一般粽每 40 顆一件，禮盒每 2 盒一件，每件 NT$260。</div>
+    `;
+    return;
+  }
+
+  shippingSummary.innerHTML = `
+    <div class="flex justify-between gap-3 font-bold">
+      <span>宅配目前 ${shipping.units} 件</span>
+      <span>NT$ ${money(shipping.fee)}</span>
+    </div>
+    <div class="mt-1 text-xs leading-relaxed">
+      ${shipping.details.join("；") || "目前沒有需要計算的宅配件數"}
+    </div>
+  `;
 }
 
 function removeCart(i) {
