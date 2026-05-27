@@ -1612,6 +1612,7 @@ function setOrderStatusFilter(value) {
 
 function clearOrderFilters() {
   window.orderSearchKeyword = "";
+  window.orderSearchDraft = "";
   window.highlightOrderId = "";
   window.orderStatusFilter = "";
   window.orderDeliveryFilter = "";
@@ -1638,40 +1639,24 @@ function hasBopomofoDraft(value) {
 
 function handleOrderSearchCompositionEnd(input) {
   window.orderSearchComposing = false;
-  window.orderSearchKeyword = input.value;
-
-  if (hasBopomofoDraft(input.value)) {
-    return;
-  }
-
-  window.restoreOrderSearchFocus = true;
-  renderOrders();
+  window.orderSearchDraft = input.value;
 }
 
 function handleOrderSearchInput(input) {
-  window.orderSearchKeyword = input.value;
-
-  if (window.orderSearchComposing || hasBopomofoDraft(input.value)) {
-    return;
-  }
-
-  if (window.orderSearchTimer) {
-    clearTimeout(window.orderSearchTimer);
-  }
-
-  window.orderSearchTimer = setTimeout(() => {
-    window.restoreOrderSearchFocus = true;
-    renderOrders();
-  }, 600);
+  window.orderSearchDraft = input.value;
 }
 
 function submitOrderSearch(input) {
+  if (!input) return;
+
   if (window.orderSearchTimer) {
     clearTimeout(window.orderSearchTimer);
   }
 
   window.orderSearchComposing = false;
   window.orderSearchKeyword = input.value;
+  window.orderSearchDraft = input.value;
+  window.orderScrollTopAfterRender = window.scrollY;
   window.restoreOrderSearchFocus = true;
   renderOrders();
 }
@@ -2124,10 +2109,8 @@ function getOrderSortDate(o) {
 }
 
 function renderOrders() {
-  const searchInput = document.getElementById("orderSearch");
-  const keyword = searchInput
-    ? searchInput.value.trim()
-    : (window.orderSearchKeyword || "");
+  const keyword = (window.orderSearchKeyword || "").trim();
+  const searchDraft = window.orderSearchDraft ?? keyword;
   const paymentFilter = document.getElementById("orderPaymentFilter")?.value || "";
   const statusFilter = document.getElementById("orderStatusFilter")?.value || window.orderStatusFilter || "";
   const deliveryFilter = document.getElementById("orderDeliveryFilter")?.value || window.orderDeliveryFilter || "";
@@ -2195,18 +2178,24 @@ function renderOrders() {
   panel.innerHTML = `
     <h2 class="text-2xl font-bold mb-4">訂單管理</h2>
 
-    <div class="grid md:grid-cols-5 gap-3 mb-4">
+    <div class="grid md:grid-cols-6 gap-3 mb-4">
       <input
         id="orderSearch"
         placeholder="搜尋姓名 / 電話 / 訂單編號 / 地址 / 商品"
         class="border p-3 rounded-xl md:col-span-2"
-        value="${keyword}"
+        value="${escapeHtml(searchDraft)}"
         oncompositionstart="handleOrderSearchCompositionStart()"
         oncompositionend="handleOrderSearchCompositionEnd(this)"
         oninput="handleOrderSearchInput(this)"
         onkeydown="handleOrderSearchKeydown(event, this)"
-        onblur="submitOrderSearch(this)"
       >
+
+      <button
+        type="button"
+        onclick="submitOrderSearch(document.getElementById('orderSearch'))"
+        class="bg-blue-700 text-white px-4 py-2 rounded-xl font-bold">
+        搜尋
+      </button>
 
       <select
         id="orderStatusFilter"
@@ -2290,6 +2279,14 @@ function renderOrders() {
       input.focus();
       const pos = input.value.length;
       input.setSelectionRange(pos, pos);
+    }, 0);
+  }
+
+  if (typeof window.orderScrollTopAfterRender === "number") {
+    const top = window.orderScrollTopAfterRender;
+    window.orderScrollTopAfterRender = null;
+    setTimeout(() => {
+      window.scrollTo({ top, behavior: "auto" });
     }, 0);
   }
 }
