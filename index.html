@@ -2969,6 +2969,36 @@ function getShippingNoteText(o) {
   return lines.join("\n");
 }
 
+function hasHeatRequest(o) {
+  const text = [
+    o.note || "",
+    ...(o.items || []).flatMap(item => [
+      item.name || "",
+      item.raw_name || "",
+      item.note || ""
+    ])
+  ].join(" ");
+
+  return /加熱|需熱|需要熱|幫.*熱|熱一下|加溫|需加溫|蒸熱|現場熱|取餐.*熱|熱食/.test(text);
+}
+
+function getHeatRequestText(o) {
+  if (!hasHeatRequest(o)) return "";
+
+  const text = [
+    getShippingNoteText(o),
+    ...(o.items || []).map(item => item.note || "")
+  ].join("\n");
+
+  const lines = cleanShippingText(text)
+    .split("\n")
+    .map(line => line.trim())
+    .filter(Boolean)
+    .filter(line => /加熱|需熱|需要熱|幫.*熱|熱一下|加溫|需加溫|蒸熱|現場熱|取餐.*熱|熱食/.test(line));
+
+  return lines.length ? [...new Set(lines)].join(" / ") : "需要加熱，出貨前請確認";
+}
+
 function getOrderTimeSlotInfo(o) {
   const text = cleanShippingText(o.note);
   const match = text.match(/取貨\/收貨時段\s*[:：]\s*([^\n]+)/);
@@ -3007,6 +3037,10 @@ function getShippingReminderList(o) {
 
   if (hasEggYolkRequest(o)) {
     reminders.push(needsEggYolkPrep(o) ? "蛋黃單先備料" : "加蛋黃+10");
+  }
+
+  if (hasHeatRequest(o)) {
+    reminders.push("加熱提醒");
   }
 
   const stockShortage = getStockShortageInfo(o);
@@ -3093,6 +3127,13 @@ function getShippingTags(o) {
     });
   }
 
+  if (hasHeatRequest(o)) {
+    tags.push({
+      text: "需要加熱",
+      cls: "bg-orange-100 text-orange-900 border-orange-500"
+    });
+  }
+
   if (getUnpaidAmount(o) > 0) {
     tags.push({
       text: `未收 NT$ ${money(getUnpaidAmount(o))}`,
@@ -3145,7 +3186,9 @@ function getShippingPriority(o) {
   if (processDays !== null && processDays < 0) return "A 逾期";
   if (o.delivery === "宅配" && shipDays !== null && shipDays < 0) return "A 逾期";
   if (hasNearStockShortage(o)) return "A 出貨近缺貨";
+  if (hasHeatRequest(o) && (processDays === 0 || (o.delivery === "宅配" && shipDays === 0))) return "B 今日加熱";
   if (processDays === 0 || (o.delivery === "宅配" && shipDays === 0)) return "B 今日";
+  if (hasHeatRequest(o) && (processDays === 1 || (o.delivery === "宅配" && shipDays === 1))) return "C 明日加熱";
   if (processDays === 1 || (o.delivery === "宅配" && shipDays === 1)) return "C 明日";
   if (
     (processDays !== null && processDays > 1 && processDays <= 3) ||
@@ -3337,6 +3380,11 @@ function renderShippingList() {
                   🥚 加蛋黃特殊單｜一顆 +10 元｜${needsEggYolkPrep(o) ? "請先備料，避免出貨前來不及加" : "請出貨前確認"}
                 </div>
               ` : ""}
+              ${hasHeatRequest(o) ? `
+                <div class="mb-3 bg-orange-100 border-2 border-orange-500 text-orange-950 rounded-xl p-4 font-bold text-lg">
+                  🔥 加熱提醒｜${getHeatRequestText(o)}
+                </div>
+              ` : ""}
               ${hasNearStockShortage(o) ? `
                 <div class="mb-3 bg-red-100 border-2 border-red-500 text-red-900 rounded-xl p-3 font-bold">
                   ⚠️ 出貨近但庫存不足｜${getStockShortageInfo(o).text}
@@ -3434,6 +3482,7 @@ function exportShippingExcel() {
     "商品明細",
     "總數量",
     "總金額",
+    "加熱提醒",
     "備註",
     "訂單編號",
     "狀態"
@@ -3454,6 +3503,7 @@ function exportShippingExcel() {
     getShippingItemText(o),
     getShippingTotalQty(o),
     Number(o.total || 0),
+    getHeatRequestText(o),
     getShippingNoteText(o),
     o.id || "",
     o.status || ""
@@ -3477,13 +3527,14 @@ function exportShippingExcel() {
     [
       getShippingTags(o).map(tag => tag.text).join(" / "),
       getShippingReminder(o),
+      getHeatRequestText(o) ? `🔥 加熱提醒：${getHeatRequestText(o)}` : "",
       getShippingNoteText(o)
     ].filter(Boolean).join("\n")
   ]);
 
   const printSheet = XLSX.utils.aoa_to_sheet([
     ["陳媽媽出貨 / 取貨清單"],
-    [`匯出日期：${todayStr()}　筆數：${list.length}　排序：逾期、今日、明日、三天內、蛋黃預備、特殊備註、大單`],
+    [`匯出日期：${todayStr()}　筆數：${list.length}　排序：逾期、今日、明日、三天內、加熱、蛋黃預備、特殊備註、大單`],
     printHeaders,
     ...printRows
   ]);
