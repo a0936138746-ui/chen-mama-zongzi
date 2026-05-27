@@ -1198,6 +1198,7 @@ function renderProducts() {
 
   frontProducts.forEach(p => {
     const card = document.createElement("div");
+    const displayName = getFrontProductDisplayName(p);
     const tag = getFrontProductTag(p);
     const description = getFrontProductDescription(p);
     const features = getFrontProductFeatures(p);
@@ -1215,7 +1216,7 @@ function renderProducts() {
               </span>
             `).join("")}
           </div>
-          <h3 class="text-xl md:text-2xl font-bold leading-snug text-stone-900 break-words">${p.name}</h3>
+          <h3 class="text-xl md:text-2xl font-bold leading-snug text-stone-900 break-words">${displayName}</h3>
           <div class="text-sm text-stone-500 mt-1">${getFrontProductMoodText(p)}</div>
         </div>
         <div class="sm:text-right shrink-0">
@@ -1250,8 +1251,57 @@ function renderProducts() {
   });
 }
 
+function normalizeFrontProductName(name) {
+  return String(name || "")
+    .replace(/紅豆檢粽/g, "紅豆鹼粽")
+    .replace(/檢粽/g, "鹼粽")
+    .replace(/素粽/g, "素食粽")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getFrontBaseProductName(product) {
+  const name = normalizeFrontProductName(product?.name);
+
+  if (name.includes("豪華")) return "豪華粽";
+  if (name.includes("南部")) return "南部粽";
+  if (name.includes("北部")) return "北部粽";
+  if (name.includes("素食") || name.includes("素")) return "素食粽";
+  if (name.includes("紅豆") && name.includes("鹼")) return "紅豆鹼粽";
+  if (name.includes("鹼")) return "原味鹼粽";
+
+  return name;
+}
+
+function getFrontProductPackCount(product) {
+  const name = normalizeFrontProductName(product?.name);
+  const match = name.match(/(\d+)\s*(?:入|粒|顆)/);
+  return match ? Number(match[1]) : 0;
+}
+
+function getFrontProductDisplayName(product) {
+  const rawName = normalizeFrontProductName(product?.name);
+  const baseName = getFrontBaseProductName(product);
+  const category = getFrontProductCategory(product);
+  const packCount = getFrontProductPackCount(product);
+
+  if (category === "gift") {
+    return packCount
+      ? `${baseName}禮盒｜${packCount} 粒裝`
+      : `${baseName}禮盒`;
+  }
+
+  if (category === "bulk") {
+    return packCount
+      ? `${baseName}｜${packCount} 粒裝`
+      : rawName;
+  }
+
+  return baseName || rawName;
+}
+
 function getFrontProductDescription(product) {
-  const name = String(product.name || "");
+  const name = normalizeFrontProductName(product.name);
 
   if (name.includes("南部")) return "水煮工法，軟Q濕潤，古早味。配料：瘦肉、肥肉、花生、香菇絲、金勾蝦、自製油蔥酥。";
   if (name.includes("北部")) return "先炒後蒸，粒粒分明，香氣濃郁。配料：菜脯、瘦肉、香菇絲、金勾蝦、自製油蔥酥。";
@@ -1264,7 +1314,7 @@ function getFrontProductDescription(product) {
 }
 
 function getFrontProductShortName(product) {
-  const name = String(product.name || "");
+  const name = normalizeFrontProductName(product.name);
   if (name.includes("南部")) return "南部粽";
   if (name.includes("北部")) return "北部粽";
   if (name.includes("豪華")) return "豪華粽";
@@ -1275,7 +1325,7 @@ function getFrontProductShortName(product) {
 }
 
 function getFrontProductIcon(product) {
-  const name = String(product.name || "");
+  const name = normalizeFrontProductName(product.name);
   if (name.includes("豪華")) return "♛";
   if (name.includes("紅豆")) return "豆";
   if (name.includes("鹼") || name.includes("檢")) return "甜";
@@ -1286,7 +1336,7 @@ function getFrontProductIcon(product) {
 }
 
 function getFrontProductMoodText(product) {
-  const name = String(product.name || "");
+  const name = normalizeFrontProductName(product.name);
   if (name.includes("豪華")) return "用料升級，送禮首選";
   if (name.includes("南部")) return "水煮軟Q，古早味";
   if (name.includes("北部")) return "粒粒分明，香氣濃郁";
@@ -1297,7 +1347,7 @@ function getFrontProductMoodText(product) {
 }
 
 function getFrontProductVisualClass(product) {
-  const name = String(product.name || "");
+  const name = normalizeFrontProductName(product.name);
 
   if (name.includes("豪華")) return "bg-gradient-to-br from-yellow-100 via-amber-100 to-orange-100";
   if (name.includes("南部")) return "bg-gradient-to-br from-amber-100 via-yellow-50 to-lime-100";
@@ -1310,7 +1360,7 @@ function getFrontProductVisualClass(product) {
 }
 
 function getFrontProductFeatures(product) {
-  const name = String(product.name || "");
+  const name = normalizeFrontProductName(product.name);
 
   if (name.includes("北部")) return ["使用桂竹葉包製", "米粒Q香、先炒後蒸", "傳統北部粽香氣"];
   if (name.includes("南部")) return ["使用桂竹葉包製", "水煮軟Q、濕潤古早味", "花生與油蔥酥香氣"];
@@ -1323,7 +1373,7 @@ function getFrontProductFeatures(product) {
 }
 
 function getFrontProductBadges(product) {
-  const name = String(product.name || "");
+  const name = normalizeFrontProductName(product.name);
 
   if (name.includes("北部")) return ["熱門", "回購推薦", "古早味"];
   if (name.includes("南部")) return ["古早味", "長輩喜歡", "回購推薦"];
@@ -1341,10 +1391,13 @@ function setFrontProductCategory(category) {
 }
 
 function getFrontProductCategory(product) {
-  const name = String(product.name || "");
+  const name = normalizeFrontProductName(product?.name);
   const lowerName = name.toLowerCase();
 
+  if (!product) return "single";
   if (lowerName.includes("diy") || name.includes("DIY") || name.includes("材料包")) return "hidden";
+  if (product.type === "fee" || name.includes("運費")) return "hidden";
+  if (/加.*蛋黃|蛋黃加購|單顆蛋黃|一顆蛋黃/.test(name)) return "hidden";
   if (product.type === "box" || name.includes("禮盒") || name.includes("盒")) return "gift";
   if (
     name.includes("整箱") ||
@@ -1360,7 +1413,7 @@ function getFrontProductCategory(product) {
 }
 
 function getFrontProductTag(product) {
-  const name = String(product.name || "");
+  const name = normalizeFrontProductName(product.name);
   const category = getFrontProductCategory(product);
 
   if (category === "gift") return "禮盒";
@@ -1385,7 +1438,13 @@ function addToCart(id) {
 
   const existing = cart.find(x => Number(x.id) === Number(id));
   if (existing) existing.qty += qty;
-  else cart.push({ id: p.id, name: p.name, price: getPriceBySource(p), qty });
+  else cart.push({
+    id: p.id,
+    name: getFrontProductDisplayName(p),
+    raw_name: p.name,
+    price: getPriceBySource(p),
+    qty
+  });
 
   renderCart();
 }
