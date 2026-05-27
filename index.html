@@ -1632,9 +1632,18 @@ function handleOrderSearchCompositionStart() {
   }
 }
 
+function hasBopomofoDraft(value) {
+  return /[\u3100-\u312F\u02C7\u02CA\u02CB\u02D9ˊˇˋ˙]/.test(String(value || ""));
+}
+
 function handleOrderSearchCompositionEnd(input) {
   window.orderSearchComposing = false;
   window.orderSearchKeyword = input.value;
+
+  if (hasBopomofoDraft(input.value)) {
+    return;
+  }
+
   window.restoreOrderSearchFocus = true;
   renderOrders();
 }
@@ -1642,7 +1651,7 @@ function handleOrderSearchCompositionEnd(input) {
 function handleOrderSearchInput(input) {
   window.orderSearchKeyword = input.value;
 
-  if (window.orderSearchComposing) {
+  if (window.orderSearchComposing || hasBopomofoDraft(input.value)) {
     return;
   }
 
@@ -1653,7 +1662,25 @@ function handleOrderSearchInput(input) {
   window.orderSearchTimer = setTimeout(() => {
     window.restoreOrderSearchFocus = true;
     renderOrders();
-  }, 250);
+  }, 600);
+}
+
+function submitOrderSearch(input) {
+  if (window.orderSearchTimer) {
+    clearTimeout(window.orderSearchTimer);
+  }
+
+  window.orderSearchComposing = false;
+  window.orderSearchKeyword = input.value;
+  window.restoreOrderSearchFocus = true;
+  renderOrders();
+}
+
+function handleOrderSearchKeydown(event, input) {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    submitOrderSearch(input);
+  }
 }
 
 function isOrderDetailOpen(orderId) {
@@ -2171,6 +2198,8 @@ function renderOrders() {
         oncompositionstart="handleOrderSearchCompositionStart()"
         oncompositionend="handleOrderSearchCompositionEnd(this)"
         oninput="handleOrderSearchInput(this)"
+        onkeydown="handleOrderSearchKeydown(event, this)"
+        onblur="submitOrderSearch(this)"
       >
 
       <select
