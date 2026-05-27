@@ -70,6 +70,26 @@
       outline: 3px solid rgba(217, 119, 6, 0.18);
       border-color: #d97706;
     }
+
+    @media print {
+      body.quote-print-mode * {
+        visibility: hidden;
+      }
+
+      body.quote-print-mode #quotePreview,
+      body.quote-print-mode #quotePreview * {
+        visibility: visible;
+      }
+
+      body.quote-print-mode #quotePreview {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        box-shadow: none;
+        border: 0;
+      }
+    }
   </style>
 </head>
 
@@ -221,6 +241,7 @@
       <button onclick="showAdminTab('orders')" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">訂單管理</button>
       <button onclick="showAdminTab('war')" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">作戰看板</button>
       <button onclick="showAdminTab('paper')" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">紙本/電話訂單</button>
+      <button onclick="showAdminTab('quote')" class="adminBtn bg-emerald-700 text-white px-4 py-2 rounded-xl">報價單</button>
       <button onclick="showAdminTab('project')" class="adminBtn bg-indigo-700 text-white px-4 py-2 rounded-xl">專案/特殊訂單</button>
       <button onclick="showAdminTab('expenses')" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">成本支出</button>
       <button onclick="showAdminTab('income')" class="adminBtn bg-green-700 text-white px-4 py-2 rounded-xl">現場收入</button>
@@ -1549,6 +1570,7 @@ function showAdminTab(tab) {
   if (tab === "orders") renderOrders();
   if (tab === "war") renderWarDashboard();
   if (tab === "paper") renderPaperOrder();
+  if (tab === "quote") renderQuoteOrder();
   if (tab === "project") renderProjectOrder();
   if (tab === "expenses") renderExpenses();
   if (tab === "income") renderIncome();
@@ -2241,6 +2263,7 @@ function orderCard(o) {
   const processDate = getProcessDate(o);
   const shipDate = getShipDate(o);
   const isProject = o.type === "project";
+  const isQuote = o.type === "quote";
   const paymentStatus = getPaymentStatus(o);
   const paidAmount = getPaidAmount(o);
   const unpaidAmount = getUnpaidAmount(o);
@@ -2277,6 +2300,7 @@ function orderCard(o) {
   }
 ">
       ${isProject ? `<div class="mb-3 inline-block bg-indigo-100 text-indigo-700 border border-indigo-300 rounded-full px-3 py-1 text-sm font-bold">🧪 專案/特殊訂單</div>` : ""}
+      ${isQuote ? `<div class="mb-3 inline-block bg-emerald-100 text-emerald-700 border border-emerald-300 rounded-full px-3 py-1 text-sm font-bold">報價單轉訂單</div>` : ""}
       ${renderOrderBadges(o)}
       ${hasEggYolkRequest(o) ? `
         <div class="mb-3 bg-yellow-100 border-2 border-yellow-500 text-yellow-900 rounded-xl p-3 font-bold">
@@ -4310,6 +4334,298 @@ async function savePaperOrder() {
   }
 
   alert("紙本訂單已新增");
+  await refreshAdmin();
+  showAdminTab("orders");
+}
+
+function renderQuoteOrder() {
+  document.getElementById("adminPanel").innerHTML = `
+    <h2 class="text-2xl font-bold mb-4">報價單</h2>
+
+    <div class="grid xl:grid-cols-[420px_1fr] gap-5 items-start">
+      <section class="bg-white p-5 rounded-2xl shadow border print:hidden">
+        <h3 class="font-bold text-xl mb-4">報價資料</h3>
+
+        <div class="grid gap-3">
+          <input id="quoteCompany" class="border p-3 rounded-xl" placeholder="公司 / 客戶名稱" oninput="renderQuotePreview()">
+          <input id="quoteContact" class="border p-3 rounded-xl" placeholder="聯絡人" oninput="renderQuotePreview()">
+          <input id="quotePhone" class="border p-3 rounded-xl" placeholder="電話 / 手機" oninput="renderQuotePreview()">
+          <input id="quoteAddress" class="border p-3 rounded-xl" placeholder="地址" oninput="renderQuotePreview()">
+          <input id="quoteDate" type="date" class="border p-3 rounded-xl" value="${todayStr()}" oninput="renderQuotePreview()">
+
+          <select id="quoteDelivery" class="border p-3 rounded-xl" onchange="renderQuotePreview()">
+            <option value="有限外送">有限外送</option>
+            <option value="自取">自取</option>
+            <option value="宅配">宅配</option>
+          </select>
+
+          <div class="grid grid-cols-2 gap-3">
+            <input id="quoteDeliveryDate" type="date" class="border p-3 rounded-xl" oninput="renderQuotePreview()">
+            <input id="quoteDeliveryTime" class="border p-3 rounded-xl" placeholder="送達/取貨時間" oninput="renderQuotePreview()">
+          </div>
+
+          <input id="quoteDeliveryNote" class="border p-3 rounded-xl" placeholder="送達備註，例如需要加熱" oninput="renderQuotePreview()">
+        </div>
+
+        <div class="mt-5 flex justify-between items-center">
+          <h3 class="font-bold text-xl">品項</h3>
+          <button type="button" onclick="addQuoteRow()" class="bg-amber-700 text-white px-4 py-2 rounded-xl font-bold">
+            新增品項
+          </button>
+        </div>
+
+        <div id="quoteRows" class="space-y-3 mt-3"></div>
+
+        <textarea id="quoteNote" class="border p-3 rounded-xl w-full mt-4" rows="3"
+          placeholder="注意事項 / 客戶備註" oninput="renderQuotePreview()"></textarea>
+
+        <div class="grid sm:grid-cols-2 gap-3 mt-4">
+          <button type="button" onclick="printQuote()" class="bg-blue-700 text-white px-4 py-3 rounded-xl font-bold">
+            列印報價單
+          </button>
+          <button type="button" onclick="saveQuoteAsOrder()" class="bg-green-700 text-white px-4 py-3 rounded-xl font-bold">
+            確認儲存成訂單
+          </button>
+        </div>
+      </section>
+
+      <section id="quotePreview" class="bg-white rounded-2xl shadow border overflow-hidden"></section>
+    </div>
+  `;
+
+  addQuoteRow();
+  addQuoteRow();
+  renderQuotePreview();
+}
+
+function addQuoteRow() {
+  const row = document.createElement("div");
+  row.className = "grid md:grid-cols-[1fr_90px_110px_1fr_auto] gap-2 bg-gray-50 p-3 rounded-xl";
+  row.innerHTML = `
+    <select class="quoteProduct border p-3 rounded-xl" onchange="onQuoteProductChange(this)">
+      ${products.filter(p => p.active !== false && p.type !== "fee").map(p => `
+        <option value="${p.id}">${escapeHtml(p.name)}</option>
+      `).join("")}
+    </select>
+    <input class="quoteQty quick-number-input border p-3 rounded-xl" type="number" inputmode="numeric"
+      value="1" min="1" data-keypad-title="輸入數量"
+      onfocus="openNumberKeypad(this)" onclick="openNumberKeypad(this)" oninput="renderQuotePreview()">
+    <input class="quotePrice quick-number-input border p-3 rounded-xl" type="number" inputmode="numeric"
+      placeholder="單價" data-keypad-title="輸入單價"
+      onfocus="openNumberKeypad(this)" onclick="openNumberKeypad(this)" oninput="renderQuotePreview()">
+    <input class="quoteItemNote border p-3 rounded-xl" placeholder="備註，例如需要加熱" oninput="renderQuotePreview()">
+    <button type="button" onclick="this.parentElement.remove(); renderQuotePreview();"
+      class="bg-red-600 text-white px-3 py-2 rounded-xl font-bold">刪除</button>
+  `;
+
+  document.getElementById("quoteRows").appendChild(row);
+  onQuoteProductChange(row.querySelector(".quoteProduct"));
+}
+
+function onQuoteProductChange(select) {
+  const product = products.find(p => String(p.id) === String(select.value));
+  const row = select.closest("div");
+  const priceInput = row?.querySelector(".quotePrice");
+
+  if (product && priceInput && !priceInput.value) {
+    priceInput.value = product.price || 0;
+  }
+
+  renderQuotePreview();
+}
+
+function getQuoteItems() {
+  return [...document.querySelectorAll("#quoteRows > div")]
+    .map(row => {
+      const select = row.querySelector(".quoteProduct");
+      const product = products.find(p => String(p.id) === String(select.value));
+      const qty = Number(row.querySelector(".quoteQty").value || 0);
+      const price = Number(row.querySelector(".quotePrice").value || product?.price || 0);
+      const note = row.querySelector(".quoteItemNote").value.trim();
+
+      return {
+        id: product?.id || "quote-" + Date.now(),
+        name: product?.name || "未選商品",
+        qty,
+        price,
+        note
+      };
+    })
+    .filter(item => item.qty > 0);
+}
+
+function getQuoteData() {
+  const items = getQuoteItems();
+  const total = items.reduce((sum, item) => sum + item.qty * item.price, 0);
+
+  return {
+    company: document.getElementById("quoteCompany")?.value.trim() || "",
+    contact: document.getElementById("quoteContact")?.value.trim() || "",
+    phone: document.getElementById("quotePhone")?.value.trim() || "",
+    address: document.getElementById("quoteAddress")?.value.trim() || "",
+    quoteDate: document.getElementById("quoteDate")?.value || todayStr(),
+    delivery: document.getElementById("quoteDelivery")?.value || "有限外送",
+    deliveryDate: document.getElementById("quoteDeliveryDate")?.value || "",
+    deliveryTime: document.getElementById("quoteDeliveryTime")?.value.trim() || "",
+    deliveryNote: document.getElementById("quoteDeliveryNote")?.value.trim() || "",
+    note: document.getElementById("quoteNote")?.value.trim() || "",
+    items,
+    total
+  };
+}
+
+function renderQuotePreview() {
+  const box = document.getElementById("quotePreview");
+  if (!box) return;
+
+  const q = getQuoteData();
+
+  box.innerHTML = `
+    <div class="bg-[#fffaf2] p-6 md:p-8 text-stone-900">
+      <div class="text-center border-b-4 border-green-900 pb-5 mb-5">
+        <div class="text-4xl font-bold tracking-wide mb-2">陳媽媽肉粽店</div>
+        <div class="text-green-900 text-4xl font-bold tracking-[0.35em]">報價單</div>
+        <div class="text-right font-bold mt-3">報價日期：${q.quoteDate}</div>
+      </div>
+
+      <div class="grid md:grid-cols-[1fr_370px] gap-6 mb-6">
+        <div class="space-y-3 text-lg">
+          <div>公司：${escapeHtml(q.company || "未填")}</div>
+          <div>聯絡人：${escapeHtml(q.contact || "未填")}</div>
+          <div>電話：${escapeHtml(q.phone || "未填")}</div>
+          <div>地址：${escapeHtml(q.address || "未填")}</div>
+        </div>
+
+        <div class="border-2 border-green-900 rounded-xl overflow-hidden">
+          <div class="bg-green-900 text-white text-center font-bold py-3 text-xl">送達資訊</div>
+          <div class="grid grid-cols-[110px_1fr] text-lg">
+            <div class="bg-green-900 text-white p-3 border-t border-white/30">方式</div>
+            <div class="p-3 border-t">${q.delivery}</div>
+            <div class="bg-green-900 text-white p-3 border-t border-white/30">日期</div>
+            <div class="p-3 border-t">${q.deliveryDate || "未填"}</div>
+            <div class="bg-green-900 text-white p-3 border-t border-white/30">時間</div>
+            <div class="p-3 border-t">${escapeHtml(q.deliveryTime || "未填")}</div>
+            <div class="bg-green-900 text-white p-3 border-t border-white/30">備註</div>
+            <div class="p-3 border-t">${escapeHtml(q.deliveryNote || "無")}</div>
+          </div>
+        </div>
+      </div>
+
+      <table class="w-full border-2 border-green-900 text-lg mb-6">
+        <thead class="bg-green-900 text-white">
+          <tr>
+            <th class="p-3 border">品項</th>
+            <th class="p-3 border">單價</th>
+            <th class="p-3 border">數量</th>
+            <th class="p-3 border">小計</th>
+            <th class="p-3 border">備註</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${
+            q.items.length
+              ? q.items.map(item => `
+                <tr>
+                  <td class="p-3 border text-center font-bold">${escapeHtml(item.name)}</td>
+                  <td class="p-3 border text-center">${money(item.price)}元</td>
+                  <td class="p-3 border text-center">${item.qty} 顆</td>
+                  <td class="p-3 border text-center">${money(item.price * item.qty)}元</td>
+                  <td class="p-3 border text-center">${escapeHtml(item.note || "")}</td>
+                </tr>
+              `).join("")
+              : `<tr><td class="p-5 border text-center" colspan="5">尚未新增品項</td></tr>`
+          }
+          <tr class="bg-[#f4eadb]">
+            <td class="p-4 border text-center font-bold text-2xl" colspan="3">總合計</td>
+            <td class="p-4 border text-center font-bold text-3xl" colspan="2">${money(q.total)}元</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="grid md:grid-cols-[1fr_420px] gap-5 items-start">
+        <div class="text-sm leading-7">
+          <div class="font-bold text-green-900 text-lg mb-1">注意事項</div>
+          <div>◆ 本報價單有效期限為 7 天，若有變動請另行告知。</div>
+          <div>◆ 訂單確認後，請於送達日前完成付款。</div>
+          <div>◆ 商品為當日現煮，請於指定時間內食用完畢。</div>
+          ${q.note ? `<div>◆ ${escapeHtml(q.note)}</div>` : ""}
+        </div>
+
+        <div class="border-2 border-green-900 rounded-xl overflow-hidden">
+          <div class="grid grid-cols-[110px_1fr]">
+            <div class="bg-green-900 text-white font-bold flex items-center justify-center p-4">匯款資訊</div>
+            <div class="p-4 leading-8">
+              <div>808 玉山銀行</div>
+              <div>帳號：0613940029136</div>
+              <div>戶名：陳媽媽肉粽店</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="text-center text-green-900 text-2xl font-bold mt-6">感謝您的訂購與支持！</div>
+      <div class="border-4 border-double border-green-900 mt-6 p-6 text-center text-2xl font-bold">
+        附上收據（需要收據）
+      </div>
+    </div>
+  `;
+}
+
+function printQuote() {
+  document.body.classList.add("quote-print-mode");
+  window.print();
+  setTimeout(() => {
+    document.body.classList.remove("quote-print-mode");
+  }, 500);
+}
+
+async function saveQuoteAsOrder() {
+  const q = getQuoteData();
+
+  if (!q.company && !q.contact) return alert("請輸入公司或聯絡人");
+  if (!q.phone) return alert("請輸入電話");
+  if (!q.deliveryDate) return alert("請輸入送達/取貨日期");
+  if (!q.deliveryTime) return alert("請輸入送達/取貨時間");
+  if (q.items.length === 0) return alert("請至少新增一個品項");
+
+  const note = [
+    "報價單轉訂單",
+    `公司：${q.company || "未填"}`,
+    `聯絡人：${q.contact || "未填"}`,
+    `取貨/收貨時段：${q.deliveryTime}`,
+    q.deliveryNote ? `送達備註：${q.deliveryNote}` : "",
+    q.note ? `報價備註：${q.note}` : ""
+  ].filter(Boolean).join("\n");
+
+  const order = {
+    id: "QT" + Date.now(),
+    time: new Date().toISOString(),
+    name: q.company || q.contact,
+    phone: q.phone,
+    address: q.address,
+    delivery: q.delivery,
+    pickup_date: q.delivery === "宅配" ? null : q.deliveryDate,
+    arrival_date: q.delivery === "宅配" ? q.deliveryDate : null,
+    ship_date: q.delivery === "宅配" && q.deliveryDate ? addDays(q.deliveryDate, -3) : null,
+    note,
+    items: q.items,
+    total: q.total,
+    status: "未完成",
+    payment_status: "未收款",
+    payment_method: "",
+    paid_amount: 0,
+    payment_note: "",
+    type: "quote"
+  };
+
+  const { error } = await db.from("orders").insert([order]);
+
+  if (error) {
+    alert("報價單儲存失敗：" + error.message);
+    return;
+  }
+
+  alert("已儲存成訂單");
   await refreshAdmin();
   showAdminTab("orders");
 }
