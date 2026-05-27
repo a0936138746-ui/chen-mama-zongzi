@@ -4339,6 +4339,10 @@ async function savePaperOrder() {
   showAdminTab("orders");
 }
 
+const QUOTE_DRAFTS_KEY = "chenMamaQuoteDrafts";
+const QUOTE_ACTIVE_DRAFT_KEY = "chenMamaActiveQuoteDraft";
+let quoteDraftLoading = false;
+
 function renderQuoteOrder() {
   document.getElementById("adminPanel").innerHTML = `
     <h2 class="text-2xl font-bold mb-4">報價單</h2>
@@ -4350,9 +4354,18 @@ function renderQuoteOrder() {
             <h3 class="font-bold text-xl">報價資料</h3>
             <div id="quoteDraftStatus" class="text-sm text-green-700 mt-1">會自動暫存</div>
           </div>
-          <button type="button" onclick="clearQuoteDraft()" class="bg-gray-700 text-white px-3 py-2 rounded-xl font-bold">
-            清除暫存
-          </button>
+        </div>
+
+        <div class="grid gap-2 mb-4">
+          <select id="quoteDraftSelect" class="border p-3 rounded-xl" onchange="switchQuoteDraft(this.value)"></select>
+          <div class="grid grid-cols-2 gap-2">
+            <button type="button" onclick="newQuoteDraft()" class="bg-amber-700 text-white px-3 py-2 rounded-xl font-bold">
+              新增報價
+            </button>
+            <button type="button" onclick="deleteCurrentQuoteDraft()" class="bg-gray-700 text-white px-3 py-2 rounded-xl font-bold">
+              刪除此暫存
+            </button>
+          </div>
         </div>
 
         <div class="grid gap-3">
@@ -4410,7 +4423,10 @@ function renderQuoteOrder() {
     </div>
   `;
 
-  if (!loadQuoteDraft()) {
+  migrateQuoteDrafts();
+  updateQuoteDraftSelector(getActiveQuoteDraftId());
+
+  if (!loadQuoteDraft(getActiveQuoteDraftId())) {
     addQuoteRow();
     addQuoteRow();
     renderQuotePreview();
@@ -4536,17 +4552,104 @@ function getQuoteData() {
   };
 }
 
+function getQuoteDrafts() {
+  try {
+    const drafts = JSON.parse(localStorage.getItem(QUOTE_DRAFTS_KEY) || "[]");
+    return Array.isArray(drafts) ? drafts : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function setQuoteDrafts(drafts) {
+  localStorage.setItem(QUOTE_DRAFTS_KEY, JSON.stringify(drafts));
+}
+
+function createQuoteDraftId() {
+  return "quote-draft-" + Date.now() + "-" + Math.random().toString(16).slice(2);
+}
+
+function getActiveQuoteDraftId() {
+  return localStorage.getItem(QUOTE_ACTIVE_DRAFT_KEY) || "";
+}
+
+function setActiveQuoteDraftId(id) {
+  if (id) {
+    localStorage.setItem(QUOTE_ACTIVE_DRAFT_KEY, id);
+  } else {
+    localStorage.removeItem(QUOTE_ACTIVE_DRAFT_KEY);
+  }
+}
+
+function getQuoteDraftTitle(draft) {
+  const name = draft.company || draft.contact || draft.phone || "未命名報價";
+  const amount = Number(draft.total || 0) ? `｜NT$ ${money(draft.total)}` : "";
+  const date = draft.deliveryDate || draft.quoteDate || "";
+
+  return `${name}${date ? "｜" + date : ""}${amount}`;
+}
+
+function migrateQuoteDrafts() {
+  const oldRaw = localStorage.getItem("chenMamaQuoteDraft");
+  const drafts = getQuoteDrafts();
+
+  if (oldRaw && drafts.length === 0) {
+    try {
+      const oldDraft = JSON.parse(oldRaw);
+      const id = oldDraft.id || createQuoteDraftId();
+      setQuoteDrafts([{ ...oldDraft, id, savedAt: oldDraft.savedAt || new Date().toISOString() }]);
+      setActiveQuoteDraftId(id);
+    } catch (error) {
+      // Keep going with an empty quote if the old draft is not readable.
+    }
+  }
+
+  localStorage.removeItem("chenMamaQuoteDraft");
+}
+
+function updateQuoteDraftSelector(activeId = "") {
+  const select = document.getElementById("quoteDraftSelect");
+  if (!select) return;
+
+  const drafts = getQuoteDrafts()
+    .sort((a, b) => String(b.savedAt || "").localeCompare(String(a.savedAt || "")));
+
+  select.innerHTML = drafts.length
+    ? drafts.map(draft => `
+        <option value="${draft.id}" ${draft.id === activeId ? "selected" : ""}>
+          ${escapeHtml(getQuoteDraftTitle(draft))}
+        </option>
+      `).join("")
+    : `<option value="">目前沒有暫存報價</option>`;
+}
+
 function saveQuoteDraft(q = null) {
+  if (quoteDraftLoading) return;
+
   try {
     const draft = q || getQuoteData();
-    localStorage.setItem("chenMamaQuoteDraft", JSON.stringify({
+    const activeId = getActiveQuoteDraftId() || createQuoteDraftId();
+    const drafts = getQuoteDrafts();
+    const draftData = {
       ...draft,
+      id: activeId,
       savedAt: new Date().toISOString()
-    }));
+    };
+
+    const index = drafts.findIndex(x => x.id === activeId);
+    if (index >= 0) {
+      drafts[index] = draftData;
+    } else {
+      drafts.push(draftData);
+    }
+
+    setQuoteDrafts(drafts);
+    setActiveQuoteDraftId(activeId);
+    updateQuoteDraftSelector(activeId);
 
     const status = document.getElementById("quoteDraftStatus");
     if (status) {
-      status.textContent = "已自動暫存";
+      status.textContent = `已自動暫存：${getQuoteDraftTitle(draftData)}`;
       status.className = "text-sm text-green-700 mt-1";
     }
   } catch (error) {
@@ -4558,53 +4661,97 @@ function saveQuoteDraft(q = null) {
   }
 }
 
-function loadQuoteDraft() {
-  try {
-    const raw = localStorage.getItem("chenMamaQuoteDraft");
-    if (!raw) return false;
+function fillQuoteForm(draft = {}) {
+  document.getElementById("quoteCompany").value = draft.company || "";
+  document.getElementById("quoteContact").value = draft.contact || "";
+  document.getElementById("quotePhone").value = draft.phone || "";
+  document.getElementById("quoteAddress").value = draft.address || "";
+  document.getElementById("quoteDate").value = draft.quoteDate || todayStr();
+  document.getElementById("quoteDelivery").value = draft.delivery || "有限外送";
+  document.getElementById("quoteDeliveryDate").value = draft.deliveryDate || "";
+  document.getElementById("quoteDeliveryTime").value = draft.deliveryTime || "";
+  document.getElementById("quoteDeliveryNote").value = draft.deliveryNote || "";
+  document.getElementById("quoteFinalTotal").value = draft.hasManualTotal ? (draft.total ?? "") : "";
+  document.getElementById("quoteNote").value = draft.note || "";
 
-    const draft = JSON.parse(raw);
+  const rows = document.getElementById("quoteRows");
+  rows.innerHTML = "";
 
-    document.getElementById("quoteCompany").value = draft.company || "";
-    document.getElementById("quoteContact").value = draft.contact || "";
-    document.getElementById("quotePhone").value = draft.phone || "";
-    document.getElementById("quoteAddress").value = draft.address || "";
-    document.getElementById("quoteDate").value = draft.quoteDate || todayStr();
-    document.getElementById("quoteDelivery").value = draft.delivery || "有限外送";
-    document.getElementById("quoteDeliveryDate").value = draft.deliveryDate || "";
-    document.getElementById("quoteDeliveryTime").value = draft.deliveryTime || "";
-    document.getElementById("quoteDeliveryNote").value = draft.deliveryNote || "";
-    document.getElementById("quoteFinalTotal").value = draft.hasManualTotal ? (draft.total ?? "") : "";
-    document.getElementById("quoteNote").value = draft.note || "";
-
-    const rows = document.getElementById("quoteRows");
-    rows.innerHTML = "";
-
-    if (Array.isArray(draft.items) && draft.items.length) {
-      draft.items.forEach(item => addQuoteRow(item));
-    } else {
-      addQuoteRow();
-      addQuoteRow();
-    }
-
-    const status = document.getElementById("quoteDraftStatus");
-    if (status) {
-      status.textContent = "已載入上次暫存";
-      status.className = "text-sm text-amber-700 mt-1";
-    }
-
-    renderQuotePreview();
-    return true;
-  } catch (error) {
-    return false;
+  if (Array.isArray(draft.items) && draft.items.length) {
+    draft.items.forEach(item => addQuoteRow(item));
+  } else {
+    addQuoteRow();
+    addQuoteRow();
   }
 }
 
-function clearQuoteDraft() {
-  if (!confirm("確定清除目前報價單暫存？")) return;
+function loadQuoteDraft(id = "") {
+  const drafts = getQuoteDrafts();
+  const targetId = id || getActiveQuoteDraftId() || drafts[0]?.id || "";
+  const draft = drafts.find(x => x.id === targetId);
 
-  localStorage.removeItem("chenMamaQuoteDraft");
-  renderQuoteOrder();
+  if (!draft) return false;
+
+  quoteDraftLoading = true;
+  setActiveQuoteDraftId(draft.id);
+  fillQuoteForm(draft);
+  quoteDraftLoading = false;
+
+  updateQuoteDraftSelector(draft.id);
+
+  const status = document.getElementById("quoteDraftStatus");
+  if (status) {
+    status.textContent = `已載入暫存：${getQuoteDraftTitle(draft)}`;
+    status.className = "text-sm text-amber-700 mt-1";
+  }
+
+  renderQuotePreview();
+  return true;
+}
+
+function switchQuoteDraft(id) {
+  if (!id) return;
+  saveQuoteDraft();
+  loadQuoteDraft(id);
+}
+
+function newQuoteDraft() {
+  const id = createQuoteDraftId();
+  setActiveQuoteDraftId(id);
+
+  quoteDraftLoading = true;
+  fillQuoteForm({ id, quoteDate: todayStr(), delivery: "有限外送", items: [] });
+  quoteDraftLoading = false;
+
+  const status = document.getElementById("quoteDraftStatus");
+  if (status) {
+    status.textContent = "已建立新報價暫存";
+    status.className = "text-sm text-green-700 mt-1";
+  }
+
+  renderQuotePreview();
+}
+
+function deleteCurrentQuoteDraft() {
+  const activeId = getActiveQuoteDraftId();
+  if (!activeId) {
+    newQuoteDraft();
+    return;
+  }
+
+  if (!confirm("確定刪除目前這一家報價暫存？")) return;
+
+  const drafts = getQuoteDrafts().filter(x => x.id !== activeId);
+  setQuoteDrafts(drafts);
+
+  const nextId = drafts[0]?.id || "";
+  setActiveQuoteDraftId(nextId);
+
+  if (nextId) {
+    loadQuoteDraft(nextId);
+  } else {
+    renderQuoteOrder();
+  }
 }
 
 function renderQuotePreview() {
@@ -4807,7 +4954,12 @@ async function saveQuoteAsOrder() {
   }
 
   alert("已儲存成訂單");
-  localStorage.removeItem("chenMamaQuoteDraft");
+  const activeId = getActiveQuoteDraftId();
+  if (activeId) {
+    const drafts = getQuoteDrafts().filter(x => x.id !== activeId);
+    setQuoteDrafts(drafts);
+    setActiveQuoteDraftId(drafts[0]?.id || "");
+  }
   await refreshAdmin();
   showAdminTab("orders");
 }
