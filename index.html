@@ -1750,7 +1750,7 @@ function updateFrontDeliveryHint() {
   if (delivery === "有限外送") {
     hint.innerHTML = `
       <div class="font-bold mb-1">有限外送提醒</div>
-      <div>目前限南崁 / 蘆竹地區滿 NT$1,500，桃園區滿 NT$5,000。若不符合，請改自取或宅配。</div>
+      <div>目前限南崁 / 蘆竹地區滿 NT$1,500，桃園區滿 NT$5,000。若不符合或大單需協調，請與 0936-138-746 陳先生聯絡。</div>
     `;
     if (dateLabel) dateLabel.innerText = "外送日期";
     if (addressLabel) addressLabel.innerText = "外送地址";
@@ -1795,11 +1795,11 @@ function getLimitedDeliveryError(address, amount) {
   const rule = getLimitedDeliveryRule(address);
 
   if (!rule) {
-    return "有限外送目前限南崁 / 蘆竹地區或桃園區。請確認地址有填區域，或改選自取 / 宅配。";
+    return "有限外送目前限南崁 / 蘆竹地區或桃園區。請確認地址有填區域，或改選自取 / 宅配；若是大單需協調，請與 0936-138-746 陳先生聯絡。";
   }
 
   if (Number(amount || 0) < rule.minimum) {
-    return `${rule.area} 有限外送需滿 NT$ ${money(rule.minimum)}。目前商品小計 NT$ ${money(amount)}，請改自取 / 宅配或增加訂購金額。`;
+    return `${rule.area} 有限外送需滿 NT$ ${money(rule.minimum)}。目前商品小計 NT$ ${money(amount)}，請改自取 / 宅配或增加訂購金額；若是大單需協調，請與 0936-138-746 陳先生聯絡。`;
   }
 
   return "";
