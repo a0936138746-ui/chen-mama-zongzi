@@ -1750,7 +1750,7 @@ function updateFrontDeliveryHint() {
   if (delivery === "有限外送") {
     hint.innerHTML = `
       <div class="font-bold mb-1">有限外送提醒</div>
-      <div>請填外送日期與地址；若地址不在可外送範圍，我們會再聯絡調整。</div>
+      <div>目前限南崁 / 蘆竹地區滿 NT$1,500，桃園區滿 NT$5,000。若不符合，請改自取或宅配。</div>
     `;
     if (dateLabel) dateLabel.innerText = "外送日期";
     if (addressLabel) addressLabel.innerText = "外送地址";
@@ -1771,6 +1771,40 @@ function updateFrontDeliveryHint() {
   if (date) date.title = "取貨日期";
 }
 
+function getLimitedDeliveryRule(address) {
+  const text = String(address || "").replace(/\s+/g, "");
+
+  if (text.includes("南崁") || text.includes("蘆竹")) {
+    return {
+      area: "南崁 / 蘆竹地區",
+      minimum: 1500
+    };
+  }
+
+  if (text.includes("桃園區") || text.includes("桃園市桃園")) {
+    return {
+      area: "桃園區",
+      minimum: 5000
+    };
+  }
+
+  return null;
+}
+
+function getLimitedDeliveryError(address, amount) {
+  const rule = getLimitedDeliveryRule(address);
+
+  if (!rule) {
+    return "有限外送目前限南崁 / 蘆竹地區或桃園區。請確認地址有填區域，或改選自取 / 宅配。";
+  }
+
+  if (Number(amount || 0) < rule.minimum) {
+    return `${rule.area} 有限外送需滿 NT$ ${money(rule.minimum)}。目前商品小計 NT$ ${money(amount)}，請改自取 / 宅配或增加訂購金額。`;
+  }
+
+  return "";
+}
+
 function validateFrontOrder({ name, phone, delivery, pickupDate, address }) {
   const phoneDigits = normalizePhone(phone);
   const timeSlot = document.getElementById("pickupTimeSlot")?.value || "";
@@ -1783,6 +1817,10 @@ function validateFrontOrder({ name, phone, delivery, pickupDate, address }) {
     return `${delivery} 請填寫地址`;
   }
   if (cart.length === 0) return "請先加入商品";
+  if (delivery === "有限外送") {
+    const limitedDeliveryError = getLimitedDeliveryError(address, getFrontCartSubtotal());
+    if (limitedDeliveryError) return limitedDeliveryError;
+  }
 
   return "";
 }
@@ -1813,6 +1851,9 @@ function confirmFrontOrderBeforeSubmit({ name, phone, delivery, pickupDate, addr
   const shippingLine = totals.shipping.fee > 0
     ? `宅配運費：NT$ ${money(totals.shipping.fee)}（${totals.shipping.units} 件）`
     : "宅配運費：NT$ 0";
+  const limitedDeliveryRule = delivery === "有限外送"
+    ? getLimitedDeliveryRule(address)
+    : null;
 
   return confirm([
     "請確認訂單內容是否正確：",
@@ -1826,7 +1867,9 @@ function confirmFrontOrderBeforeSubmit({ name, phone, delivery, pickupDate, addr
     "",
     "商品：",
     ...itemLines,
-    shippingLine,
+    delivery === "有限外送" && limitedDeliveryRule
+      ? `有限外送：${limitedDeliveryRule.area}，已達 NT$ ${money(limitedDeliveryRule.minimum)} 門檻`
+      : shippingLine,
     `應付總金額：NT$ ${money(totals.total)}`,
     note ? `備註：${note}` : "",
     "",
