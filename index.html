@@ -1691,13 +1691,19 @@ function isOrderDetailOpen(orderId) {
 function toggleOrderDetail(orderId) {
   window.expandedOrderIds = window.expandedOrderIds || {};
   const key = String(orderId);
+  const card = document.getElementById("orderCard-" + key);
+  const previousTop = card ? card.getBoundingClientRect().top : 0;
   window.expandedOrderIds[key] = !window.expandedOrderIds[key];
   renderOrders();
 
   setTimeout(() => {
-    document.getElementById("orderCard-" + key)?.scrollIntoView({
-      behavior: "smooth",
-      block: "start"
+    const newCard = document.getElementById("orderCard-" + key);
+    if (!newCard) return;
+
+    const newTop = newCard.getBoundingClientRect().top;
+    window.scrollBy({
+      top: newTop - previousTop,
+      behavior: "auto"
     });
   }, 0);
 }
