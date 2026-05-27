@@ -39,18 +39,32 @@
     }
 
     .front-hero {
-      background-image:
-        linear-gradient(90deg, rgba(49, 20, 9, 0.96) 0%, rgba(75, 35, 14, 0.82) 50%, rgba(24, 66, 38, 0.28) 100%),
-        url("assets/chen-mama-poster.jpg");
-      background-size: cover;
-      background-position: center top;
+      background:
+        radial-gradient(circle at 78% 22%, rgba(245, 158, 11, 0.22), transparent 26%),
+        radial-gradient(circle at 88% 72%, rgba(31, 77, 46, 0.35), transparent 28%),
+        linear-gradient(135deg, #3f1d0b 0%, #6f3513 46%, #1f4d2e 100%);
+      position: relative;
+      overflow: hidden;
     }
 
-    @media (max-width: 768px) {
-      .front-hero {
-        min-height: 620px;
-        background-position: center top;
-      }
+    .front-hero::after {
+      content: "粽";
+      position: absolute;
+      right: clamp(1rem, 7vw, 7rem);
+      top: clamp(5rem, 12vw, 9rem);
+      width: clamp(9rem, 28vw, 22rem);
+      height: clamp(9rem, 28vw, 22rem);
+      border-radius: 46% 54% 52% 48%;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(145deg, rgba(250, 204, 21, 0.92), rgba(34, 197, 94, 0.82));
+      color: rgba(63, 29, 11, 0.92);
+      font-size: clamp(4.5rem, 13vw, 11rem);
+      font-weight: 900;
+      transform: rotate(-10deg);
+      box-shadow: 0 28px 70px rgba(0, 0, 0, 0.22);
+      opacity: 0.92;
+      z-index: 0;
     }
 
     .front-glass {
@@ -74,7 +88,29 @@
       background: #fff7ed;
     }
 
+    .front-zongzi-mark {
+      width: 5.5rem;
+      height: 5.5rem;
+      border-radius: 42% 58% 55% 45%;
+      display: grid;
+      place-items: center;
+      font-size: 2.6rem;
+      font-weight: 900;
+      transform: rotate(-8deg);
+      box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.45), 0 18px 38px rgba(67, 20, 7, 0.14);
+    }
+
     @media (max-width: 768px) {
+      .front-hero {
+        min-height: 620px;
+      }
+
+      .front-hero::after {
+        right: -1.5rem;
+        top: 4.5rem;
+        opacity: 0.38;
+      }
+
       .front-product-img {
         aspect-ratio: 1 / 1;
       }
@@ -139,7 +175,7 @@
   </div>
 
   <div class="front-hero text-white px-5 py-12 md:py-20">
-    <div class="max-w-6xl mx-auto grid lg:grid-cols-[1fr_360px] gap-8 items-end min-h-[560px] md:min-h-[620px]">
+    <div class="relative z-10 max-w-6xl mx-auto grid lg:grid-cols-[1fr_360px] gap-8 items-end min-h-[560px] md:min-h-[620px]">
       <div class="pb-4">
         <div class="flex gap-2 flex-wrap mb-5">
           <span class="bg-amber-300 text-amber-950 rounded-full px-4 py-2 text-sm font-bold">端午節預訂中</span>
@@ -1176,8 +1212,15 @@ function renderProducts() {
     card.className = "front-card bg-white rounded-2xl transition overflow-hidden";
     card.innerHTML = `
       <div class="front-product-img overflow-hidden">
-        <img src="assets/chen-mama-poster.jpg" alt="${escapeHtml(p.name)}"
-          class="w-full h-full object-cover object-center">
+        <div class="w-full h-full ${getFrontProductVisualClass(p)} flex items-center justify-center p-6 text-center">
+          <div>
+            <div class="front-zongzi-mark mx-auto mb-4 bg-white/80 text-stone-900">
+              ${getFrontProductIcon(p)}
+            </div>
+            <div class="text-3xl font-black tracking-wide text-stone-900">${getFrontProductShortName(p)}</div>
+            <div class="mt-2 text-sm font-bold text-stone-700">${getFrontProductMoodText(p)}</div>
+          </div>
+        </div>
       </div>
 
       <div class="p-5">
@@ -1240,6 +1283,52 @@ function getFrontProductDescription(product) {
   if (name.includes("鹼") || name.includes("檢")) return "簡單純粹，傳統風味。";
 
   return "";
+}
+
+function getFrontProductShortName(product) {
+  const name = String(product.name || "");
+  if (name.includes("南部")) return "南部粽";
+  if (name.includes("北部")) return "北部粽";
+  if (name.includes("豪華")) return "豪華粽";
+  if (name.includes("素")) return "素食粽";
+  if (name.includes("紅豆")) return "紅豆鹼粽";
+  if (name.includes("鹼") || name.includes("檢")) return "原味鹼粽";
+  return name.replace(/\d+\s*(入|粒|顆)/g, "").trim() || "手作肉粽";
+}
+
+function getFrontProductIcon(product) {
+  const name = String(product.name || "");
+  if (name.includes("豪華")) return "♛";
+  if (name.includes("紅豆")) return "豆";
+  if (name.includes("鹼") || name.includes("檢")) return "甜";
+  if (name.includes("素")) return "素";
+  if (name.includes("南部")) return "南";
+  if (name.includes("北部")) return "北";
+  return "粽";
+}
+
+function getFrontProductMoodText(product) {
+  const name = String(product.name || "");
+  if (name.includes("豪華")) return "用料升級，送禮首選";
+  if (name.includes("南部")) return "水煮軟Q，古早味";
+  if (name.includes("北部")) return "粒粒分明，香氣濃郁";
+  if (name.includes("素")) return "清爽不油，自然風味";
+  if (name.includes("紅豆")) return "紅豆餡在裡面";
+  if (name.includes("鹼") || name.includes("檢")) return "簡單純粹，傳統滋味";
+  return "用心包粽，傳承好味道";
+}
+
+function getFrontProductVisualClass(product) {
+  const name = String(product.name || "");
+
+  if (name.includes("豪華")) return "bg-gradient-to-br from-yellow-100 via-amber-100 to-orange-100";
+  if (name.includes("南部")) return "bg-gradient-to-br from-amber-100 via-yellow-50 to-lime-100";
+  if (name.includes("北部")) return "bg-gradient-to-br from-emerald-100 via-lime-50 to-amber-100";
+  if (name.includes("素")) return "bg-gradient-to-br from-green-100 via-emerald-50 to-teal-100";
+  if (name.includes("紅豆")) return "bg-gradient-to-br from-rose-100 via-red-50 to-amber-100";
+  if (name.includes("鹼") || name.includes("檢")) return "bg-gradient-to-br from-yellow-50 via-amber-50 to-stone-100";
+
+  return "bg-gradient-to-br from-amber-100 via-lime-50 to-green-100";
 }
 
 function getFrontProductFeatures(product) {
