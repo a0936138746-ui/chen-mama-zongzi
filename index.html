@@ -3708,7 +3708,65 @@ function orderCard(o) {
           <div class="text-sm whitespace-pre-line order-card-text">${escapeHtml(getLatestCustomerRevisionText(o))}</div>
         </div>
       ` : ""}
-      <div class="grid lg:grid-cols-[1fr_320px] gap-4 items-start">
+      <div class="md:hidden">
+        <div class="flex justify-between gap-3 items-start">
+          <div class="min-w-0">
+            <div class="text-sm font-bold ${
+              o.status === "已取消"
+                ? "text-red-600"
+                : (o.status === "已取貨" || o.status === "已宅配")
+                ? "text-green-700"
+                : "text-orange-600"
+            }">
+              ${o.status === "已取消" ? "已取消" : (o.status === "已取貨" || o.status === "已宅配") ? "已完成" : "待處理"}
+            </div>
+            <div class="font-bold text-xl break-words">${o.name || ""}</div>
+            <a href="tel:${normalizePhone(o.phone)}" class="text-blue-700 font-bold">${o.phone || ""}</a>
+          </div>
+          <div class="text-right">
+            <div class="text-2xl font-bold text-amber-700">NT$ ${money(o.total)}</div>
+            <div class="text-xs mt-1 inline-block border rounded-full px-2 py-1 font-bold ${getPaymentBadgeClass(o)}">
+              ${paymentStatus}
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 mt-3 text-sm">
+          <div class="bg-gray-50 rounded-xl p-3">方式：${o.delivery || ""}</div>
+          <div class="bg-gray-50 rounded-xl p-3">日期：${processDate || "未填"}</div>
+          ${o.delivery === "宅配" ? `<div class="bg-blue-50 text-blue-700 rounded-xl p-3 col-span-2">應寄出日：${shipDate || "未填"}</div>` : ""}
+          ${renderTimeSlotBadge(o) ? `<div class="col-span-2">${renderTimeSlotBadge(o)}</div>` : ""}
+        </div>
+
+        <div class="mt-3 grid grid-cols-2 gap-2">
+          <button type="button" onclick="quickMarkPaid('${o.id}', 'orders')"
+            class="mobile-action-btn bg-emerald-700 text-white px-3 py-4 rounded-xl font-bold">
+            已收款
+          </button>
+
+          <button type="button" onclick="quickSetOrderStatus('${o.id}', '已取貨', 'orders')"
+            class="mobile-action-btn bg-lime-700 text-white px-3 py-4 rounded-xl font-bold">
+            已取貨
+          </button>
+
+          <button type="button" onclick="quickSetOrderStatus('${o.id}', '已宅配', 'orders')"
+            class="mobile-action-btn bg-blue-700 text-white px-3 py-4 rounded-xl font-bold">
+            已宅配
+          </button>
+
+          <button type="button" onclick="quickSetOrderStatus('${o.id}', '已取消', 'orders')"
+            class="mobile-action-btn bg-red-700 text-white px-3 py-4 rounded-xl font-bold">
+            取消訂單
+          </button>
+        </div>
+
+        <button type="button" onclick="toggleOrderDetail('${o.id}')"
+          class="mobile-action-btn mt-3 w-full bg-gray-700 text-white px-4 py-3 rounded-xl font-bold">
+          ${detailOpen ? "收合明細" : "查看明細"}
+        </button>
+      </div>
+
+      <div class="hidden md:grid lg:grid-cols-[1fr_320px] gap-4 items-start">
         <div class="min-w-0 order-card-text">
         ${
   o.status === "已取消"
