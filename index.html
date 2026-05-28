@@ -8141,6 +8141,43 @@ function setStockSort(sort) {
   renderStock();
 }
 
+function toggleStockDemandList(key) {
+  window.expandedStockDemandIds = window.expandedStockDemandIds || {};
+  window.expandedStockDemandIds[key] = !window.expandedStockDemandIds[key];
+  renderStock();
+}
+
+function renderStockDemandList(row, key) {
+  const relatedOrders = row.relatedOrders || [];
+  const expandedMap = window.expandedStockDemandIds || {};
+  const expanded = Boolean(expandedMap[key]);
+  const visibleOrders = expanded ? relatedOrders : relatedOrders.slice(0, 4);
+
+  if (!relatedOrders.length) {
+    return `<div class="text-gray-500">目前沒有未完成訂單需求</div>`;
+  }
+
+  return `
+    <div class="space-y-1">
+      ${visibleOrders.map(order => `
+        <button onclick="openOrderInOrders('${order.id}')"
+          class="block text-left w-full py-1 ${order.shortage ? "text-red-700 font-bold" : "text-blue-700"} hover:underline">
+          ${order.shortage ? "⚠️ " : ""}${order.date}｜${order.name}｜需求 ${order.qty}
+        </button>
+      `).join("")}
+
+      ${
+        relatedOrders.length > 4
+          ? `<button type="button" onclick="toggleStockDemandList('${key}')"
+              class="mt-2 bg-white/80 border px-3 py-2 rounded-xl text-sm font-bold text-gray-700 w-full">
+              ${expanded ? "收合需求" : `展開全部 ${relatedOrders.length} 筆需求`}
+            </button>`
+          : ""
+      }
+    </div>
+  `;
+}
+
 function renderStock() {
   const mode = window.stockMode || "all";
   const sort = window.stockSort || "risk";
@@ -8197,7 +8234,7 @@ function renderStock() {
       </div>
 
       <div class="grid md:grid-cols-3 gap-4">
-        ${baseRows.map(row => `
+        ${baseRows.map((row, index) => `
           <div class="p-5 rounded-2xl border ${row.statusClass}">
             <div class="flex justify-between gap-2">
               <div>
@@ -8227,21 +8264,7 @@ function renderStock() {
             </div>
 
             <div class="mt-3 text-sm">
-              ${
-                row.relatedOrders.length
-                  ? row.relatedOrders.slice(0, 4).map(order => `
-                    <button onclick="openOrderInOrders('${order.id}')"
-                      class="block text-left w-full py-1 ${order.shortage ? "text-red-700 font-bold" : "text-blue-700"} hover:underline">
-                      ${order.shortage ? "⚠️ " : ""}${order.date}｜${order.name}｜需求 ${order.qty}
-                    </button>
-                  `).join("")
-                  : `<div class="text-gray-500">目前沒有未完成訂單需求</div>`
-              }
-              ${
-                row.relatedOrders.length > 4
-                  ? `<div class="text-gray-500">另有 ${row.relatedOrders.length - 4} 筆訂單需求</div>`
-                  : ""
-              }
+              ${renderStockDemandList(row, `base-${index}`)}
             </div>
           </div>
         `).join("")}
@@ -8270,7 +8293,7 @@ function renderStock() {
     </div>
 
     <div class="grid md:grid-cols-3 gap-4">
-      ${filteredRows.map(row => `
+      ${filteredRows.map((row, index) => `
         <div class="p-5 rounded-2xl shadow border ${row.statusClass}">
           <div class="flex justify-between gap-2">
             <div class="font-bold text-xl">${row.product.name}</div>
@@ -8297,21 +8320,7 @@ function renderStock() {
           </div>
 
           <div class="mt-3 text-sm">
-            ${
-              row.relatedOrders.length
-                ? row.relatedOrders.slice(0, 4).map(order => `
-                  <button onclick="openOrderInOrders('${order.id}')"
-                    class="block text-left w-full py-1 ${order.shortage ? "text-red-700 font-bold" : "text-blue-700"} hover:underline">
-                    ${order.shortage ? "⚠️ " : ""}${order.date}｜${order.name}｜需求 ${order.qty}
-                  </button>
-                `).join("")
-                : `<div class="text-gray-500">目前沒有未完成訂單需求</div>`
-            }
-            ${
-              row.relatedOrders.length > 4
-                ? `<div class="text-gray-500">另有 ${row.relatedOrders.length - 4} 筆訂單需求</div>`
-                : ""
-            }
+            ${renderStockDemandList(row, `detail-${row.product.id}-${index}`)}
           </div>
         </div>
       `).join("")}
