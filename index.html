@@ -2999,6 +2999,26 @@ function hasEggYolkRequest(o) {
   return /(加.*蛋黃|蛋黃.*加|一顆蛋黃|整顆蛋黃|蛋黃)/.test(text);
 }
 
+function hasPeanutRequest(o) {
+  const text = getOrderTextForAlerts(o)
+    .replace(/\s+/g, "")
+    .toLowerCase();
+
+  if (!text.includes("花生")) return false;
+  if (/(不要|不用|不加|無|免|去|拿掉).*花生|花生.*(不要|不用|不加|無|免|去|拿掉)/.test(text)) return false;
+
+  return /加.*花生|花生.*加|包.*花生|花生|客製/.test(text);
+}
+
+function hasSpecialPrepRequest(o) {
+  const text = getOrderTextForAlerts(o)
+    .replace(/\s+/g, "")
+    .toLowerCase();
+
+  return /特殊製程|客製|客制|活動|公益|學校|公司|團購|大量|試產|oem|diy|材料包/.test(text) ||
+    o.type === "project";
+}
+
 function hasCustomerRevision(o) {
   return String(o.note || "").includes("[客戶前台修改");
 }
@@ -3020,6 +3040,94 @@ function getEggYolkWorkDays(o) {
 function needsEggYolkPrep(o) {
   const days = getEggYolkWorkDays(o);
   return hasEggYolkRequest(o) && days !== null && days <= 5;
+}
+
+function getPrepCountdownWorkDate(o) {
+  return getShippingWorkDate(o) || getProcessDate(o) || "";
+}
+
+function createPrepCountdownItem(o, type, label, leadDays, note = "") {
+  const workDate = getPrepCountdownWorkDate(o);
+  const workDays = daysFromToday(workDate);
+
+  if (!workDate || workDays === null || workDays < 0) return null;
+
+  const prepDate = addDays(workDate, -leadDays);
+  const prepDays = daysFromToday(prepDate);
+
+  if (prepDays === null || prepDays > 7) return null;
+
+  return {
+    order: o,
+    type,
+    label,
+    leadDays,
+    note,
+    workDate,
+    prepDate,
+    prepDays
+  };
+}
+
+function getOrderPrepCountdownItems(o) {
+  const items = [];
+
+  if (hasNearStockShortage(o)) {
+    const item = createPrepCountdownItem(o, "stock", "出貨近缺貨", 7, getStockShortageInfo(o).text);
+    if (item) items.push(item);
+  }
+
+  if (isDiyOrder(o) || hasSpecialPrepRequest(o)) {
+    const item = createPrepCountdownItem(o, "special", "DIY / 活動 / 特殊單", 7, "需要提前準備材料與流程");
+    if (item) items.push(item);
+  }
+
+  if (hasEggYolkRequest(o)) {
+    const item = createPrepCountdownItem(o, "egg", "蛋黃特殊製程", 5, "蛋黃單建議提前備料");
+    if (item) items.push(item);
+  }
+
+  if (hasPeanutRequest(o)) {
+    const item = createPrepCountdownItem(o, "peanut", "花生特殊製程", 5, "花生客製單請提前確認");
+    if (item) items.push(item);
+  }
+
+  if (Number(o.total || 0) >= 10000) {
+    const item = createPrepCountdownItem(o, "big", "大量 / 公司團購", 5, "大單請提前確認數量與人力");
+    if (item) items.push(item);
+  }
+
+  if (hasHeatRequest(o)) {
+    const item = createPrepCountdownItem(o, "heat", "加熱提醒", 1, getHeatRequestText(o));
+    if (item) items.push(item);
+  }
+
+  if (o.delivery === "宅配") {
+    const shipDate = getShipDate(o);
+    const shipDays = daysFromToday(shipDate);
+
+    if (shipDate && shipDays !== null && shipDays <= 7 && shipDays >= 0) {
+      items.push({
+        order: o,
+        type: "ship",
+        label: "宅配應寄出",
+        leadDays: 0,
+        note: `希望到貨日：${o.arrival_date || "未填"}`,
+        workDate: o.arrival_date || shipDate,
+        prepDate: shipDate,
+        prepDays: shipDays
+      });
+    }
+  }
+
+  return items;
+}
+
+function getPrepCountdownLevel(item) {
+  if (item.prepDays < 0) return { text: "已晚", cls: "bg-red-100 text-red-800 border-red-400" };
+  if (item.prepDays === 0) return { text: "今天開始", cls: "bg-red-100 text-red-800 border-red-400" };
+  if (item.prepDays <= 2) return { text: `${item.prepDays} 天內`, cls: "bg-orange-100 text-orange-800 border-orange-400" };
+  return { text: `${item.prepDays} 天後`, cls: "bg-yellow-100 text-yellow-800 border-yellow-400" };
 }
 
 function addDemandToMap(map, productId, qty) {
@@ -4086,6 +4194,14 @@ function renderWarDashboard() {
   const eggYolkList = unfinishedOrders.filter(o => hasEggYolkRequest(o));
   const eggYolkPrepList = unfinishedOrders.filter(o => needsEggYolkPrep(o));
   const stockShortageList = unfinishedOrders.filter(o => hasNearStockShortage(o));
+  const prepCountdownItems = unfinishedOrders
+    .flatMap(getOrderPrepCountdownItems)
+    .sort((a, b) => {
+      const dayDiff = a.prepDays - b.prepDays;
+      if (dayDiff !== 0) return dayDiff;
+      return (a.workDate || "9999-12-31").localeCompare(b.workDate || "9999-12-31");
+    });
+  const urgentPrepCount = prepCountdownItems.filter(item => item.prepDays <= 0).length;
 
   const duplicateGroups = Object.values(activeOrders.reduce((groups, o) => {
     const phone = String(o.phone || "").trim();
@@ -4275,6 +4391,55 @@ function renderWarDashboard() {
     </section>
   `;
 
+  const renderPrepCountdownSection = () => `
+    <section class="bg-white rounded-2xl shadow p-5 border-2 ${urgentPrepCount ? "border-red-300" : "border-yellow-200"}">
+      <div class="flex justify-between items-center flex-wrap gap-3 mb-3">
+        <div>
+          <h3 class="text-xl font-bold">預備倒數警示</h3>
+          <div class="text-sm text-gray-500">蛋黃、花生、DIY/活動、宅配、缺貨、大單會提前提醒，不等到當天才看到。</div>
+        </div>
+        <span class="${urgentPrepCount ? "bg-red-100 text-red-800" : "bg-yellow-100 text-yellow-800"} px-3 py-1 rounded-full text-sm font-bold">
+          ${urgentPrepCount ? `今天前必處理 ${urgentPrepCount}` : `7 天內 ${prepCountdownItems.length}`}
+        </span>
+      </div>
+
+      <div class="grid gap-3">
+        ${
+          prepCountdownItems.length
+            ? prepCountdownItems.map(item => {
+                const level = getPrepCountdownLevel(item);
+                const o = item.order;
+                return `
+                  <div class="border rounded-xl p-4 ${item.prepDays <= 0 ? "bg-red-50 border-red-300" : "bg-yellow-50 border-yellow-200"}">
+                    <div class="flex justify-between gap-3 flex-wrap">
+                      <div>
+                        <div class="flex gap-2 flex-wrap items-center mb-2">
+                          <span class="border rounded-full px-3 py-1 text-sm font-bold ${level.cls}">${level.text}</span>
+                          <span class="bg-white border rounded-full px-3 py-1 text-sm font-bold">${item.label}</span>
+                        </div>
+                        <button onclick="openOrderInOrders('${o.id}')"
+                          class="text-left text-blue-700 font-bold hover:underline text-lg">
+                          ${escapeHtml(o.name || "未填姓名")}｜${escapeHtml(o.phone || "")}
+                        </button>
+                        <div class="text-sm text-gray-600 mt-1">
+                          應開始：${item.prepDate || "未填"}｜出貨/交付：${item.workDate || "未填"}｜${escapeHtml(o.delivery || "")}
+                        </div>
+                        ${item.note ? `<div class="text-sm text-red-700 font-bold mt-1">${escapeHtml(item.note)}</div>` : ""}
+                      </div>
+                      <div class="text-right">
+                        <div class="font-bold text-amber-700">NT$ ${money(o.total)}</div>
+                        <div class="text-sm text-gray-600">${getShippingItemText(o) || "未填商品"}</div>
+                      </div>
+                    </div>
+                  </div>
+                `;
+              }).join("")
+            : `<div class="bg-gray-50 p-4 rounded-xl text-gray-500">目前沒有 7 天內需要提前準備的特殊項目</div>`
+        }
+      </div>
+    </section>
+  `;
+
   document.getElementById("adminPanel").innerHTML = `
     <h2 class="text-2xl font-bold mb-4">作戰看板</h2>
 
@@ -4309,6 +4474,11 @@ function renderWarDashboard() {
         <div class="text-2xl font-bold text-red-700">${stockShortageList.length}</div>
       </button>
 
+      <div class="${urgentPrepCount ? "bg-red-50 border-red-400" : "bg-yellow-50 border-yellow-300"} border p-4 rounded-xl">
+        <div class="font-bold">預備倒數</div>
+        <div class="text-2xl font-bold ${urgentPrepCount ? "text-red-700" : "text-yellow-700"}">${prepCountdownItems.length}</div>
+      </div>
+
       <button onclick="setOrderQuickFilter('eggYolk'); showAdminTab('orders')" class="bg-yellow-50 border border-yellow-300 p-4 rounded-xl text-left">
         <div class="font-bold">蛋黃預備</div>
         <div class="text-2xl font-bold text-yellow-700">${eggYolkPrepList.length}</div>
@@ -4321,6 +4491,7 @@ function renderWarDashboard() {
     </div>
 
     <div class="space-y-6">
+      ${renderPrepCountdownSection()}
       ${renderSection("出貨近缺貨", stockShortageList, "目前沒有出貨近但缺貨的訂單", {
         sort: sortByDashboardDate
       })}
