@@ -6137,8 +6137,26 @@ function renderExpenses() {
               <option>其他</option>
             </select>
 
-            <input id="expenseItem" class="border p-3 rounded-xl" placeholder="項目名稱">
-            <input id="expenseAmount" type="number" class="border p-3 rounded-xl text-xl font-bold" placeholder="金額">
+            <div class="bg-amber-50 border border-amber-200 rounded-2xl p-3">
+              <div class="flex justify-between items-center gap-3 mb-3">
+                <div>
+                  <div class="font-bold">支出明細</div>
+                  <div class="text-xs text-gray-500">一家商家買多個品項時，可逐列輸入。</div>
+                </div>
+                <button type="button" onclick="addExpenseRow()"
+                  class="bg-amber-700 text-white px-3 py-2 rounded-xl font-bold">
+                  新增明細
+                </button>
+              </div>
+
+              <div id="expenseRows" class="space-y-3"></div>
+
+              <div class="mt-3 flex justify-between font-bold text-red-700">
+                <span>明細合計</span>
+                <span>NT$ <span id="expenseTotalPreview">0</span></span>
+              </div>
+            </div>
+
             <input id="expensePayment" class="border p-3 rounded-xl" placeholder="付款方式">
             <input id="expenseNote" class="border p-3 rounded-xl" placeholder="備註">
 
@@ -6194,6 +6212,7 @@ function renderExpenses() {
 `;
     
 loadVendors();
+addExpenseRow();
 }
 
 function renderIncome() {
@@ -6475,36 +6494,106 @@ function onVendorChange() {
   }
 }  
 
+function addExpenseRow(rowData = {}) {
+  const rows = document.getElementById("expenseRows");
+  if (!rows) return;
+
+  const row = document.createElement("div");
+  row.className = "expenseRow bg-white border rounded-xl p-3";
+  row.innerHTML = `
+    <div class="grid grid-cols-2 gap-2">
+      <input class="expenseItem border p-3 rounded-xl col-span-2" placeholder="項目名稱，例如：豬肉、花生、包材"
+        value="${escapeHtml(rowData.item || "")}">
+
+      <input class="expenseQty border p-3 rounded-xl" type="number" inputmode="decimal" placeholder="數量"
+        value="${rowData.qty || ""}" oninput="calculateExpenseRowsTotal()">
+
+      <input class="expenseUnit border p-3 rounded-xl" placeholder="單位，例如：斤、個、包"
+        value="${escapeHtml(rowData.unit || "")}">
+
+      <input class="expenseUnitPrice border p-3 rounded-xl" type="number" inputmode="decimal" placeholder="單價"
+        value="${rowData.unitPrice || ""}" oninput="calculateExpenseRowsTotal()">
+
+      <input class="expenseAmount border p-3 rounded-xl font-bold text-red-700" type="number" inputmode="decimal" placeholder="金額"
+        value="${rowData.amount || ""}" oninput="calculateExpenseRowsTotal()">
+    </div>
+
+    <button type="button" onclick="this.closest('.expenseRow').remove(); calculateExpenseRowsTotal();"
+      class="mt-2 bg-red-600 text-white px-3 py-2 rounded-xl text-sm font-bold">
+      刪除此明細
+    </button>
+  `;
+
+  rows.appendChild(row);
+  calculateExpenseRowsTotal();
+}
+
+function getExpenseRowData() {
+  return [...document.querySelectorAll(".expenseRow")].map(row => {
+    const item = row.querySelector(".expenseItem")?.value.trim() || "";
+    const qty = Number(row.querySelector(".expenseQty")?.value || 0);
+    const unit = row.querySelector(".expenseUnit")?.value.trim() || "";
+    const unitPrice = Number(row.querySelector(".expenseUnitPrice")?.value || 0);
+    const amountInput = Number(row.querySelector(".expenseAmount")?.value || 0);
+    const computedAmount = qty > 0 && unitPrice > 0 ? qty * unitPrice : 0;
+    const amount = amountInput || computedAmount;
+
+    return {
+      item,
+      qty,
+      unit,
+      unitPrice,
+      amount
+    };
+  }).filter(row => row.item || row.amount > 0);
+}
+
+function calculateExpenseRowsTotal() {
+  const total = getExpenseRowData().reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  const box = document.getElementById("expenseTotalPreview");
+  if (box) box.innerText = money(total);
+}
+
 async function saveExpense() {
-  const item = document.getElementById("expenseItem").value.trim();
-  const amount = Number(document.getElementById("expenseAmount").value);
+  const rows = getExpenseRowData();
 
   const vendorSelect = document.getElementById("expenseVendor");
   const vendor_name =
     vendorSelect.options[vendorSelect.selectedIndex]?.text || "";
 
-  if (!item) return alert("請輸入項目名稱");
-  if (!amount || amount <= 0) return alert("請輸入正確金額");
+  if (rows.length === 0) return alert("請至少輸入一筆支出明細");
+  if (rows.some(row => !row.item)) return alert("每筆明細都要填項目名稱");
+  if (rows.some(row => !row.amount || row.amount <= 0)) return alert("每筆明細都要有正確金額");
 
-  const expense = {
-    id: "EX" + Date.now(),
-    date: document.getElementById("expenseDate").value,
-    vendor_name,
-    category: document.getElementById("expenseCategory").value,
-    item,
-    amount,
-    payment_method: document.getElementById("expensePayment").value.trim(),
-    note: document.getElementById("expenseNote").value.trim()
-  };
+  const baseNote = document.getElementById("expenseNote").value.trim();
+  const batchId = "EXB" + Date.now();
+  const expenseRows = rows.map((row, index) => {
+    const qtyText = row.qty ? `${row.qty}${row.unit || ""}` : "";
+    const unitPriceText = row.unitPrice ? `單價 ${money(row.unitPrice)}` : "";
+    const detailText = [qtyText, unitPriceText].filter(Boolean).join("｜");
 
-  const { error } = await db.from("expenses").insert([expense]);
+    return {
+      id: `${batchId}-${index + 1}`,
+      date: document.getElementById("expenseDate").value,
+      vendor_name,
+      category: document.getElementById("expenseCategory").value,
+      item: row.item,
+      amount: row.amount,
+      payment_method: document.getElementById("expensePayment").value.trim(),
+      note: [detailText, baseNote, rows.length > 1 ? `同批支出 ${batchId}` : ""]
+        .filter(Boolean)
+        .join("｜")
+    };
+  });
+
+  const { error } = await db.from("expenses").insert(expenseRows);
 
   if (error) {
     alert("新增支出失敗：" + error.message);
     return;
   }
 
-  alert("支出已新增");
+  alert(`支出已新增 ${expenseRows.length} 筆`);
   await refreshAdmin();
   showAdminTab("expenses");
 }
