@@ -384,7 +384,7 @@
 </section>
 
 <!-- 後台 -->
-<section id="adminPage" class="hidden p-6">
+<section id="adminPage" class="hidden p-4 md:p-6 pb-28 md:pb-6">
   <div id="loginBox" class="max-w-md mx-auto bg-white p-6 rounded-2xl shadow">
     <h2 class="text-2xl font-bold mb-4">後台登入</h2>
     <input id="adminPassword" type="password" class="border p-3 rounded-xl w-full mb-4" placeholder="請輸入密碼">
@@ -401,20 +401,44 @@
           <div class="font-bold text-lg">後台功能選單</div>
           <div class="text-sm text-gray-500">依工作類型整理，找功能比較快。</div>
         </div>
-        <select class="border p-3 rounded-xl md:hidden w-full" onchange="showAdminTab(this.value)">
-          <option value="orders">訂單管理</option>
-          <option value="war">作戰看板</option>
-          <option value="shipping">出貨/取貨清單</option>
-          <option value="paper">紙本/電話訂單</option>
-          <option value="quote">報價單</option>
-          <option value="project">專案/特殊訂單</option>
-          <option value="expenses">成本支出</option>
-          <option value="income">現場收入</option>
-          <option value="stats">營運統計</option>
-          <option value="stock">庫存查看</option>
-          <option value="product">商品管理</option>
-          <option value="email">匯入官網Email</option>
-        </select>
+      </div>
+
+      <div class="md:hidden space-y-4">
+        <div>
+          <div class="text-xs font-bold text-gray-500 mb-2">常用功能</div>
+          <div class="grid grid-cols-2 gap-3">
+            <button data-admin-tab="orders" onclick="showAdminTab('orders')" class="adminBtn bg-amber-700 text-white px-4 py-5 rounded-2xl text-left font-bold shadow">
+              <div class="text-lg">訂單管理</div>
+              <div class="text-xs text-white/80 mt-1">查單、收款、狀態</div>
+            </button>
+            <button data-admin-tab="shipping" onclick="showAdminTab('shipping')" class="adminBtn bg-blue-700 text-white px-4 py-5 rounded-2xl text-left font-bold shadow">
+              <div class="text-lg">出貨清單</div>
+              <div class="text-xs text-white/80 mt-1">取貨、宅配、加熱</div>
+            </button>
+            <button data-admin-tab="paper" onclick="showAdminTab('paper')" class="adminBtn bg-orange-700 text-white px-4 py-5 rounded-2xl text-left font-bold shadow">
+              <div class="text-lg">新增訂單</div>
+              <div class="text-xs text-white/80 mt-1">紙本 / 電話</div>
+            </button>
+            <button data-admin-tab="stock" onclick="showAdminTab('stock')" class="adminBtn bg-lime-700 text-white px-4 py-5 rounded-2xl text-left font-bold shadow">
+              <div class="text-lg">庫存查看</div>
+              <div class="text-xs text-white/80 mt-1">缺貨、需求</div>
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <div class="text-xs font-bold text-gray-500 mb-2">其他功能</div>
+          <div class="grid grid-cols-3 gap-2">
+            <button data-admin-tab="war" onclick="showAdminTab('war')" class="adminBtn bg-amber-100 text-amber-900 border border-amber-200 px-3 py-3 rounded-xl font-bold">看板</button>
+            <button data-admin-tab="quote" onclick="showAdminTab('quote')" class="adminBtn bg-emerald-100 text-emerald-900 border border-emerald-200 px-3 py-3 rounded-xl font-bold">報價</button>
+            <button data-admin-tab="project" onclick="showAdminTab('project')" class="adminBtn bg-indigo-100 text-indigo-900 border border-indigo-200 px-3 py-3 rounded-xl font-bold">專案</button>
+            <button data-admin-tab="expenses" onclick="showAdminTab('expenses')" class="adminBtn bg-red-100 text-red-900 border border-red-200 px-3 py-3 rounded-xl font-bold">成本</button>
+            <button data-admin-tab="income" onclick="showAdminTab('income')" class="adminBtn bg-green-100 text-green-900 border border-green-200 px-3 py-3 rounded-xl font-bold">收入</button>
+            <button data-admin-tab="stats" onclick="showAdminTab('stats')" class="adminBtn bg-yellow-100 text-yellow-900 border border-yellow-200 px-3 py-3 rounded-xl font-bold">統計</button>
+            <button data-admin-tab="product" onclick="showAdminTab('product')" class="adminBtn bg-stone-100 text-stone-900 border border-stone-200 px-3 py-3 rounded-xl font-bold">商品</button>
+            <button data-admin-tab="email" onclick="showAdminTab('email')" class="adminBtn bg-purple-100 text-purple-900 border border-purple-200 px-3 py-3 rounded-xl font-bold col-span-2">官網匯入</button>
+          </div>
+        </div>
       </div>
 
       <div class="hidden md:grid md:grid-cols-4 gap-4">
@@ -456,6 +480,14 @@
       </div>
     </div>
     <div id="adminPanel"></div>
+
+    <nav class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t shadow-2xl px-2 py-2 grid grid-cols-5 gap-1">
+      <button data-admin-tab="orders" onclick="showAdminTab('orders')" class="adminBtn text-xs font-bold rounded-xl py-3 bg-amber-700 text-white">訂單</button>
+      <button data-admin-tab="shipping" onclick="showAdminTab('shipping')" class="adminBtn text-xs font-bold rounded-xl py-3 bg-blue-700 text-white">出貨</button>
+      <button data-admin-tab="paper" onclick="showAdminTab('paper')" class="adminBtn text-xs font-bold rounded-xl py-3 bg-orange-700 text-white">新增</button>
+      <button data-admin-tab="stock" onclick="showAdminTab('stock')" class="adminBtn text-xs font-bold rounded-xl py-3 bg-lime-700 text-white">庫存</button>
+      <button data-admin-tab="expenses" onclick="showAdminTab('expenses')" class="adminBtn text-xs font-bold rounded-xl py-3 bg-red-700 text-white">成本</button>
+    </nav>
   </div>
 </section>
 
