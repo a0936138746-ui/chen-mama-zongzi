@@ -373,19 +373,65 @@
 
   <div id="adminContent" class="hidden">
     <div id="adminOrderNotice" class="hidden mb-5"></div>
-            <div class="flex flex-wrap gap-3 mb-6">
-      <button onclick="showAdminTab('orders')" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">訂單管理</button>
-      <button onclick="showAdminTab('war')" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">作戰看板</button>
-      <button onclick="showAdminTab('paper')" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">紙本/電話訂單</button>
-      <button onclick="showAdminTab('quote')" class="adminBtn bg-emerald-700 text-white px-4 py-2 rounded-xl">報價單</button>
-      <button onclick="showAdminTab('project')" class="adminBtn bg-indigo-700 text-white px-4 py-2 rounded-xl">專案/特殊訂單</button>
-      <button onclick="showAdminTab('expenses')" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">成本支出</button>
-      <button onclick="showAdminTab('income')" class="adminBtn bg-green-700 text-white px-4 py-2 rounded-xl">現場收入</button>
-      <button onclick="showAdminTab('stats')" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">營運統計</button>
-      <button onclick="showAdminTab('stock')" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">庫存查看</button>
-      <button onclick="showAdminTab('shipping')" class="adminBtn bg-blue-700 text-white px-4 py-2 rounded-xl">出貨/取貨清單</button>
-      <button onclick="renderEmailImport()" class="adminBtn bg-purple-700 text-white px-4 py-2 rounded-xl">匯入官網Email</button>
-      <button onclick="renderProductAdmin()" class="adminBtn bg-amber-700 text-white px-4 py-2 rounded-xl">商品管理</button>
+    <div class="bg-white border rounded-2xl shadow-sm p-4 mb-6">
+      <div class="flex justify-between items-center gap-3 flex-wrap mb-3">
+        <div>
+          <div class="font-bold text-lg">後台功能選單</div>
+          <div class="text-sm text-gray-500">依工作類型整理，找功能比較快。</div>
+        </div>
+        <select class="border p-3 rounded-xl md:hidden w-full" onchange="showAdminTab(this.value)">
+          <option value="orders">訂單管理</option>
+          <option value="war">作戰看板</option>
+          <option value="shipping">出貨/取貨清單</option>
+          <option value="paper">紙本/電話訂單</option>
+          <option value="quote">報價單</option>
+          <option value="project">專案/特殊訂單</option>
+          <option value="expenses">成本支出</option>
+          <option value="income">現場收入</option>
+          <option value="stats">營運統計</option>
+          <option value="stock">庫存查看</option>
+          <option value="product">商品管理</option>
+          <option value="email">匯入官網Email</option>
+        </select>
+      </div>
+
+      <div class="hidden md:grid md:grid-cols-4 gap-4">
+        <div>
+          <div class="text-xs font-bold text-gray-500 mb-2">主要作業</div>
+          <div class="grid gap-2">
+            <button data-admin-tab="orders" onclick="showAdminTab('orders')" class="adminBtn bg-amber-700 text-white px-4 py-3 rounded-xl text-left font-bold">訂單管理</button>
+            <button data-admin-tab="war" onclick="showAdminTab('war')" class="adminBtn bg-amber-700 text-white px-4 py-3 rounded-xl text-left font-bold">作戰看板</button>
+            <button data-admin-tab="shipping" onclick="showAdminTab('shipping')" class="adminBtn bg-blue-700 text-white px-4 py-3 rounded-xl text-left font-bold">出貨/取貨清單</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="text-xs font-bold text-gray-500 mb-2">新增訂單</div>
+          <div class="grid gap-2">
+            <button data-admin-tab="paper" onclick="showAdminTab('paper')" class="adminBtn bg-amber-700 text-white px-4 py-3 rounded-xl text-left font-bold">紙本/電話訂單</button>
+            <button data-admin-tab="quote" onclick="showAdminTab('quote')" class="adminBtn bg-emerald-700 text-white px-4 py-3 rounded-xl text-left font-bold">報價單</button>
+            <button data-admin-tab="project" onclick="showAdminTab('project')" class="adminBtn bg-indigo-700 text-white px-4 py-3 rounded-xl text-left font-bold">專案/特殊訂單</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="text-xs font-bold text-gray-500 mb-2">財務成本</div>
+          <div class="grid gap-2">
+            <button data-admin-tab="expenses" onclick="showAdminTab('expenses')" class="adminBtn bg-red-700 text-white px-4 py-3 rounded-xl text-left font-bold">成本支出</button>
+            <button data-admin-tab="income" onclick="showAdminTab('income')" class="adminBtn bg-green-700 text-white px-4 py-3 rounded-xl text-left font-bold">現場收入</button>
+            <button data-admin-tab="stats" onclick="showAdminTab('stats')" class="adminBtn bg-amber-700 text-white px-4 py-3 rounded-xl text-left font-bold">營運統計</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="text-xs font-bold text-gray-500 mb-2">商品與匯入</div>
+          <div class="grid gap-2">
+            <button data-admin-tab="stock" onclick="showAdminTab('stock')" class="adminBtn bg-amber-700 text-white px-4 py-3 rounded-xl text-left font-bold">庫存查看</button>
+            <button data-admin-tab="product" onclick="showAdminTab('product')" class="adminBtn bg-amber-700 text-white px-4 py-3 rounded-xl text-left font-bold">商品管理</button>
+            <button data-admin-tab="email" onclick="showAdminTab('email')" class="adminBtn bg-purple-700 text-white px-4 py-3 rounded-xl text-left font-bold">匯入官網Email</button>
+          </div>
+        </div>
+      </div>
     </div>
     <div id="adminPanel"></div>
   </div>
@@ -2380,6 +2426,25 @@ function showAdminTab(tab) {
   if (tab === "stats") renderStats();
   if (tab === "stock") renderStock();
   if (tab === "shipping") renderShippingList();
+  if (tab === "email") renderEmailImport();
+  if (tab === "product") renderProductAdmin();
+
+  updateAdminNavState(tab);
+}
+
+function updateAdminNavState(tab) {
+  document.querySelectorAll("[data-admin-tab]").forEach(button => {
+    const active = button.dataset.adminTab === tab;
+    button.classList.toggle("ring-4", active);
+    button.classList.toggle("ring-amber-300", active);
+    button.classList.toggle("scale-[1.02]", active);
+  });
+
+  document.querySelectorAll("#adminContent select").forEach(select => {
+    if ([...select.options].some(option => option.value === tab)) {
+      select.value = tab;
+    }
+  });
 }
 
 function openOrderInOrders(orderId) {
