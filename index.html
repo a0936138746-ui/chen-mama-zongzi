@@ -6086,9 +6086,44 @@ async function saveProjectOrder() {
   
 function renderExpenses() {
   const expenseTotal = expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const today = todayStr();
+  const weekRange = getWeekRange();
+  const monthStart = today.slice(0, 7) + "-01";
+  const todayExpenses = expenses.filter(e => e.date === today);
+  const weekExpenses = expenses.filter(e => isDateInRange(e.date, weekRange.start, weekRange.end));
+  const monthExpenses = expenses.filter(e => isDateInRange(e.date, monthStart, today));
+  const todayTotal = todayExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const weekTotal = weekExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const monthTotal = monthExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const categoryRank = getExpenseRankRows(expenses, e => e.category || "未分類");
+  const vendorRank = getExpenseRankRows(expenses, e => e.vendor_name || "未選商家");
+  const itemRank = getExpenseRankRows(expenses, e => e.item || "未填品項");
 
   document.getElementById("adminPanel").innerHTML = `
     <h2 class="text-2xl font-bold mb-4">成本支出紀錄</h2>
+
+    <section class="bg-white rounded-2xl shadow border p-5 mb-5">
+      <div class="flex justify-between gap-3 flex-wrap items-center mb-4">
+        <div>
+          <h3 class="text-xl font-bold">成本支出看板</h3>
+          <div class="text-sm text-gray-500">用目前支出紀錄即時計算，方便快速看成本集中在哪裡。</div>
+        </div>
+        <div class="text-sm text-gray-500">本週：${weekRange.start} ~ ${weekRange.end}</div>
+      </div>
+
+      <div class="grid md:grid-cols-4 gap-3 mb-5">
+        ${expenseMetricCard("總支出", expenseTotal, "bg-red-50 text-red-700")}
+        ${expenseMetricCard("今日支出", todayTotal, "bg-amber-50 text-amber-700")}
+        ${expenseMetricCard("本週支出", weekTotal, "bg-blue-50 text-blue-700")}
+        ${expenseMetricCard("本月支出", monthTotal, "bg-purple-50 text-purple-700")}
+      </div>
+
+      <div class="grid lg:grid-cols-3 gap-4">
+        ${expenseRankPanel("分類支出排行", categoryRank)}
+        ${expenseRankPanel("商家支出排行", vendorRank)}
+        ${expenseRankPanel("品項支出排行", itemRank)}
+      </div>
+    </section>
 
     <div class="grid lg:grid-cols-[420px_1fr] gap-5">
       <div class="space-y-5">
@@ -6213,6 +6248,69 @@ function renderExpenses() {
     
 loadVendors();
 addExpenseRow();
+}
+
+function getExpenseRankRows(list, getKey) {
+  const groups = {};
+
+  (list || []).forEach(expense => {
+    const key = getKey(expense) || "未分類";
+    if (!groups[key]) {
+      groups[key] = {
+        key,
+        count: 0,
+        amount: 0
+      };
+    }
+
+    groups[key].count += 1;
+    groups[key].amount += Number(expense.amount || 0);
+  });
+
+  return Object.values(groups)
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, 6);
+}
+
+function expenseMetricCard(label, amount, cls) {
+  return `
+    <div class="${cls} rounded-2xl p-4 border border-current/10">
+      <div class="text-sm font-bold opacity-80">${label}</div>
+      <div class="text-2xl font-bold mt-2">NT$ ${money(amount)}</div>
+    </div>
+  `;
+}
+
+function expenseRankPanel(title, rows) {
+  const total = rows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+
+  return `
+    <div class="bg-gray-50 rounded-2xl p-4 border">
+      <div class="font-bold mb-3">${title}</div>
+      ${
+        rows.length
+          ? rows.map(row => {
+              const percent = total > 0 ? Math.round((row.amount / total) * 100) : 0;
+              return `
+                <div class="mb-3">
+                  <div class="flex justify-between gap-3 text-sm">
+                    <span class="font-bold break-words">${escapeHtml(row.key)}</span>
+                    <span class="whitespace-nowrap">NT$ ${money(row.amount)}</span>
+                  </div>
+                  <div class="flex justify-between text-xs text-gray-500 mb-1">
+                    <span>${row.count} 筆</span>
+                    <span>${percent}%</span>
+                  </div>
+                  <div class="h-2 bg-white rounded-full overflow-hidden">
+                    <div class="h-2 bg-red-500 rounded-full" style="width:${Math.min(percent, 100)}%"></div>
+                  </div>
+                </div>
+              `;
+            }).join("")
+          : `<div class="text-gray-500 text-sm">目前沒有資料</div>`
+      }
+    </div>
+  `;
 }
 
 function renderIncome() {
