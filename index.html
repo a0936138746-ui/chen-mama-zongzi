@@ -2795,15 +2795,9 @@ function openOrderInOrders(orderId) {
 }
 
 function setOrderQuickFilter(type) {
-  window.orderSearchKeyword = "";
   window.highlightOrderId = "";
-  window.orderStatusFilter = "";
-  window.orderDeliveryFilter = "";
-  window.orderSourceFilter = "";
-  window.orderQuickFilter = type;
-
-  const payment = document.getElementById("orderPaymentFilter");
-  if (payment) payment.value = "";
+  window.orderQuickFilter = window.orderQuickFilter === type ? "" : type;
+  window.orderScrollTopAfterRender = window.scrollY;
 
   renderOrders();
 }
@@ -2814,12 +2808,51 @@ function setOrderStatusFilter(value) {
   renderOrders();
 }
 
+function setOrderDeliveryFilter(value) {
+  window.orderDeliveryFilter = value;
+  window.orderQuickFilter = "";
+  renderOrders();
+}
+
+function setOrderPaymentFilter(value) {
+  window.orderPaymentFilter = value;
+  window.orderQuickFilter = "";
+  renderOrders();
+}
+
+function setOrderSourceFilter(value) {
+  window.orderSourceFilter = value;
+  window.orderQuickFilter = "";
+  renderOrders();
+}
+
+function clearOrderSearch() {
+  window.orderSearchKeyword = "";
+  window.orderSearchDraft = "";
+  window.highlightOrderId = "";
+
+  const search = document.getElementById("orderSearch");
+  if (search) search.value = "";
+
+  renderOrders();
+}
+
+function clearOrderConditionFilters() {
+  window.orderStatusFilter = "";
+  window.orderDeliveryFilter = "";
+  window.orderPaymentFilter = "";
+  window.orderSourceFilter = "";
+  window.orderQuickFilter = "";
+  renderOrders();
+}
+
 function clearOrderFilters() {
   window.orderSearchKeyword = "";
   window.orderSearchDraft = "";
   window.highlightOrderId = "";
   window.orderStatusFilter = "";
   window.orderDeliveryFilter = "";
+  window.orderPaymentFilter = "";
   window.orderSourceFilter = "";
   window.orderQuickFilter = "";
 
@@ -3370,7 +3403,7 @@ function getOrderSortDate(o) {
 function renderOrders() {
   const keyword = (window.orderSearchKeyword || "").trim();
   const searchDraft = window.orderSearchDraft ?? keyword;
-  const paymentFilter = document.getElementById("orderPaymentFilter")?.value || "";
+  const paymentFilter = document.getElementById("orderPaymentFilter")?.value || window.orderPaymentFilter || "";
   const statusFilter = document.getElementById("orderStatusFilter")?.value || window.orderStatusFilter || "";
   const deliveryFilter = document.getElementById("orderDeliveryFilter")?.value || window.orderDeliveryFilter || "";
   const sourceFilter = document.getElementById("orderSourceFilter")?.value || window.orderSourceFilter || "";
@@ -3379,6 +3412,7 @@ function renderOrders() {
   window.orderSearchKeyword = keyword;
   window.orderStatusFilter = statusFilter;
   window.orderDeliveryFilter = deliveryFilter;
+  window.orderPaymentFilter = paymentFilter;
   window.orderSourceFilter = sourceFilter;
 
   const filteredOrders = orders
@@ -3440,78 +3474,116 @@ function renderOrders() {
   const completedCount = orders.filter(o => o.status === "已取貨" || o.status === "已宅配").length;
   const cancelledCount = orders.filter(o => o.status === "已取消").length;
   const customerRevisionCount = orders.filter(hasCustomerRevision).length;
+  const activeFilterText = [
+    keyword ? `搜尋：${keyword}` : "",
+    quickFilter ? `快速：${{
+      today: "今日",
+      tomorrow: "明日",
+      overdue: "逾期",
+      shipping: "宅配待寄",
+      pickup: "自取待取",
+      unpaid: "未結清",
+      completed: "已完成",
+      cancelled: "已取消",
+      customerRevision: "客戶修改",
+      eggYolk: "加蛋黃",
+      stockShortage: "出貨近缺貨"
+    }[quickFilter] || quickFilter}` : "",
+    statusFilter ? `狀態：${statusFilter}` : "",
+    deliveryFilter ? `方式：${deliveryFilter}` : "",
+    paymentFilter ? `付款：${paymentFilter}` : "",
+    sourceFilter ? `來源：${sourceFilter}` : ""
+  ].filter(Boolean).join("，");
 
   panel.innerHTML = `
     <h2 class="text-2xl font-bold mb-4">訂單管理</h2>
 
-    <div class="grid md:grid-cols-7 gap-3 mb-4">
-      <input
-        id="orderSearch"
-        placeholder="搜尋姓名 / 電話 / 訂單編號 / 地址 / 商品"
-        class="border p-3 rounded-xl md:col-span-2"
-        value="${escapeHtml(searchDraft)}"
-        oncompositionstart="handleOrderSearchCompositionStart()"
-        oncompositionend="handleOrderSearchCompositionEnd(this)"
-        oninput="handleOrderSearchInput(this)"
-        onkeydown="handleOrderSearchKeydown(event, this)"
-      >
+    <section class="bg-white border rounded-2xl shadow-sm p-4 mb-4">
+      <div class="font-bold mb-2">訂單查詢</div>
 
-      <button
-        type="button"
-        onclick="submitOrderSearch(document.getElementById('orderSearch'))"
-        class="bg-blue-700 text-white px-4 py-2 rounded-xl font-bold">
-        搜尋
-      </button>
+      <div class="grid md:grid-cols-[1fr_auto_auto] gap-2 mb-3">
+        <input
+          id="orderSearch"
+          placeholder="輸入姓名 / 電話 / 訂單編號 / 地址 / 商品，再按查詢"
+          class="border p-4 rounded-xl text-lg"
+          value="${escapeHtml(searchDraft)}"
+          oncompositionstart="handleOrderSearchCompositionStart()"
+          oncompositionend="handleOrderSearchCompositionEnd(this)"
+          oninput="handleOrderSearchInput(this)"
+          onkeydown="handleOrderSearchKeydown(event, this)"
+        >
 
-      <select
-        id="orderStatusFilter"
-        class="border p-3 rounded-xl"
-        onchange="setOrderStatusFilter(this.value)">
-        ${["","未完成","已完成","已取貨","已宅配","已取消"].map(s => `
-          <option value="${s}" ${statusFilter === s ? "selected" : ""}>
-            ${s || "狀態篩選"}
-          </option>
-        `).join("")}
-      </select>
+        <button
+          type="button"
+          onclick="submitOrderSearch(document.getElementById('orderSearch'))"
+          class="bg-blue-700 text-white px-5 py-3 rounded-xl font-bold">
+          查詢
+        </button>
 
-      <select
-        id="orderDeliveryFilter"
-        class="border p-3 rounded-xl"
-        onchange="window.orderDeliveryFilter=this.value; renderOrders()">
-        ${["","自取","宅配","有限外送"].map(s => `
-          <option value="${s}" ${deliveryFilter === s ? "selected" : ""}>
-            ${s || "方式篩選"}
-          </option>
-        `).join("")}
-      </select>
+        <button
+          type="button"
+          onclick="clearOrderSearch()"
+          class="bg-white text-blue-700 border border-blue-300 px-5 py-3 rounded-xl font-bold">
+          清搜尋
+        </button>
+      </div>
 
-      <select
-        id="orderPaymentFilter"
-        class="border p-3 rounded-xl"
-        onchange="renderOrders()">
-        ${["","未結清","未收款","訂金","已收款","退款"].map(s => `
-          <option value="${s}" ${paymentFilter === s ? "selected" : ""}>
-            ${s || "付款篩選"}
-          </option>
-        `).join("")}
-      </select>
+      <div class="grid md:grid-cols-4 gap-2">
+        <select
+          id="orderStatusFilter"
+          class="border p-3 rounded-xl"
+          onchange="setOrderStatusFilter(this.value)">
+          ${["","未完成","已完成","已取貨","已宅配","已取消"].map(s => `
+            <option value="${s}" ${statusFilter === s ? "selected" : ""}>
+              ${s || "狀態篩選"}
+            </option>
+          `).join("")}
+        </select>
 
-      <select
-        id="orderSourceFilter"
-        class="border p-3 rounded-xl"
-        onchange="window.orderSourceFilter=this.value; renderOrders()">
-        ${[
-          ["", "來源篩選"],
-          ["normal", "前台訂單"],
-          ["paper", "紙本/電話"],
-          ["web", "官網匯入"],
-          ["project", "專案/特殊"],
-          ["quote", "報價轉單"]
-        ].map(([value, label]) => `
-          <option value="${value}" ${sourceFilter === value ? "selected" : ""}>${label}</option>
-        `).join("")}
-      </select>
-    </div>
+        <select
+          id="orderDeliveryFilter"
+          class="border p-3 rounded-xl"
+          onchange="setOrderDeliveryFilter(this.value)">
+          ${["","自取","宅配","有限外送"].map(s => `
+            <option value="${s}" ${deliveryFilter === s ? "selected" : ""}>
+              ${s || "方式篩選"}
+            </option>
+          `).join("")}
+        </select>
+
+        <select
+          id="orderPaymentFilter"
+          class="border p-3 rounded-xl"
+          onchange="setOrderPaymentFilter(this.value)">
+          ${["","未結清","未收款","訂金","已收款","退款"].map(s => `
+            <option value="${s}" ${paymentFilter === s ? "selected" : ""}>
+              ${s || "付款篩選"}
+            </option>
+          `).join("")}
+        </select>
+
+        <select
+          id="orderSourceFilter"
+          class="border p-3 rounded-xl"
+          onchange="setOrderSourceFilter(this.value)">
+          ${[
+            ["", "來源篩選"],
+            ["normal", "前台訂單"],
+            ["paper", "紙本/電話"],
+            ["web", "官網匯入"],
+            ["project", "專案/特殊"],
+            ["quote", "報價轉單"]
+          ].map(([value, label]) => `
+            <option value="${value}" ${sourceFilter === value ? "selected" : ""}>${label}</option>
+          `).join("")}
+        </select>
+      </div>
+
+      <div class="flex gap-2 flex-wrap mt-3">
+        <button onclick="clearOrderConditionFilters()" class="bg-gray-100 text-gray-800 border px-4 py-2 rounded-xl font-bold">清條件</button>
+        <button onclick="clearOrderFilters()" class="bg-gray-700 text-white px-4 py-2 rounded-xl font-bold">全部訂單</button>
+      </div>
+    </section>
 
     <div class="flex gap-2 mb-4 flex-wrap">
       <button onclick="setOrderQuickFilter('today')" class="bg-red-600 text-white px-4 py-2 rounded-xl">今日 ${todayCount}</button>
@@ -3525,7 +3597,6 @@ function renderOrders() {
       <button onclick="setOrderQuickFilter('customerRevision')" class="bg-orange-700 text-white px-4 py-2 rounded-xl">客戶修改 ${customerRevisionCount}</button>
       <button onclick="setOrderQuickFilter('eggYolk')" class="bg-yellow-600 text-white px-4 py-2 rounded-xl">加蛋黃 ${orders.filter(o => !isClosedOrder(o) && hasEggYolkRequest(o)).length}</button>
       <button onclick="setOrderQuickFilter('stockShortage')" class="bg-red-700 text-white px-4 py-2 rounded-xl">出貨近缺貨 ${orders.filter(o => !isClosedOrder(o) && hasNearStockShortage(o)).length}</button>
-      <button onclick="clearOrderFilters()" class="bg-gray-700 text-white px-4 py-2 rounded-xl">清除篩選</button>
       <button
         onclick="refreshAdmin().then(renderOrders)"
         class="bg-sky-700 text-white px-4 py-2 rounded-xl">
@@ -3535,6 +3606,7 @@ function renderOrders() {
 
     <div class="bg-amber-50 p-3 rounded-xl mb-4 text-sm text-amber-900">
       顯示 ${filteredOrders.length} / ${orders.length} 筆；未結案 ${activeCount} 筆。點統計、看板或清單中的客戶姓名，可直接跳到對應訂單。
+      ${activeFilterText ? `<div class="mt-1 font-bold">目前條件：${escapeHtml(activeFilterText)}</div>` : ""}
     </div>
 
     <div class="space-y-4">
