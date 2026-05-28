@@ -2540,6 +2540,7 @@ function renderAdminOrderNotice() {
   const today = todayStr();
   const frontOrders = orders.filter(isFrontOrder);
   const todayFrontOrders = frontOrders.filter(order => String(order.time || "").slice(0, 10) === today);
+  const customerRevisionOrders = orders.filter(hasCustomerRevision);
   const latestFrontOrder = frontOrders
     .slice()
     .sort((a, b) => String(b.time || "").localeCompare(String(a.time || "")))[0];
@@ -2572,6 +2573,13 @@ function renderAdminOrderNotice() {
           <div class="bg-white/80 rounded-xl p-3">
             <div class="text-xs text-gray-500">今日前台訂單</div>
             <div class="text-2xl font-bold">${todayFrontOrders.length} 筆</div>
+          </div>
+          <div class="bg-white/80 rounded-xl p-3">
+            <div class="text-xs text-gray-500">客戶修改待確認</div>
+            <button type="button" onclick="showAdminTab('orders'); setTimeout(() => setOrderQuickFilter('customerRevision'), 0)"
+              class="text-2xl font-bold text-orange-700 hover:underline">
+              ${customerRevisionOrders.length} 筆
+            </button>
           </div>
           <div class="bg-white/80 rounded-xl p-3 md:col-span-2">
             <div class="text-xs text-gray-500">最新前台訂單</div>
@@ -2926,6 +2934,20 @@ function hasEggYolkRequest(o) {
   return /(加.*蛋黃|蛋黃.*加|一顆蛋黃|整顆蛋黃|蛋黃)/.test(text);
 }
 
+function hasCustomerRevision(o) {
+  return String(o.note || "").includes("[客戶前台修改");
+}
+
+function getLatestCustomerRevisionText(o) {
+  const note = String(o.note || "");
+  const chunks = note
+    .split("[客戶前台修改")
+    .slice(1)
+    .map(text => "[客戶前台修改" + text.trim());
+
+  return chunks.length ? chunks[chunks.length - 1] : "";
+}
+
 function getEggYolkWorkDays(o) {
   return daysFromToday(getShippingWorkDate(o) || getProcessDate(o));
 }
@@ -3204,6 +3226,13 @@ function getOrderAlert(o) {
     badges.push({ text: "🚨 已逾期未結案", cls: "bg-red-100 text-red-700 border-red-300" });
   }
 
+  if (hasCustomerRevision(o)) {
+    badges.push({
+      text: "🔁 客戶已修改",
+      cls: "bg-orange-100 text-orange-800 border-orange-400"
+    });
+  }
+
   if (hasEggYolkRequest(o)) {
     badges.push({
       text: needsEggYolkPrep(o) ? "🥚 蛋黃單：出貨前先備料" : "🥚 加蛋黃 +10",
@@ -3354,6 +3383,7 @@ function renderOrders() {
         (quickFilter === "unpaid" && getUnpaidAmount(o) > 0) ||
         (quickFilter === "completed" && (o.status === "已取貨" || o.status === "已宅配")) ||
         (quickFilter === "cancelled" && o.status === "已取消") ||
+        (quickFilter === "customerRevision" && hasCustomerRevision(o)) ||
         (quickFilter === "eggYolk" && !isClosedOrder(o) && hasEggYolkRequest(o)) ||
         (quickFilter === "stockShortage" && !isClosedOrder(o) && hasNearStockShortage(o));
 
@@ -3377,6 +3407,7 @@ function renderOrders() {
   const unpaidCount = orders.filter(o => getUnpaidAmount(o) > 0).length;
   const completedCount = orders.filter(o => o.status === "已取貨" || o.status === "已宅配").length;
   const cancelledCount = orders.filter(o => o.status === "已取消").length;
+  const customerRevisionCount = orders.filter(hasCustomerRevision).length;
 
   panel.innerHTML = `
     <h2 class="text-2xl font-bold mb-4">訂單管理</h2>
@@ -3459,6 +3490,7 @@ function renderOrders() {
       <button onclick="setOrderQuickFilter('unpaid')" class="bg-amber-700 text-white px-4 py-2 rounded-xl">未結清 ${unpaidCount}</button>
       <button onclick="setOrderQuickFilter('completed')" class="bg-green-700 text-white px-4 py-2 rounded-xl">已完成 ${completedCount}</button>
       <button onclick="setOrderQuickFilter('cancelled')" class="bg-gray-600 text-white px-4 py-2 rounded-xl">已取消 ${cancelledCount}</button>
+      <button onclick="setOrderQuickFilter('customerRevision')" class="bg-orange-700 text-white px-4 py-2 rounded-xl">客戶修改 ${customerRevisionCount}</button>
       <button onclick="setOrderQuickFilter('eggYolk')" class="bg-yellow-600 text-white px-4 py-2 rounded-xl">加蛋黃 ${orders.filter(o => !isClosedOrder(o) && hasEggYolkRequest(o)).length}</button>
       <button onclick="setOrderQuickFilter('stockShortage')" class="bg-red-700 text-white px-4 py-2 rounded-xl">出貨近缺貨 ${orders.filter(o => !isClosedOrder(o) && hasNearStockShortage(o)).length}</button>
       <button onclick="clearOrderFilters()" class="bg-gray-700 text-white px-4 py-2 rounded-xl">清除篩選</button>
@@ -3564,6 +3596,12 @@ function orderCard(o) {
       ${hasNearStockShortage(o) ? `
         <div class="mb-3 bg-red-100 border-2 border-red-500 text-red-900 rounded-xl p-3 font-bold">
           ⚠️ 出貨近但庫存不足：${getStockShortageInfo(o).text}。請先補貨或調整出貨。
+        </div>
+      ` : ""}
+      ${hasCustomerRevision(o) ? `
+        <div class="mb-3 bg-orange-50 border-2 border-orange-400 text-orange-900 rounded-xl p-3">
+          <div class="font-bold mb-1">🔁 客戶已自行修改訂單，請確認商品與金額</div>
+          <div class="text-sm whitespace-pre-line order-card-text">${escapeHtml(getLatestCustomerRevisionText(o))}</div>
         </div>
       ` : ""}
       <div class="grid lg:grid-cols-[1fr_320px] gap-4 items-start">
