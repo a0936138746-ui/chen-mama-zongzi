@@ -6085,19 +6085,24 @@ async function saveProjectOrder() {
 }
   
 function renderExpenses() {
-  const expenseTotal = expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
   const today = todayStr();
   const weekRange = getWeekRange();
   const monthStart = today.slice(0, 7) + "-01";
-  const todayExpenses = expenses.filter(e => e.date === today);
-  const weekExpenses = expenses.filter(e => isDateInRange(e.date, weekRange.start, weekRange.end));
-  const monthExpenses = expenses.filter(e => isDateInRange(e.date, monthStart, today));
+  const expenseStart = window.expenseStartDate || "";
+  const expenseEnd = window.expenseEndDate || "";
+  const expenseCategoryFilter = window.expenseCategoryFilter || "";
+  const expenseKeyword = window.expenseKeyword || "";
+  const filteredExpenses = getFilteredExpenses();
+  const expenseTotal = filteredExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const todayExpenses = filteredExpenses.filter(e => e.date === today);
+  const weekExpenses = filteredExpenses.filter(e => isDateInRange(e.date, weekRange.start, weekRange.end));
+  const monthExpenses = filteredExpenses.filter(e => isDateInRange(e.date, monthStart, today));
   const todayTotal = todayExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
   const weekTotal = weekExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
   const monthTotal = monthExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-  const categoryRank = getExpenseRankRows(expenses, e => e.category || "未分類");
-  const vendorRank = getExpenseRankRows(expenses, e => e.vendor_name || "未選商家");
-  const itemRank = getExpenseRankRows(expenses, e => e.item || "未填品項");
+  const categoryRank = getExpenseRankRows(filteredExpenses, e => e.category || "未分類");
+  const vendorRank = getExpenseRankRows(filteredExpenses, e => e.vendor_name || "未選商家");
+  const itemRank = getExpenseRankRows(filteredExpenses, e => e.item || "未填品項");
 
   document.getElementById("adminPanel").innerHTML = `
     <h2 class="text-2xl font-bold mb-4">成本支出紀錄</h2>
@@ -6122,6 +6127,33 @@ function renderExpenses() {
         ${expenseRankPanel("分類支出排行", categoryRank)}
         ${expenseRankPanel("商家支出排行", vendorRank)}
         ${expenseRankPanel("品項支出排行", itemRank)}
+      </div>
+
+      <div class="mt-5 bg-gray-50 border rounded-2xl p-4">
+        <div class="font-bold mb-3">支出查詢</div>
+        <div class="grid md:grid-cols-5 gap-3">
+          <input id="expenseStartDate" type="date" class="border p-3 rounded-xl" value="${expenseStart}">
+          <input id="expenseEndDate" type="date" class="border p-3 rounded-xl" value="${expenseEnd}">
+          <select id="expenseCategoryFilter" class="border p-3 rounded-xl">
+            ${["","食材","包材","物流","人事","設備場地","行銷","其他"].map(category => `
+              <option value="${category}" ${expenseCategoryFilter === category ? "selected" : ""}>${category || "全部分類"}</option>
+            `).join("")}
+          </select>
+          <input id="expenseKeyword" class="border p-3 rounded-xl" placeholder="搜尋商家 / 品項 / 備註" value="${escapeHtml(expenseKeyword)}">
+          <button type="button" onclick="applyExpenseFilters()"
+            class="bg-blue-700 text-white px-4 py-3 rounded-xl font-bold">
+            查詢
+          </button>
+        </div>
+        <div class="flex gap-2 flex-wrap mt-3">
+          <button type="button" onclick="setExpenseQuickRange('today')" class="bg-red-600 text-white px-4 py-2 rounded-xl">今天</button>
+          <button type="button" onclick="setExpenseQuickRange('week')" class="bg-blue-600 text-white px-4 py-2 rounded-xl">本週</button>
+          <button type="button" onclick="setExpenseQuickRange('month')" class="bg-purple-600 text-white px-4 py-2 rounded-xl">本月</button>
+          <button type="button" onclick="clearExpenseFilters()" class="bg-gray-700 text-white px-4 py-2 rounded-xl">全部</button>
+        </div>
+        <div class="text-sm text-gray-500 mt-3">
+          目前顯示 ${filteredExpenses.length} / ${expenses.length} 筆，合計 NT$ ${money(expenseTotal)}
+        </div>
       </div>
     </section>
 
@@ -6207,13 +6239,13 @@ function renderExpenses() {
         <div class="bg-red-50 border border-red-200 p-5 rounded-2xl shadow mb-4">
           <div class="text-sm text-red-700 font-bold">支出總計</div>
           <div class="text-3xl font-bold text-red-700">NT$ ${money(expenseTotal)}</div>
-          <div class="text-sm text-gray-600">共 ${expenses.length} 筆支出</div>
+          <div class="text-sm text-gray-600">目前顯示 ${filteredExpenses.length} / ${expenses.length} 筆支出</div>
         </div>
 
         <div class="space-y-3">
           ${
-            expenses.length
-              ? expenses.map(e => `
+            filteredExpenses.length
+              ? filteredExpenses.map(e => `
                 <div class="bg-white p-4 rounded-2xl shadow border">
                   <div class="flex justify-between gap-3 flex-wrap">
                     <div class="min-w-[220px] flex-1 order-card-text">
@@ -6239,7 +6271,7 @@ function renderExpenses() {
                   </div>
                 </div>
               `).join("")
-              : `<div class="bg-gray-100 p-4 rounded-xl">目前沒有支出紀錄</div>`
+              : `<div class="bg-gray-100 p-4 rounded-xl">目前沒有符合條件的支出紀錄</div>`
           }
         </div>
       </section>
@@ -6248,6 +6280,69 @@ function renderExpenses() {
     
 loadVendors();
 addExpenseRow();
+}
+
+function getFilteredExpenses() {
+  const start = window.expenseStartDate || "";
+  const end = window.expenseEndDate || "";
+  const category = window.expenseCategoryFilter || "";
+  const keyword = String(window.expenseKeyword || "").trim().toLowerCase();
+
+  return expenses.filter(expense => {
+    const date = expense.date || "";
+    const text = `
+      ${expense.vendor_name || ""}
+      ${expense.category || ""}
+      ${expense.item || ""}
+      ${expense.payment_method || ""}
+      ${expense.note || ""}
+    `.toLowerCase();
+
+    if (start && date < start) return false;
+    if (end && date > end) return false;
+    if (category && expense.category !== category) return false;
+    if (keyword && !text.includes(keyword)) return false;
+
+    return true;
+  });
+}
+
+function applyExpenseFilters() {
+  window.expenseStartDate = document.getElementById("expenseStartDate")?.value || "";
+  window.expenseEndDate = document.getElementById("expenseEndDate")?.value || "";
+  window.expenseCategoryFilter = document.getElementById("expenseCategoryFilter")?.value || "";
+  window.expenseKeyword = document.getElementById("expenseKeyword")?.value || "";
+  renderExpenses();
+}
+
+function setExpenseQuickRange(type) {
+  const today = todayStr();
+
+  if (type === "today") {
+    window.expenseStartDate = today;
+    window.expenseEndDate = today;
+  }
+
+  if (type === "week") {
+    const range = getWeekRange();
+    window.expenseStartDate = range.start;
+    window.expenseEndDate = range.end;
+  }
+
+  if (type === "month") {
+    window.expenseStartDate = today.slice(0, 7) + "-01";
+    window.expenseEndDate = today;
+  }
+
+  renderExpenses();
+}
+
+function clearExpenseFilters() {
+  window.expenseStartDate = "";
+  window.expenseEndDate = "";
+  window.expenseCategoryFilter = "";
+  window.expenseKeyword = "";
+  renderExpenses();
 }
 
 function getExpenseRankRows(list, getKey) {
