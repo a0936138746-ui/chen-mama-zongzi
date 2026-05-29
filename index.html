@@ -227,8 +227,12 @@
             class="bg-amber-400 text-stone-950 px-7 py-5 rounded-2xl font-bold text-xl shadow-xl">
             立即訂購
           </button>
+          <button type="button" onclick="scrollToQuickOrder()"
+            class="bg-white text-amber-900 px-7 py-5 rounded-2xl font-bold text-xl shadow-xl">
+            快速訂購
+          </button>
           <button type="button" onclick="openLineContact()"
-            class="bg-green-700 text-white px-7 py-5 rounded-2xl font-bold text-xl shadow-xl">
+            class="bg-green-700 text-white px-7 py-5 rounded-2xl font-bold text-xl shadow-xl sm:col-span-2">
             加入 LINE 官方
           </button>
         </div>
@@ -271,6 +275,14 @@
           <button onclick="loadProducts()" class="bg-stone-900 text-white px-4 py-2 rounded-xl font-bold">重新讀取商品</button>
         </div>
 
+        <section id="quickOrderPanel" class="mb-5"></section>
+
+        <div class="flex items-center justify-between gap-3 mb-3">
+          <div>
+            <h3 class="text-xl font-bold text-stone-900">完整商品列表</h3>
+            <div class="text-sm text-stone-500">需要禮盒、整數或看詳細介紹可從這裡選。</div>
+          </div>
+        </div>
         <div id="frontCategoryTabs" class="grid grid-cols-3 gap-2 mb-4"></div>
         <div id="productList" class="grid md:grid-cols-1 xl:grid-cols-2 gap-4"></div>
 
@@ -1337,6 +1349,7 @@ function renderProducts() {
   const box = document.getElementById("productList");
   const tabs = document.getElementById("frontCategoryTabs");
   box.innerHTML = "";
+  renderQuickOrderPanel();
 
   const categories = [
     { key: "single", label: "單點區" },
@@ -1431,6 +1444,129 @@ function renderProducts() {
     `;
     box.appendChild(card);
   });
+}
+
+function getQuickOrderProducts() {
+  const wantedNames = ["北部粽", "南部粽", "素食粽", "豪華粽", "原味鹼粽", "紅豆鹼粽"];
+  const available = products.filter(isFrontProductAvailable);
+
+  return wantedNames
+    .map(baseName => {
+      const singleMatch = available.find(p =>
+        getFrontBaseProductName(p) === baseName &&
+        getFrontProductCategory(p) === "single"
+      );
+
+      if (singleMatch) return singleMatch;
+
+      return available.find(p => getFrontBaseProductName(p) === baseName);
+    })
+    .filter(Boolean);
+}
+
+function getCartQtyByProductId(productId) {
+  const item = cart.find(x => Number(x.id) === Number(productId));
+  return Number(item?.qty || 0);
+}
+
+function changeQuickCartQty(productId, delta) {
+  const product = products.find(p => Number(p.id) === Number(productId));
+  if (!product) return;
+
+  const current = getCartQtyByProductId(productId);
+  const nextQty = Math.max(0, current + delta);
+  const existing = cart.find(x => Number(x.id) === Number(productId));
+
+  if (nextQty === 0) {
+    cart = cart.filter(x => Number(x.id) !== Number(productId));
+  } else if (existing) {
+    existing.qty = nextQty;
+  } else {
+    cart.push({
+      id: product.id,
+      name: getFrontProductDisplayName(product),
+      raw_name: product.name,
+      price: getPriceBySource(product),
+      qty: nextQty
+    });
+  }
+
+  renderCart();
+}
+
+function renderQuickOrderPanel() {
+  const panel = document.getElementById("quickOrderPanel");
+  if (!panel) return;
+
+  const quickProducts = getQuickOrderProducts();
+
+  if (!quickProducts.length) {
+    panel.innerHTML = "";
+    return;
+  }
+
+  panel.innerHTML = `
+    <div class="front-card bg-white rounded-2xl p-4 md:p-5 border-2 border-amber-200">
+      <div class="flex justify-between items-start gap-3 flex-wrap mb-4">
+        <div>
+          <h3 class="text-2xl font-bold text-stone-900">快速訂購</h3>
+          <div class="text-base text-stone-600 mt-1">常買商品直接按數量，適合長輩快速下單。</div>
+        </div>
+        <button type="button" onclick="document.getElementById('customerName')?.scrollIntoView({ behavior: 'smooth', block: 'center' })"
+          class="bg-green-700 text-white px-5 py-3 rounded-xl font-bold">
+          選好了，填資料
+        </button>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-3">
+        ${quickProducts.map(product => {
+          const qty = getCartQtyByProductId(product.id);
+          const name = getFrontBaseProductName(product);
+
+          return `
+            <div class="bg-[#fff8ed] border border-amber-100 rounded-2xl p-4">
+              <div class="flex justify-between gap-3 mb-3">
+                <div>
+                  <div class="text-2xl font-bold text-stone-900">${name}</div>
+                  <div class="text-sm text-stone-500">${getFrontProductMoodText(product)}</div>
+                </div>
+                <div class="text-right shrink-0">
+                  <div class="text-sm text-stone-500">單價</div>
+                  <div class="text-2xl font-bold text-amber-800">NT$ ${money(product.price)}</div>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-[64px_1fr_64px] gap-2 items-center">
+                <button type="button" onclick="changeQuickCartQty(${product.id}, -1)"
+                  class="mobile-action-btn bg-white border-2 border-stone-200 text-3xl rounded-2xl font-bold">
+                  -
+                </button>
+                <div class="bg-white rounded-2xl border-2 border-amber-200 text-center py-3">
+                  <div class="text-sm text-stone-500">已選</div>
+                  <div class="text-4xl font-bold text-stone-900">${qty}</div>
+                </div>
+                <button type="button" onclick="changeQuickCartQty(${product.id}, 1)"
+                  class="mobile-action-btn bg-amber-600 text-white text-3xl rounded-2xl font-bold">
+                  +
+                </button>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2 mt-2">
+                <button type="button" onclick="changeQuickCartQty(${product.id}, 5)"
+                  class="mobile-action-btn bg-amber-100 text-amber-900 rounded-xl font-bold">
+                  +5
+                </button>
+                <button type="button" onclick="changeQuickCartQty(${product.id}, 10)"
+                  class="mobile-action-btn bg-stone-900 text-white rounded-xl font-bold">
+                  +10
+                </button>
+              </div>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    </div>
+  `;
 }
 
 function normalizeFrontProductName(name) {
@@ -1719,6 +1855,7 @@ function renderCart() {
     if (shippingFeeText) shippingFeeText.innerText = "NT$ 0";
     totalBox.innerText = "0";
     renderFrontShippingSummary(totals.shipping);
+    renderQuickOrderPanel();
     return;
   }
 
@@ -1764,6 +1901,7 @@ function renderCart() {
   }
   renderFrontShippingSummary(totals.shipping);
   totalBox.innerText = money(totals.total);
+  renderQuickOrderPanel();
 }
 
 function renderFrontShippingSummary(shipping) {
@@ -1843,6 +1981,13 @@ function normalizePhone(value) {
 
 function scrollToFrontOrder() {
   document.getElementById("frontOrderSection")?.scrollIntoView({
+    behavior: "smooth",
+    block: "start"
+  });
+}
+
+function scrollToQuickOrder() {
+  document.getElementById("quickOrderPanel")?.scrollIntoView({
     behavior: "smooth",
     block: "start"
   });
