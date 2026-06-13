@@ -465,6 +465,10 @@
               <div class="text-lg">出貨清單</div>
               <div class="text-xs text-white/80 mt-1">取貨、宅配、加熱</div>
             </button>
+            <button data-admin-tab="dailyDemand" onclick="showAdminTab('dailyDemand')" class="adminBtn bg-teal-700 text-white px-4 py-5 rounded-2xl text-left font-bold shadow">
+              <div class="text-lg">每日需求</div>
+              <div class="text-xs text-white/80 mt-1">備料數量、名單</div>
+            </button>
             <button data-admin-tab="paper" onclick="showAdminTab('paper')" class="adminBtn bg-orange-700 text-white px-4 py-5 rounded-2xl text-left font-bold shadow">
               <div class="text-lg">新增訂單</div>
               <div class="text-xs text-white/80 mt-1">紙本 / 電話</div>
@@ -498,6 +502,7 @@
             <button data-admin-tab="orders" onclick="showAdminTab('orders')" class="adminBtn bg-amber-700 text-white px-4 py-3 rounded-xl text-left font-bold">訂單管理</button>
             <button data-admin-tab="war" onclick="showAdminTab('war')" class="adminBtn bg-amber-700 text-white px-4 py-3 rounded-xl text-left font-bold">作戰看板</button>
             <button data-admin-tab="shipping" onclick="showAdminTab('shipping')" class="adminBtn bg-blue-700 text-white px-4 py-3 rounded-xl text-left font-bold">出貨/取貨清單</button>
+            <button data-admin-tab="dailyDemand" onclick="showAdminTab('dailyDemand')" class="adminBtn bg-teal-700 text-white px-4 py-3 rounded-xl text-left font-bold">每日需求統計</button>
           </div>
         </div>
 
@@ -2944,6 +2949,7 @@ function showAdminTab(tab) {
   if (tab === "stats") renderStats();
   if (tab === "stock") renderStock();
   if (tab === "shipping") renderShippingList();
+  if (tab === "dailyDemand") renderDailyDemand();
   if (tab === "email") renderEmailImport();
   if (tab === "product") renderProductAdmin();
 
@@ -5100,6 +5106,339 @@ async function completeShippingOrder(id) {
   alert("已完成結案");
   await refreshAdmin();
   renderShippingList();
+}
+
+function setDailyDemandPreset(days) {
+  const date = addDays(todayStr(), days);
+  const startInput = document.getElementById("dailyDemandStart");
+  const endInput = document.getElementById("dailyDemandEnd");
+
+  if (startInput) startInput.value = date;
+  if (endInput) endInput.value = date;
+
+  renderDailyDemand();
+}
+
+function getDailyDemandBaseNames() {
+  return ["北部粽", "南部粽", "豪華粽", "素食粽", "原味鹼粽", "紅豆鹼粽"];
+}
+
+function getDailyDemandDateRange() {
+  const start = document.getElementById("dailyDemandStart")?.value || addDays(todayStr(), 1);
+  const end = document.getElementById("dailyDemandEnd")?.value || start;
+
+  return {
+    start: start <= end ? start : end,
+    end: end >= start ? end : start
+  };
+}
+
+function isOrderInDailyDemandRange(order, start, end) {
+  const workDate = getShippingWorkDate(order);
+  return workDate && workDate >= start && workDate <= end;
+}
+
+function getDailyDemandRows() {
+  const { start, end } = getDailyDemandDateRange();
+  const includeClosed = document.getElementById("dailyDemandIncludeClosed")?.checked || false;
+
+  return orders
+    .filter(order => includeClosed || !isClosedOrder(order))
+    .filter(order => order.status !== "已取消")
+    .filter(order => isOrderInDailyDemandRange(order, start, end))
+    .sort((a, b) => {
+      const dateDiff = getShippingWorkDate(a).localeCompare(getShippingWorkDate(b));
+      if (dateDiff !== 0) return dateDiff;
+
+      const slotDiff = (getOrderTimeSlotInfo(a).raw || "").localeCompare(getOrderTimeSlotInfo(b).raw || "");
+      if (slotDiff !== 0) return slotDiff;
+
+      return String(a.time || "").localeCompare(String(b.time || ""));
+    });
+}
+
+function buildDailyDemandSummary(list) {
+  const demandMap = {};
+
+  list.forEach(order => {
+    const orderDemandMap = getOrderProductDemandMap(order);
+
+    Object.entries(orderDemandMap).forEach(([productId, qty]) => {
+      addDemandToMap(demandMap, productId, qty);
+    });
+  });
+
+  const baseRows = getDailyDemandBaseNames().map(baseName => {
+    const product = getBaseZongziProductByName(baseName);
+    const qty = product ? Number(demandMap[String(product.id)] || 0) : 0;
+    const stock = product ? Number(product.stock || 0) : 0;
+
+    if (product) delete demandMap[String(product.id)];
+
+    return {
+      name: baseName,
+      qty,
+      stock,
+      remain: stock - qty
+    };
+  });
+
+  const otherRows = Object.entries(demandMap)
+    .map(([productId, qty]) => {
+      const product = products.find(p => String(p.id) === String(productId));
+      if (product?.type === "fee") return null;
+
+      const quantity = Number(qty || 0);
+      const stock = product ? Number(product.stock || 0) : 0;
+
+      return {
+        name: product?.name || `商品 ${productId}`,
+        qty: quantity,
+        stock,
+        remain: stock - quantity
+      };
+    })
+    .filter(row => row && row.qty > 0);
+
+  const totalAmount = list.reduce((sum, order) => sum + Number(order.total || 0), 0);
+  const paidAmount = list.reduce((sum, order) => sum + getPaidAmount(order), 0);
+  const unpaidAmount = list.reduce((sum, order) => sum + getUnpaidAmount(order), 0);
+  const shippingFee = list.reduce((sum, order) => {
+    return sum + (order.items || [])
+      .filter(item => item.type === "fee" || String(item.id || "").includes("shipping"))
+      .reduce((feeSum, item) => feeSum + Number(item.price || 0) * Number(item.qty || 0), 0);
+  }, 0);
+
+  return {
+    baseRows,
+    otherRows,
+    totalAmount,
+    paidAmount,
+    unpaidAmount,
+    shippingFee,
+    eggYolkCount: list.filter(hasEggYolkRequest).length,
+    heatCount: list.filter(hasHeatRequest).length,
+    diyCount: list.filter(isDiyOrder).length,
+    shortageCount: list.filter(hasNearStockShortage).length,
+    deliveryCount: list.filter(order => order.delivery === "宅配").length,
+    pickupCount: list.filter(order => order.delivery === "自取").length,
+    localDeliveryCount: list.filter(order => order.delivery === "有限外送").length
+  };
+}
+
+function renderDailyDemand() {
+  const { start, end } = getDailyDemandDateRange();
+  const includeClosed = document.getElementById("dailyDemandIncludeClosed")?.checked || false;
+  const list = getDailyDemandRows();
+  const summary = buildDailyDemandSummary(list);
+  const dateText = start === end ? start : `${start} ~ ${end}`;
+  const demandRows = [...summary.baseRows, ...summary.otherRows]
+    .filter(row => row.qty > 0 || getDailyDemandBaseNames().includes(row.name));
+  const warningRows = demandRows.filter(row => row.remain < 0);
+
+  document.getElementById("adminPanel").innerHTML = `
+    <h2 class="text-2xl font-bold mb-4">每日需求統計</h2>
+
+    <section class="bg-white border rounded-2xl shadow p-4 md:p-5 mb-5">
+      <div class="flex flex-wrap gap-2 mb-4">
+        <button type="button" onclick="setDailyDemandPreset(0)" class="bg-red-600 text-white px-4 py-3 rounded-xl font-bold">今天</button>
+        <button type="button" onclick="setDailyDemandPreset(1)" class="bg-orange-600 text-white px-4 py-3 rounded-xl font-bold">明天</button>
+        <button type="button" onclick="setDailyDemandPreset(2)" class="bg-amber-600 text-white px-4 py-3 rounded-xl font-bold">後天</button>
+      </div>
+
+      <div class="grid md:grid-cols-[1fr_1fr_auto_auto] gap-3 items-end">
+        <label class="block">
+          <span class="block text-sm font-bold text-gray-600 mb-1">開始日期（工作日）</span>
+          <input id="dailyDemandStart" type="date" value="${start}" class="border p-3 rounded-xl w-full">
+        </label>
+
+        <label class="block">
+          <span class="block text-sm font-bold text-gray-600 mb-1">結束日期（工作日）</span>
+          <input id="dailyDemandEnd" type="date" value="${end}" class="border p-3 rounded-xl w-full">
+        </label>
+
+        <label class="flex items-center gap-2 bg-gray-50 border rounded-xl px-4 py-3 font-bold">
+          <input id="dailyDemandIncludeClosed" type="checkbox" ${includeClosed ? "checked" : ""}>
+          包含已完成
+        </label>
+
+        <button type="button" onclick="renderDailyDemand()" class="bg-blue-700 text-white px-5 py-3 rounded-xl font-bold">查詢</button>
+      </div>
+
+      <div class="mt-3 text-sm text-gray-600">
+        目前用「工作日」統計：宅配看應寄出日；自取、有限外送看取貨日。已取消不列入。
+      </div>
+    </section>
+
+    <section class="grid md:grid-cols-4 gap-3 mb-5">
+      <div class="bg-teal-50 border border-teal-200 rounded-2xl p-4">
+        <div class="text-sm text-teal-700">統計日期</div>
+        <div class="text-xl font-bold text-teal-900">${dateText}</div>
+      </div>
+      <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+        <div class="text-sm text-amber-700">訂單筆數</div>
+        <div class="text-3xl font-bold text-amber-800">${list.length}</div>
+      </div>
+      <div class="bg-green-50 border border-green-200 rounded-2xl p-4">
+        <div class="text-sm text-green-700">總金額</div>
+        <div class="text-3xl font-bold text-green-800">NT$ ${money(summary.totalAmount)}</div>
+      </div>
+      <div class="bg-red-50 border border-red-200 rounded-2xl p-4">
+        <div class="text-sm text-red-700">未收款</div>
+        <div class="text-3xl font-bold text-red-700">NT$ ${money(summary.unpaidAmount)}</div>
+      </div>
+    </section>
+
+    ${warningRows.length ? `
+      <section class="bg-red-50 border-2 border-red-300 text-red-800 rounded-2xl p-4 mb-5 font-bold">
+        ⚠️ 庫存不足：${warningRows.map(row => `${escapeHtml(row.name)} 缺 ${Math.abs(row.remain)}`).join("、")}
+      </section>
+    ` : ""}
+
+    <section class="grid xl:grid-cols-[1fr_360px] gap-5 mb-5">
+      <div class="bg-white border rounded-2xl shadow p-4 md:p-5">
+        <div class="flex justify-between items-center gap-3 mb-3">
+          <h3 class="text-xl font-bold">商品需求總表</h3>
+          <button type="button" onclick="exportDailyDemandExcel()" class="bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold">匯出 Excel</button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left">
+            <thead class="bg-gray-100">
+              <tr>
+                <th class="p-3 rounded-l-xl">商品</th>
+                <th class="p-3 text-right">需求</th>
+                <th class="p-3 text-right">庫存</th>
+                <th class="p-3 text-right rounded-r-xl">預估可用</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${demandRows.map(row => `
+                <tr class="border-b">
+                  <td class="p-3 font-bold">${escapeHtml(row.name)}</td>
+                  <td class="p-3 text-right text-xl font-bold">${row.qty}</td>
+                  <td class="p-3 text-right">${row.stock}</td>
+                  <td class="p-3 text-right font-bold ${row.remain < 0 ? "text-red-700" : "text-green-700"}">${row.remain}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="bg-white border rounded-2xl shadow p-4 md:p-5">
+        <h3 class="text-xl font-bold mb-3">重點提醒</h3>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="bg-yellow-50 rounded-xl p-3"><div class="text-sm">加蛋黃</div><div class="text-2xl font-bold text-yellow-700">${summary.eggYolkCount}</div></div>
+          <div class="bg-orange-50 rounded-xl p-3"><div class="text-sm">需加熱</div><div class="text-2xl font-bold text-orange-700">${summary.heatCount}</div></div>
+          <div class="bg-indigo-50 rounded-xl p-3"><div class="text-sm">DIY/活動</div><div class="text-2xl font-bold text-indigo-700">${summary.diyCount}</div></div>
+          <div class="bg-red-50 rounded-xl p-3"><div class="text-sm">缺貨風險</div><div class="text-2xl font-bold text-red-700">${summary.shortageCount}</div></div>
+          <div class="bg-blue-50 rounded-xl p-3"><div class="text-sm">宅配</div><div class="text-2xl font-bold text-blue-700">${summary.deliveryCount}</div></div>
+          <div class="bg-lime-50 rounded-xl p-3"><div class="text-sm">自取/外送</div><div class="text-2xl font-bold text-lime-700">${summary.pickupCount + summary.localDeliveryCount}</div></div>
+        </div>
+        <div class="mt-4 border-t pt-3 text-sm leading-7">
+          <div>已收款：NT$ ${money(summary.paidAmount)}</div>
+          <div>宅配運費：NT$ ${money(summary.shippingFee)}</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-white border rounded-2xl shadow p-4 md:p-5">
+      <h3 class="text-xl font-bold mb-3">訂單明細</h3>
+      <div class="space-y-3">
+        ${
+          list.length
+            ? list.map(order => `
+              <div class="border rounded-xl p-3 grid md:grid-cols-[180px_140px_1fr_120px] gap-3 items-start">
+                <div>
+                  <button type="button" onclick="openOrderInOrders('${order.id}')" class="text-left text-blue-700 font-bold hover:underline">
+                    ${escapeHtml(getShippingCustomerName(order) || order.name || "未填姓名")}
+                  </button>
+                  <div class="text-sm text-gray-500">${escapeHtml(getShippingPhoneText(order) || order.phone || "")}</div>
+                </div>
+                <div>
+                  <div class="font-bold">${getShippingWorkDate(order)}</div>
+                  <div class="text-sm text-gray-500">${order.delivery || ""}｜${getOrderTimeSlotInfo(order).raw || "未填時段"}</div>
+                </div>
+                <div class="whitespace-pre-line text-sm">${escapeHtml(getShippingItemText(order) || "沒有商品明細")}</div>
+                <div class="md:text-right">
+                  <div class="font-bold text-amber-700">NT$ ${money(order.total)}</div>
+                  <div class="text-xs ${getUnpaidAmount(order) > 0 ? "text-red-700" : "text-green-700"}">${getPaymentStatus(order)}</div>
+                </div>
+                ${getShippingNoteText(order) ? `<div class="md:col-span-4 bg-purple-50 text-purple-800 rounded-xl p-2 text-sm whitespace-pre-line">備註：${escapeHtml(getShippingNoteText(order))}</div>` : ""}
+              </div>
+            `).join("")
+            : `<div class="bg-gray-50 rounded-xl p-5 text-gray-500">這個日期沒有需要處理的訂單</div>`
+        }
+      </div>
+    </section>
+  `;
+}
+
+function exportDailyDemandExcel() {
+  if (!window.XLSX) {
+    alert("Excel 匯出套件尚未載入，請重新整理頁面後再試一次");
+    return;
+  }
+
+  const { start, end } = getDailyDemandDateRange();
+  const list = getDailyDemandRows();
+  const summary = buildDailyDemandSummary(list);
+  const demandRows = [...summary.baseRows, ...summary.otherRows]
+    .filter(row => row.qty > 0 || getDailyDemandBaseNames().includes(row.name));
+
+  if (!list.length) {
+    alert("目前沒有可匯出的每日需求");
+    return;
+  }
+
+  const summarySheet = XLSX.utils.aoa_to_sheet([
+    ["陳媽媽每日需求統計"],
+    [`工作日：${start === end ? start : `${start} ~ ${end}`}　訂單：${list.length} 筆　總金額：NT$ ${money(summary.totalAmount)}`],
+    [],
+    ["商品", "需求", "庫存", "預估可用"],
+    ...demandRows.map(row => [row.name, row.qty, row.stock, row.remain]),
+    [],
+    ["提醒", "數量"],
+    ["加蛋黃訂單", summary.eggYolkCount],
+    ["需加熱訂單", summary.heatCount],
+    ["DIY/活動訂單", summary.diyCount],
+    ["缺貨風險訂單", summary.shortageCount],
+    ["未收款", summary.unpaidAmount]
+  ]);
+
+  summarySheet["!cols"] = [{ wch: 20 }, { wch: 10 }, { wch: 10 }, { wch: 12 }];
+
+  const detailRows = list.map(order => [
+    getShippingWorkDate(order),
+    getShippingDeliveryDate(order),
+    order.delivery || "",
+    getOrderTimeSlotInfo(order).raw || "",
+    getShippingCustomerName(order) || order.name || "",
+    getShippingPhoneText(order) || order.phone || "",
+    getShippingItemText(order),
+    Number(order.total || 0),
+    getPaymentStatus(order),
+    getShippingNoteText(order),
+    order.id || ""
+  ]);
+
+  const detailSheet = XLSX.utils.aoa_to_sheet([
+    ["工作日", "交付日", "方式", "時段", "客戶", "電話", "商品明細", "金額", "付款", "備註", "訂單編號"],
+    ...detailRows
+  ]);
+
+  detailSheet["!cols"] = [
+    { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 16 }, { wch: 14 }, { wch: 16 },
+    { wch: 40 }, { wch: 12 }, { wch: 12 }, { wch: 32 }, { wch: 18 }
+  ];
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, summarySheet, "需求總表");
+  XLSX.utils.book_append_sheet(workbook, detailSheet, "訂單明細");
+
+  const rangeText = start === end ? start : `${start}-${end}`;
+  XLSX.writeFile(workbook, `陳媽媽每日需求統計_${rangeText}_${todayStr()}.xlsx`);
 }
 
 function renderShippingList() {
