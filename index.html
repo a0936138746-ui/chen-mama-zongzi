@@ -491,6 +491,7 @@
             <button data-admin-tab="stats" onclick="showAdminTab('stats')" class="adminBtn bg-yellow-100 text-yellow-900 border border-yellow-200 px-3 py-3 rounded-xl font-bold">統計</button>
             <button data-admin-tab="product" onclick="showAdminTab('product')" class="adminBtn bg-stone-100 text-stone-900 border border-stone-200 px-3 py-3 rounded-xl font-bold">商品</button>
             <button data-admin-tab="email" onclick="showAdminTab('email')" class="adminBtn bg-purple-100 text-purple-900 border border-purple-200 px-3 py-3 rounded-xl font-bold col-span-2">官網匯入</button>
+            <button data-admin-tab="temp" onclick="showAdminTab('temp')" class="adminBtn bg-sky-100 text-sky-900 border border-sky-200 px-3 py-3 rounded-xl font-bold col-span-3">臨時暫存</button>
           </div>
         </div>
       </div>
@@ -530,6 +531,7 @@
             <button data-admin-tab="stock" onclick="showAdminTab('stock')" class="adminBtn bg-amber-700 text-white px-4 py-3 rounded-xl text-left font-bold">庫存查看</button>
             <button data-admin-tab="product" onclick="showAdminTab('product')" class="adminBtn bg-amber-700 text-white px-4 py-3 rounded-xl text-left font-bold">商品管理</button>
             <button data-admin-tab="email" onclick="showAdminTab('email')" class="adminBtn bg-purple-700 text-white px-4 py-3 rounded-xl text-left font-bold">匯入官網Email</button>
+            <button data-admin-tab="temp" onclick="showAdminTab('temp')" class="adminBtn bg-sky-700 text-white px-4 py-3 rounded-xl text-left font-bold">臨時暫存區</button>
           </div>
         </div>
       </div>
@@ -546,6 +548,53 @@
   </div>
 </section>
 
+<!-- 臨時暫存入口 -->
+<section id="capturePage" class="hidden min-h-screen bg-sky-50 p-4">
+  <div class="max-w-2xl mx-auto">
+    <div class="bg-white rounded-2xl shadow border p-5 md:p-6">
+      <div class="mb-5">
+        <h2 class="text-3xl font-bold text-sky-900">臨時訂單暫存</h2>
+        <div class="text-gray-600 mt-1">忙亂時先貼 LINE / 簡訊內容，晚點再回後台確認轉正式訂單。</div>
+      </div>
+
+      <label class="block mb-4">
+        <span class="block font-bold mb-2">貼上客人訊息</span>
+        <textarea id="captureRawText" class="border p-3 rounded-xl w-full h-56" placeholder="例如：王小姐 0912... 6/18 晚上自取 北部粽20 南部粽10 要加熱" oninput="previewCaptureParse()"></textarea>
+      </label>
+
+      <div class="grid md:grid-cols-2 gap-3 mb-4">
+        <input id="captureName" class="border p-3 rounded-xl" placeholder="客人姓名">
+        <input id="capturePhone" class="border p-3 rounded-xl" placeholder="電話" inputmode="tel">
+        <input id="captureDate" type="date" class="border p-3 rounded-xl">
+        <select id="captureDelivery" class="border p-3 rounded-xl">
+          <option value="自取">自取</option>
+          <option value="宅配">宅配</option>
+          <option value="有限外送">有限外送</option>
+        </select>
+        <select id="captureTimeSlot" class="border p-3 rounded-xl">
+          <option value="">時段未填</option>
+          <option value="早上">早上</option>
+          <option value="晚上">晚上</option>
+          <option value="其他">其他</option>
+        </select>
+        <input id="captureAddress" class="border p-3 rounded-xl" placeholder="地址">
+      </div>
+
+      <textarea id="captureNote" class="border p-3 rounded-xl w-full mb-4" rows="3" placeholder="備註 / 截圖描述"></textarea>
+
+      <div id="capturePreview" class="bg-sky-50 border border-sky-200 rounded-2xl p-4 mb-4 text-sm text-sky-900">
+        貼上文字後會嘗試自動判斷姓名、電話、日期與品項。
+      </div>
+
+      <button type="button" onclick="saveTempCapture()" class="bg-sky-700 text-white px-6 py-4 rounded-xl font-bold w-full text-lg">
+        先暫存
+      </button>
+
+      <div id="captureSaveStatus" class="mt-4 text-center font-bold"></div>
+    </div>
+  </div>
+</section>
+
 </div>
 
 <script>
@@ -557,6 +606,7 @@ let products = [];
 let orders = [];
 let expenses = [];
 let incomes = [];
+let tempOrders = [];
 let cart = [];
 let isSubmittingFrontOrder = false;
 let frontLookupOrders = [];
@@ -1289,6 +1339,7 @@ function refreshPaperPrices() {
 function showPage(page) {
   document.getElementById("frontPage").classList.toggle("hidden", page !== "front");
   document.getElementById("adminPage").classList.toggle("hidden", page !== "admin");
+  document.getElementById("capturePage").classList.toggle("hidden", page !== "capture");
 }
 
 let adminUnlockTapCount = 0;
@@ -2016,6 +2067,201 @@ function closeLineQrModal() {
   if (!modal) return;
   modal.classList.add("hidden");
   modal.classList.remove("flex");
+}
+
+function initCaptureEntry() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("capture") !== "1") return;
+
+  showPage("capture");
+
+  if (params.get("key") !== "1127") {
+    document.getElementById("capturePage").innerHTML = `
+      <div class="max-w-md mx-auto mt-10 bg-white border rounded-2xl shadow p-6 text-center">
+        <h2 class="text-2xl font-bold text-red-700 mb-3">暫存入口未授權</h2>
+        <div class="text-gray-600">請使用正確的快速暫存網址。</div>
+      </div>
+    `;
+    return;
+  }
+
+  setTimeout(() => document.getElementById("captureRawText")?.focus(), 200);
+}
+
+function parseCaptureDate(text) {
+  const normalized = String(text || "");
+  const isoMatch = normalized.match(/(20\d{2})[\/\-年](\d{1,2})[\/\-月](\d{1,2})/);
+  if (isoMatch) {
+    return `${isoMatch[1]}-${String(isoMatch[2]).padStart(2, "0")}-${String(isoMatch[3]).padStart(2, "0")}`;
+  }
+
+  const monthDayMatch = normalized.match(/(\d{1,2})[\/月](\d{1,2})/);
+  if (monthDayMatch) {
+    const year = new Date().getFullYear();
+    return `${year}-${String(monthDayMatch[1]).padStart(2, "0")}-${String(monthDayMatch[2]).padStart(2, "0")}`;
+  }
+
+  return "";
+}
+
+function parseCaptureName(text, phone) {
+  const lines = String(text || "")
+    .split(/\n/)
+    .map(line => line.trim())
+    .filter(Boolean);
+  const labeledName = String(text || "").match(/(?:姓名|客人|訂購人|收件人)\s*[:：]?\s*([^\s，,。]+)/);
+
+  if (labeledName) return labeledName[1].trim();
+
+  return lines.find(line =>
+    !line.includes(phone || "__no_phone__") &&
+    !/\d{2,}/.test(line) &&
+    line.length <= 12
+  ) || "";
+}
+
+function getCaptureProductAliases(product) {
+  const baseName = getFrontBaseProductName(product);
+  const rawName = normalizeFrontProductName(product.name);
+  const aliases = new Set([baseName, rawName]);
+
+  if (baseName === "原味鹼粽") {
+    aliases.add("鹼粽");
+    aliases.add("檢粽");
+    aliases.add("原味檢粽");
+  }
+
+  if (baseName === "紅豆鹼粽") {
+    aliases.add("紅豆檢粽");
+  }
+
+  return [...aliases].filter(Boolean);
+}
+
+function parseCaptureItems(text) {
+  const compactText = String(text || "").replace(/\s+/g, "");
+  const availableProducts = products.filter(p => p.active !== false && p.type !== "fee");
+  const items = [];
+  const usedProductIds = new Set();
+
+  availableProducts.forEach(product => {
+    if (usedProductIds.has(String(product.id))) return;
+
+    for (const alias of getCaptureProductAliases(product)) {
+      const escapedAlias = alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const match = compactText.match(new RegExp(`${escapedAlias}(?:x|X|\\*|：|:)?(\\d+)`));
+
+      if (match) {
+        items.push({
+          id: product.id,
+          name: getFrontProductDisplayName(product),
+          raw_name: product.name,
+          price: Number(product.price || 0),
+          qty: Number(match[1])
+        });
+        usedProductIds.add(String(product.id));
+        break;
+      }
+    }
+  });
+
+  return items;
+}
+
+function parseTempCaptureText(text) {
+  const cleanText = String(text || "").trim();
+  const phoneMatch = cleanText.match(/09\d[\d\-\s]{7,12}/);
+  const phone = phoneMatch ? phoneMatch[0].replace(/[^\d]/g, "") : "";
+  const delivery = /宅配|寄送|到貨|收件|地址/.test(cleanText)
+    ? "宅配"
+    : /外送|送過去|送到/.test(cleanText)
+    ? "有限外送"
+    : "自取";
+  const timeSlot = /晚上|晚間|傍晚|下午|夜/.test(cleanText)
+    ? "晚上"
+    : /早上|上午|中午|午前/.test(cleanText)
+    ? "早上"
+    : "";
+
+  return {
+    name: parseCaptureName(cleanText, phone),
+    phone,
+    date: parseCaptureDate(cleanText),
+    delivery,
+    time_slot: timeSlot,
+    address: "",
+    note: /加熱|蛋黃|花生|公司|團購|急|冷凍|分裝|送禮/.test(cleanText) ? cleanText : "",
+    items: parseCaptureItems(cleanText)
+  };
+}
+
+function previewCaptureParse() {
+  const rawText = document.getElementById("captureRawText")?.value || "";
+  const parsed = parseTempCaptureText(rawText);
+
+  if (parsed.name && !document.getElementById("captureName").value) document.getElementById("captureName").value = parsed.name;
+  if (parsed.phone && !document.getElementById("capturePhone").value) document.getElementById("capturePhone").value = parsed.phone;
+  if (parsed.date && !document.getElementById("captureDate").value) document.getElementById("captureDate").value = parsed.date;
+  if (parsed.delivery) document.getElementById("captureDelivery").value = parsed.delivery;
+  if (parsed.time_slot) document.getElementById("captureTimeSlot").value = parsed.time_slot;
+  if (parsed.note && !document.getElementById("captureNote").value) document.getElementById("captureNote").value = parsed.note;
+
+  document.getElementById("capturePreview").innerHTML = `
+    <div class="font-bold mb-2">系統先判斷如下，最後仍需後台確認：</div>
+    <div>姓名：${escapeHtml(document.getElementById("captureName").value || parsed.name || "未判斷")}</div>
+    <div>電話：${escapeHtml(document.getElementById("capturePhone").value || parsed.phone || "未判斷")}</div>
+    <div>日期：${escapeHtml(document.getElementById("captureDate").value || parsed.date || "未判斷")}</div>
+    <div>方式：${escapeHtml(document.getElementById("captureDelivery").value || parsed.delivery || "未判斷")}</div>
+    <div class="mt-2 font-bold">品項：</div>
+    ${
+      parsed.items.length
+        ? parsed.items.map(item => `<div>${escapeHtml(item.name)} x ${item.qty}</div>`).join("")
+        : `<div class="text-amber-700">尚未判斷出品項，可先暫存，晚點後台補。</div>`
+    }
+  `;
+}
+
+async function saveTempCapture() {
+  const rawText = document.getElementById("captureRawText").value.trim();
+  const parsed = parseTempCaptureText(rawText);
+  const statusBox = document.getElementById("captureSaveStatus");
+
+  if (!rawText) return alert("請先貼上客人訊息");
+
+  const tempOrder = {
+    id: "TMP" + Date.now(),
+    raw_text: rawText,
+    name: document.getElementById("captureName").value.trim() || parsed.name,
+    phone: document.getElementById("capturePhone").value.trim() || parsed.phone,
+    delivery: document.getElementById("captureDelivery").value || parsed.delivery,
+    order_date: document.getElementById("captureDate").value || parsed.date || null,
+    time_slot: document.getElementById("captureTimeSlot").value || parsed.time_slot,
+    address: document.getElementById("captureAddress").value.trim(),
+    note: document.getElementById("captureNote").value.trim(),
+    items: parsed.items,
+    status: "待確認"
+  };
+
+  statusBox.className = "mt-4 text-center font-bold text-sky-700";
+  statusBox.innerText = "儲存中...";
+
+  const { error } = await db.from("temp_orders").insert([tempOrder]);
+
+  if (error) {
+    statusBox.className = "mt-4 text-center font-bold text-red-700";
+    statusBox.innerText = "儲存失敗，可能尚未建立 temp_orders 資料表";
+    alert("暫存失敗：" + error.message);
+    return;
+  }
+
+  statusBox.className = "mt-4 text-center font-bold text-green-700";
+  statusBox.innerText = "已暫存，晚點到後台臨時暫存區確認。";
+  ["captureRawText", "captureName", "capturePhone", "captureDate", "captureTimeSlot", "captureAddress", "captureNote"]
+    .forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = "";
+    });
+  document.getElementById("capturePreview").innerHTML = "貼上文字後會嘗試自動判斷姓名、電話、日期與品項。";
 }
 
 function isLineInAppBrowser() {
@@ -2937,6 +3183,21 @@ async function loadIncome() {
   incomes = data || [];
 }  
 
+async function loadTempOrders() {
+  const { data, error } = await db
+    .from("temp_orders")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    tempOrders = [];
+    return { error };
+  }
+
+  tempOrders = data || [];
+  return { error: null };
+}
+
 function showAdminTab(tab) {
   currentAdminTab = tab;
   if (tab === "orders") renderOrders();
@@ -2950,6 +3211,7 @@ function showAdminTab(tab) {
   if (tab === "stock") renderStock();
   if (tab === "shipping") renderShippingList();
   if (tab === "dailyDemand") renderDailyDemand();
+  if (tab === "temp") renderTempOrders();
   if (tab === "email") renderEmailImport();
   if (tab === "product") renderProductAdmin();
 
@@ -5439,6 +5701,173 @@ function exportDailyDemandExcel() {
 
   const rangeText = start === end ? start : `${start}-${end}`;
   XLSX.writeFile(workbook, `陳媽媽每日需求統計_${rangeText}_${todayStr()}.xlsx`);
+}
+
+async function renderTempOrders() {
+  const result = await loadTempOrders();
+  const panel = document.getElementById("adminPanel");
+
+  if (result.error) {
+    panel.innerHTML = `
+      <h2 class="text-2xl font-bold mb-4">臨時暫存區</h2>
+      <div class="bg-red-50 border border-red-200 text-red-800 rounded-2xl p-5">
+        <div class="font-bold text-lg mb-2">暫存資料表尚未建立或沒有權限</div>
+        <div class="text-sm leading-7">
+          請先到 Supabase SQL Editor 建立 temp_orders 資料表。建立後，手機快速暫存才會成功。
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  const pending = tempOrders.filter(order => order.status !== "已轉正式" && order.status !== "已忽略");
+  const done = tempOrders.filter(order => order.status === "已轉正式" || order.status === "已忽略");
+
+  panel.innerHTML = `
+    <h2 class="text-2xl font-bold mb-4">臨時暫存區</h2>
+
+    <section class="bg-sky-50 border border-sky-200 rounded-2xl p-4 mb-5">
+      <div class="font-bold text-sky-900">快速暫存網址</div>
+      <div class="text-sm text-sky-800 mt-1 break-all">
+        ${location.origin}${location.pathname}?capture=1&key=1127
+      </div>
+      <div class="text-sm text-gray-600 mt-2">
+        手機可把這個網址加入主畫面，忙的時候直接開、貼訊息、先暫存。
+      </div>
+    </section>
+
+    <div class="flex justify-between items-center gap-3 flex-wrap mb-4">
+      <div class="text-sm text-gray-600">待確認 ${pending.length} 筆｜已處理 ${done.length} 筆</div>
+      <button type="button" onclick="renderTempOrders()" class="bg-blue-700 text-white px-4 py-2 rounded-xl font-bold">重新整理</button>
+    </div>
+
+    <div class="space-y-4">
+      ${
+        pending.length
+          ? pending.map(order => tempOrderCard(order)).join("")
+          : `<div class="bg-white border rounded-2xl p-5 text-gray-500">目前沒有待確認暫存訂單</div>`
+      }
+    </div>
+  `;
+}
+
+function tempOrderCard(order) {
+  const items = Array.isArray(order.items) ? order.items : [];
+  const itemText = items.length
+    ? items.map(item => `${item.name || item.raw_name || "未命名商品"} x ${item.qty || 0}`).join("、")
+    : "未判斷品項";
+
+  return `
+    <div class="bg-white border rounded-2xl p-4 shadow-sm">
+      <div class="flex justify-between gap-3 flex-wrap mb-3">
+        <div>
+          <div class="font-bold text-xl">${escapeHtml(order.name || "未填姓名")}</div>
+          <div class="text-blue-700 font-bold">${escapeHtml(order.phone || "未填電話")}</div>
+          <div class="text-sm text-gray-500">${new Date(order.created_at || Date.now()).toLocaleString("zh-TW")}</div>
+        </div>
+        <div class="text-right">
+          <div class="font-bold">${escapeHtml(order.order_date || "未填日期")}</div>
+          <div class="text-sm text-gray-600">${escapeHtml(order.delivery || "自取")}｜${escapeHtml(order.time_slot || "未填時段")}</div>
+        </div>
+      </div>
+
+      <div class="bg-amber-50 border border-amber-100 rounded-xl p-3 mb-3">
+        <div class="font-bold mb-1">系統判斷品項</div>
+        <div>${escapeHtml(itemText)}</div>
+      </div>
+
+      ${order.note ? `<div class="bg-purple-50 text-purple-800 rounded-xl p-3 mb-3 whitespace-pre-line">備註：${escapeHtml(order.note)}</div>` : ""}
+
+      <details class="mb-3">
+        <summary class="cursor-pointer text-gray-600 font-bold">查看原始訊息</summary>
+        <pre class="mt-2 bg-gray-50 border rounded-xl p-3 whitespace-pre-wrap text-sm">${escapeHtml(order.raw_text || "")}</pre>
+      </details>
+
+      <div class="grid sm:grid-cols-2 gap-2">
+        <button type="button" onclick="convertTempOrderToOrder('${order.id}')"
+          class="bg-green-700 text-white px-4 py-3 rounded-xl font-bold">
+          確認轉正式訂單
+        </button>
+        <button type="button" onclick="ignoreTempOrder('${order.id}')"
+          class="bg-gray-600 text-white px-4 py-3 rounded-xl font-bold">
+          標記忽略
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+async function convertTempOrderToOrder(id) {
+  const temp = tempOrders.find(order => String(order.id) === String(id));
+  if (!temp) return alert("找不到這筆暫存");
+
+  if (!temp.name || !temp.phone) {
+    alert("這筆暫存缺姓名或電話，請先手動補到正式訂單。");
+    return;
+  }
+
+  const items = Array.isArray(temp.items) ? temp.items : [];
+  const total = items.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.qty || 0), 0);
+  const timeNote = temp.time_slot ? `取貨/收貨時段：${temp.time_slot}` : "";
+  const backendNote = [
+    timeNote,
+    temp.note,
+    "由臨時暫存區轉入",
+    temp.raw_text ? `原始訊息：\n${temp.raw_text}` : ""
+  ].filter(Boolean).join("\n");
+
+  const order = {
+    id: "TMPORD" + Date.now(),
+    time: new Date().toISOString(),
+    name: temp.name,
+    phone: temp.phone,
+    address: temp.address || "",
+    delivery: temp.delivery || "自取",
+    pickup_date: temp.delivery === "宅配" ? null : (temp.order_date || null),
+    arrival_date: temp.delivery === "宅配" ? (temp.order_date || null) : null,
+    ship_date: temp.delivery === "宅配" && temp.order_date ? addDays(temp.order_date, -3) : null,
+    note: backendNote,
+    items,
+    total,
+    status: "未完成",
+    payment_status: "未收款",
+    payment_method: "",
+    paid_amount: 0,
+    payment_note: "",
+    type: "temp"
+  };
+
+  if (!confirm(`確定把 ${temp.name} 轉成正式訂單？\n金額：NT$ ${money(total)}\n品項：${items.length ? "已判斷" : "未判斷，需再修改"}`)) {
+    return;
+  }
+
+  const { error } = await db.from("orders").insert([order]);
+
+  if (error) {
+    alert("轉正式訂單失敗：" + error.message);
+    return;
+  }
+
+  await db.from("temp_orders").update({ status: "已轉正式" }).eq("id", id);
+  alert("已轉正式訂單");
+  await refreshAdmin();
+  showAdminTab("temp");
+}
+
+async function ignoreTempOrder(id) {
+  if (!confirm("確定標記忽略這筆暫存？")) return;
+
+  const { error } = await db
+    .from("temp_orders")
+    .update({ status: "已忽略" })
+    .eq("id", id);
+
+  if (error) {
+    alert("更新失敗：" + error.message);
+    return;
+  }
+
+  renderTempOrders();
 }
 
 function renderShippingList() {
@@ -9039,6 +9468,7 @@ async function refreshAdmin() {
 
 initAdminEntry();
 initLineBrowserNotice();
+initCaptureEntry();
 loadProducts();
 updateFrontDeliveryHint();
   function renderProductAdmin() {
