@@ -8,6 +8,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <style>
     .mobile-action-btn {
       min-height: 44px;
@@ -7095,7 +7096,7 @@ function renderQuoteOrder() {
         <textarea id="quoteNote" class="border p-3 rounded-xl w-full mt-4" rows="3"
           placeholder="注意事項 / 客戶備註，例如優惠、贈送、公益不收費、需加熱" oninput="renderQuotePreview()"></textarea>
 
-        <div class="grid sm:grid-cols-3 gap-3 mt-4">
+        <div class="grid sm:grid-cols-4 gap-3 mt-4">
           <button type="button" onclick="printQuote()" class="bg-blue-700 text-white px-4 py-3 rounded-xl font-bold">
             列印報價單
           </button>
@@ -7616,6 +7617,7 @@ function renderVendorDocument(type = "payment") {
 
         <div class="grid sm:grid-cols-3 gap-3 mt-4">
           <button type="button" onclick="printVendorDoc()" class="bg-blue-700 text-white px-4 py-3 rounded-xl font-bold">列印</button>
+          <button type="button" onclick="downloadVendorDocWord()" class="bg-indigo-700 text-white px-4 py-3 rounded-xl font-bold">下載 Word</button>
           <button type="button" onclick="downloadVendorDocImage()" class="bg-purple-700 text-white px-4 py-3 rounded-xl font-bold">下載圖片</button>
           <button type="button" onclick="copyVendorDocText()" class="bg-green-700 text-white px-4 py-3 rounded-xl font-bold">複製資料</button>
         </div>
@@ -9043,6 +9045,211 @@ async function downloadVendorDocImage() {
   link.download = `${getVendorDocFileName(d)}.png`;
   link.href = canvas.toDataURL("image/png");
   link.click();
+}
+
+function getVendorDocTemplateDocxPath(type) {
+  return type === "vendorPayment"
+    ? "assets/廠商匯款入帳委託書_含大小章_調整版_可列印.docx"
+    : "assets/入帳委託書_含大小章_調整版_可列印.docx";
+}
+
+function escapeXmlText(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+function toWordPt(percent, axis = "x") {
+  const pageSize = axis === "y" ? 841.89 : 595.28;
+  return Math.round((Number(percent || 0) / 100) * pageSize * 10) / 10;
+}
+
+function vendorDocWordFieldXml(text, left, top, width, options = {}) {
+  if (!String(text || "").trim()) return "";
+  const fontSize = Math.round(Number(options.fontPt || 9.5) * 2);
+  const height = Number(options.heightPt || 16);
+  const align = options.align || "left";
+  const weight = options.bold === false ? "" : "<w:b/>";
+  const fieldId = "docField" + Math.random().toString(16).slice(2);
+
+  return `
+    <w:r>
+      <w:pict>
+        <v:shape id="${fieldId}" type="#_x0000_t202"
+          style="position:absolute;margin-left:${toWordPt(left, "x")}pt;margin-top:${toWordPt(top, "y")}pt;width:${toWordPt(width, "x")}pt;height:${height}pt;z-index:251659264;mso-position-horizontal-relative:page;mso-position-vertical-relative:page"
+          filled="f" stroked="f">
+          <v:textbox inset="0,0,0,0" style="mso-fit-shape-to-text:t">
+            <w:txbxContent>
+              <w:p>
+                <w:pPr>
+                  <w:spacing w:before="0" w:after="0"/>
+                  <w:jc w:val="${align}"/>
+                </w:pPr>
+                <w:r>
+                  <w:rPr>
+                    <w:rFonts w:ascii="Microsoft JhengHei" w:hAnsi="Microsoft JhengHei" w:eastAsia="Microsoft JhengHei"/>
+                    ${weight}
+                    <w:sz w:val="${fontSize}"/>
+                  </w:rPr>
+                  <w:t>${escapeXmlText(text)}</w:t>
+                </w:r>
+              </w:p>
+            </w:txbxContent>
+          </v:textbox>
+        </v:shape>
+      </w:pict>
+    </w:r>`;
+}
+
+function vendorDocWordCheckXml(checked, left, top) {
+  return checked ? vendorDocWordFieldXml("V", left, top, 2, { fontPt: 10.5, heightPt: 12 }) : "";
+}
+
+function getVendorDocWordFields(d) {
+  const parts = getVendorDocRocDateParts(d.documentDate);
+  const entryParts = getVendorDocRocDateParts(d.entryDate || d.documentDate);
+  const amount = d.amount ? money(d.amount) : "";
+  const bankFullName = [d.bank, d.branch].filter(Boolean).join(" ");
+
+  if (d.type === "vendorPayment") {
+    return [
+      vendorDocWordFieldXml(d.companyName, 15.5, 8.5, 36),
+      vendorDocWordFieldXml(d.taxId, 78, 8.5, 16),
+      vendorDocWordFieldXml(d.responsible, 15.5, 11.6, 24),
+      vendorDocWordFieldXml(d.contact, 49.5, 11.6, 22),
+      vendorDocWordFieldXml(d.phone, 83, 11.6, 14),
+      vendorDocWordFieldXml(d.address, 15.5, 14.0, 74, { fontPt: 8.8 }),
+      vendorDocWordFieldXml(d.accountName, 28, 17.3, 58),
+      vendorDocWordFieldXml(bankFullName, 28, 20.1, 38, { fontPt: 8.8 }),
+      vendorDocWordFieldXml(d.bankCode, 82.5, 20.1, 10),
+      vendorDocWordFieldXml(d.accountNumber, 73, 24.8, 21, { fontPt: 8.8 }),
+      vendorDocWordFieldXml(d.email, 15.5, 26.8, 42, { fontPt: 8.8 }),
+      vendorDocWordFieldXml(d.fax, 74, 26.8, 20),
+      vendorDocWordFieldXml(d.amountText, 23, 30.0, 40),
+      vendorDocWordFieldXml(amount, 88, 30.0, 10, { align: "right" }),
+      vendorDocWordFieldXml(d.purpose, 15.5, 32.9, 74),
+      vendorDocWordFieldXml(d.companyName, 15.5, 45.0, 38),
+      vendorDocWordFieldXml(d.responsible || d.contact, 15.5, 49.0, 34),
+      vendorDocWordFieldXml(parts.year, 62, 53.7, 6, { align: "center" }),
+      vendorDocWordFieldXml(parts.month, 76, 53.7, 5, { align: "center" }),
+      vendorDocWordFieldXml(parts.day, 89, 53.7, 5, { align: "center" })
+    ].join("");
+  }
+
+  return [
+    vendorDocWordFieldXml(d.companyName, 35.0, 11.2, 34),
+    vendorDocWordFieldXml(d.taxId, 37.0, 13.35, 32),
+    vendorDocWordFieldXml(d.responsible, 22.5, 15.55, 22),
+    vendorDocWordFieldXml(d.contact, 50.6, 15.55, 25),
+    vendorDocWordFieldXml(d.phone, 24.4, 17.7, 24),
+    vendorDocWordFieldXml(d.address, 24.4, 19.85, 46, { fontPt: 8.3 }),
+    vendorDocWordFieldXml(bankFullName, 43.2, 24.35, 39, { fontPt: 8.3 }),
+    vendorDocWordFieldXml(d.bankCode, 29.0, 26.55, 34),
+    vendorDocWordFieldXml(d.accountName, 20.4, 28.7, 31),
+    vendorDocWordFieldXml(d.accountNumber, 56.8, 28.7, 31, { fontPt: 8.3 }),
+    vendorDocWordFieldXml(d.purpose, 29.4, 33.2, 34),
+    vendorDocWordFieldXml(d.amountText, 31.2, 35.35, 23),
+    vendorDocWordFieldXml(amount, 61.8, 35.35, 14, { align: "center" }),
+    vendorDocWordFieldXml(entryParts.year, 25.0, 37.45, 5, { align: "center" }),
+    vendorDocWordFieldXml(entryParts.month, 35.5, 37.45, 5, { align: "center" }),
+    vendorDocWordFieldXml(entryParts.day, 45.0, 37.45, 5, { align: "center" }),
+    vendorDocWordCheckXml(d.relatedContract, 16.4, 41.45),
+    vendorDocWordCheckXml(d.relatedInvoice, 29.0, 41.45),
+    vendorDocWordCheckXml(d.relatedRemittance, 46.8, 41.45),
+    vendorDocWordCheckXml(d.relatedOther, 59.0, 41.45),
+    vendorDocWordFieldXml(d.relatedOtherText, 68.0, 41.15, 13),
+    vendorDocWordFieldXml(d.entrustedUnitName, 24.7, 48.6, 42),
+    vendorDocWordFieldXml(d.entrustedTaxId, 24.7, 51.7, 38),
+    vendorDocWordFieldXml(d.companyName, 19.0, 68.65, 30),
+    vendorDocWordFieldXml(d.responsible || d.contact, 19.0, 73.65, 28),
+    vendorDocWordFieldXml(parts.year, 58.0, 81.45, 7, { align: "center" }),
+    vendorDocWordFieldXml(parts.month, 74.0, 81.45, 5, { align: "center" }),
+    vendorDocWordFieldXml(parts.day, 87.0, 81.45, 5, { align: "center" })
+  ].join("");
+}
+
+function getVendorDocWordDocumentXml(d) {
+  const fields = getVendorDocWordFields(d);
+
+  return `<?xml version='1.0' encoding='UTF-8' standalone='yes'?>
+<w:document xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas" xmlns:mo="http://schemas.microsoft.com/office/mac/office/2008/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:mv="urn:schemas-microsoft-com:mac:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:wp14="http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:w10="urn:schemas-microsoft-com:office:word" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup" xmlns:wpi="http://schemas.microsoft.com/office/word/2010/wordprocessingInk" xmlns:wne="http://schemas.microsoft.com/office/word/2006/wordml" xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" mc:Ignorable="w14 wp14">
+  <w:body>
+    <w:p>
+      <w:pPr>
+        <w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/>
+        <w:jc w:val="left"/>
+      </w:pPr>
+      <w:r>
+        <w:drawing>
+          <wp:inline xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture" distT="0" distB="0" distL="0" distR="0">
+            <wp:extent cx="7560310" cy="10692000"/>
+            <wp:docPr id="1" name="Original Form"/>
+            <wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr>
+            <a:graphic>
+              <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                <pic:pic>
+                  <pic:nvPicPr><pic:cNvPr id="0" name="form-template"/><pic:cNvPicPr/></pic:nvPicPr>
+                  <pic:blipFill>
+                    <a:blip r:embed="rId9"/>
+                    <a:stretch><a:fillRect/></a:stretch>
+                  </pic:blipFill>
+                  <pic:spPr>
+                    <a:xfrm><a:off x="0" y="0"/><a:ext cx="7560310" cy="10692000"/></a:xfrm>
+                    <a:prstGeom prst="rect"/>
+                  </pic:spPr>
+                </pic:pic>
+              </a:graphicData>
+            </a:graphic>
+          </wp:inline>
+        </w:drawing>
+      </w:r>
+      ${fields}
+    </w:p>
+    <w:sectPr>
+      <w:pgSz w:w="11906" w:h="16838"/>
+      <w:pgMar w:top="0" w:right="0" w:bottom="0" w:left="0" w:header="0" w:footer="0" w:gutter="0"/>
+      <w:cols w:space="720"/>
+      <w:docGrid w:linePitch="360"/>
+    </w:sectPr>
+  </w:body>
+</w:document>`;
+}
+
+async function downloadVendorDocWord() {
+  if (!window.JSZip) {
+    alert("Word 匯出套件尚未載入，請重新整理後再試一次");
+    return;
+  }
+
+  const d = getVendorDocData();
+  if (!d.amountText && d.amount) {
+    d.amountText = numberToChineseAmount(d.amount);
+  }
+
+  try {
+    const response = await fetch(getVendorDocTemplateDocxPath(d.type));
+    if (!response.ok) throw new Error("找不到 Word 範本");
+
+    const zip = await JSZip.loadAsync(await response.arrayBuffer());
+    zip.file("word/document.xml", getVendorDocWordDocumentXml(d));
+
+    const blob = await zip.generateAsync({
+      type: "blob",
+      mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    });
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${getVendorDocFileName(d)}.docx`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (error) {
+    alert("Word 下載失敗：" + error.message);
+  }
 }
 
 function addQuoteRow(item = null) {
