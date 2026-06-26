@@ -9026,7 +9026,7 @@ function renderVendorDocPreview() {
     d.relatedInvoice ||
     (!d.relatedContract && !d.relatedRemittance && !d.relatedOther);
   const template = d.type === "vendorPayment" ? "assets/vendor-payment-authorization-template.jpg?v=20260627a" : "assets/payment-authorization-template.jpg?v=20260627a";
-  const fieldNudgeY = d.type === "vendorPayment" ? "1.8mm" : "0";
+  const fieldNudgeY = d.type === "vendorPayment" ? "2.4mm" : "0";
   const fields = d.type === "vendorPayment"
     ? [
         renderVendorDocField(d.companyName, 17.94, 7.61, 36),
@@ -9364,7 +9364,7 @@ function nudgeDocxMarginTop(shape, offsetMm) {
   }));
 }
 
-function nudgeVendorPaymentDocxFieldsDown(xml, offsetMm = 1.8) {
+function nudgeVendorPaymentDocxFieldsDown(xml, offsetMm = 2.4) {
   const offsetEmu = Math.round(offsetMm * 36000);
   const boxes = getDocxTextBoxContents(xml);
   const shiftedAnchors = new Set();
@@ -9526,7 +9526,7 @@ function applyAdjustedVendorPaymentDocxTemplate(xmlText, d) {
     });
   }
 
-  nudgeVendorPaymentDocxFieldsDown(xml, 1.8);
+  nudgeVendorPaymentDocxFieldsDown(xml, 2.4);
 
   return new XMLSerializer().serializeToString(xml);
 }
