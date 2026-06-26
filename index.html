@@ -9055,7 +9055,7 @@ async function downloadVendorDocImage() {
 
 function getVendorDocTemplateDocxPath(type) {
   return type === "vendorPayment"
-    ? "assets/廠商匯款入帳委託書_含大小章_調整版_可列印.docx"
+    ? "assets/廠商匯款入帳委託書_套印調整版.docx"
     : "assets/入帳委託書_套印調整版.docx";
 }
 
@@ -9241,6 +9241,36 @@ function setDocxShapeText(shape, value) {
   });
 }
 
+function setDocxShapeTextColor(shape, color) {
+  const wordNs = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+  let runProperties = Array.from(shape.getElementsByTagNameNS(wordNs, "rPr"));
+  if (!runProperties.length) runProperties = Array.from(shape.getElementsByTagName("w:rPr"));
+  if (!runProperties.length) runProperties = Array.from(shape.getElementsByTagName("rPr"));
+
+  runProperties.forEach(rPr => {
+    let colorNode = Array.from(rPr.getElementsByTagNameNS(wordNs, "color"))[0];
+    if (!colorNode) colorNode = Array.from(rPr.getElementsByTagName("w:color"))[0];
+    if (!colorNode) {
+      colorNode = rPr.ownerDocument.createElementNS(wordNs, "w:color");
+      rPr.appendChild(colorNode);
+    }
+
+    colorNode.setAttribute("w:val", color);
+    colorNode.removeAttribute("w:themeColor");
+    colorNode.removeAttribute("w:themeTint");
+  });
+}
+
+function getVendorPaymentAmountDigitChars(amount) {
+  const digits = ["零", "壹", "貳", "參", "肆", "伍", "陸", "柒", "捌", "玖"];
+  const numericText = String(Math.max(0, Math.floor(Number(amount || 0))))
+    .replace(/[^\d]/g, "")
+    .padStart(7, "0")
+    .slice(-7);
+
+  return numericText.split("").map(n => digits[Number(n)] || "零");
+}
+
 function getAdjustedPaymentDocxValues(d) {
   const documentParts = getVendorDocRocDateParts(d.documentDate);
   const entryParts = getVendorDocRocDateParts(d.entryDate || d.documentDate);
@@ -9296,6 +9326,60 @@ function applyAdjustedPaymentDocxTemplate(xmlText, d) {
   return new XMLSerializer().serializeToString(xml);
 }
 
+function getAdjustedVendorPaymentDocxValues(d) {
+  const documentParts = getVendorDocRocDateParts(d.documentDate);
+  const amount = d.amount ? money(d.amount) : "";
+  const amountChars = getVendorPaymentAmountDigitChars(d.amount);
+
+  return [
+    d.companyName || "",
+    d.taxId || "",
+    amount,
+    documentParts.day,
+    documentParts.month,
+    documentParts.year,
+    d.responsible || "",
+    d.companyName || "",
+    d.purpose || "",
+    amountChars[6],
+    amountChars[5],
+    amountChars[4],
+    amountChars[2],
+    amountChars[1],
+    amountChars[0],
+    amountChars[3],
+    d.email || "",
+    d.bank || "",
+    d.branch || "",
+    d.accountNumber || "",
+    d.bankCode || "",
+    d.accountName || "",
+    d.address || "",
+    d.responsible || "",
+    d.contact || "",
+    d.phone || ""
+  ];
+}
+
+function applyAdjustedVendorPaymentDocxTemplate(xmlText, d) {
+  const parser = new DOMParser();
+  const xml = parser.parseFromString(xmlText, "application/xml");
+  const errorNode = xml.querySelector("parsererror");
+  if (errorNode) return xmlText;
+
+  const vmlNs = "urn:schemas-microsoft-com:vml";
+  let shapes = Array.from(xml.getElementsByTagNameNS(vmlNs, "shape"));
+  if (!shapes.length) shapes = Array.from(xml.getElementsByTagName("v:shape"));
+  const values = getAdjustedVendorPaymentDocxValues(d);
+
+  shapes.forEach((shape, index) => {
+    if (index < values.length) setDocxShapeText(shape, values[index]);
+    if (index >= 9 && index <= 15) setDocxShapeTextColor(shape, "548DD4");
+  });
+
+  return new XMLSerializer().serializeToString(xml);
+}
+
 async function downloadVendorDocWord() {
   if (!window.JSZip) {
     alert("Word 匯出套件尚未載入，請重新整理後再試一次");
@@ -9316,6 +9400,9 @@ async function downloadVendorDocWord() {
     if (d.type === "payment") {
       const currentXml = await zip.file("word/document.xml").async("string");
       zip.file("word/document.xml", applyAdjustedPaymentDocxTemplate(currentXml, d));
+    } else if (d.type === "vendorPayment") {
+      const currentXml = await zip.file("word/document.xml").async("string");
+      zip.file("word/document.xml", applyAdjustedVendorPaymentDocxTemplate(currentXml, d));
     } else {
       zip.file("word/document.xml", getVendorDocWordDocumentXml(d));
     }
