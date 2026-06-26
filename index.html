@@ -11037,13 +11037,33 @@ function fillReceiptForm(draft = {}) {
   rowsToUse.forEach(item => addReceiptRow(item));
 }
 
+function getReceiptAmountParts(value) {
+  const digits = ["零", "壹", "貳", "參", "肆", "伍", "陸", "柒", "捌", "玖"];
+  const amount = Math.max(0, Math.floor(Number(value || 0)));
+  const digitText = (n) => digits[Number(n) || 0];
+  const hasAmount = amount > 0;
+
+  return [
+    {
+      unit: "萬",
+      text: amount >= 10000
+        ? String(Math.floor(amount / 10000)).split("").map(digitText).join("")
+        : ""
+    },
+    { unit: "仟", text: amount >= 1000 ? digitText(Math.floor(amount / 1000) % 10) : "" },
+    { unit: "佰", text: amount >= 100 ? digitText(Math.floor(amount / 100) % 10) : "" },
+    { unit: "拾", text: amount >= 10 ? digitText(Math.floor(amount / 10) % 10) : "" },
+    { unit: "元", text: hasAmount ? digitText(amount % 10) : "" }
+  ];
+}
+
 function renderReceiptPreview() {
   const box = document.getElementById("quotePreview");
   if (!box) return;
 
   const data = getReceiptData();
   const dateParts = getVendorDocRocDateParts(data.receiptDate);
-  const amountText = data.total ? numberToChineseAmount(data.total) : "";
+  const amountParts = getReceiptAmountParts(data.total);
   const displayItems = data.items.length
     ? data.items
     : [{ name: "尚未填寫品項", unit: "", qty: "", price: 0, note: "" }];
@@ -11132,9 +11152,20 @@ function renderReceiptPreview() {
               </tr>
             `).join("")}
             <tr class="bg-blue-50">
-              <td class="p-3 border text-center font-bold text-[20px]" colspan="4">合計新台幣</td>
-              <td class="p-3 border font-bold text-blue-900" colspan="2">${escapeHtml(amountText)}</td>
-              <td class="p-3 border text-right font-bold text-[22px]">NT$ ${money(data.total)}</td>
+              <td class="p-3 border" colspan="7">
+                <div class="grid grid-cols-[34mm_1fr_44mm] gap-3 items-center">
+                  <div class="text-center font-bold text-[20px]">合計新台幣</div>
+                  <div class="grid grid-cols-5 border-2 border-blue-900 bg-white">
+                    ${amountParts.map(part => `
+                      <div class="border-r last:border-r-0 border-blue-900">
+                        <div class="bg-blue-900 text-white text-center text-[12px] font-bold py-1">${part.unit}</div>
+                        <div class="h-[12mm] flex items-center justify-center text-[24px] font-bold text-blue-950">${escapeHtml(part.text)}</div>
+                      </div>
+                    `).join("")}
+                  </div>
+                  <div class="text-right font-bold text-[22px]">NT$ ${money(data.total)}</div>
+                </div>
+              </td>
             </tr>
           </tbody>
         </table>
