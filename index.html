@@ -9394,17 +9394,43 @@ async function downloadVendorDocPdf() {
     return;
   }
 
-  const target = document.querySelector("#docPreview .vendor-doc-sheet") || document.querySelector("#docPreview .quote-a4-page");
+  const d = getVendorDocData();
+  if (!d.amountText && d.amount) {
+    d.amountText = numberToChineseAmount(d.amount);
+    const amountTextInput = document.getElementById("vendorDocAmountText");
+    if (amountTextInput && !amountTextInput.value) amountTextInput.value = d.amountText;
+  }
+
+  let fallbackPreview = null;
+  if (!document.getElementById("docPreview")) {
+    fallbackPreview = document.createElement("section");
+    fallbackPreview.id = "docPreview";
+    fallbackPreview.style.position = "fixed";
+    fallbackPreview.style.left = "-99999px";
+    fallbackPreview.style.top = "0";
+    document.body.appendChild(fallbackPreview);
+  }
+
+  renderVendorDocPreview();
+  await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+  let target = document.querySelector("#docPreview .vendor-doc-sheet") || document.querySelector("#docPreview .quote-a4-page");
   if (!target) {
+    if (fallbackPreview) fallbackPreview.remove();
     alert("找不到文件預覽畫面");
     return;
   }
 
-  const d = getVendorDocData();
-  if (!d.amountText && d.amount) {
-    d.amountText = numberToChineseAmount(d.amount);
-  }
   autoSaveVendorDocProfile(d);
+
+  const images = [...target.querySelectorAll("img")];
+  await Promise.all(images.map(img => {
+    if (img.complete) return Promise.resolve();
+    return new Promise(resolve => {
+      img.onload = resolve;
+      img.onerror = resolve;
+    });
+  }));
 
   const canvas = await html2canvas(target, {
     scale: 2,
@@ -9420,6 +9446,8 @@ async function downloadVendorDocPdf() {
 
   pdf.addImage(canvas.toDataURL("image/jpeg", 0.96), "JPEG", 0, 0, 210, 297);
   pdf.save(`${getVendorDocFileName(d)}.pdf`);
+
+  if (fallbackPreview) fallbackPreview.remove();
 }
 
 async function copyVendorDocText() {
