@@ -8643,6 +8643,7 @@ function renderVendorDocPreview() {
   const parts = getVendorDocRocDateParts(d.documentDate);
   const entryParts = getVendorDocRocDateParts(d.entryDate || d.documentDate);
   const amount = d.amount ? money(d.amount) : "";
+  const amountText = d.amountText || (d.amount ? numberToChineseAmount(d.amount) : "");
   const bankFullName = [d.bank, d.branch].filter(Boolean).join(" ");
   const template =
     d.type === "vendorPayment"
@@ -8973,6 +8974,7 @@ function renderVendorDocPreview() {
   const parts = getVendorDocRocDateParts(d.documentDate);
   const entryParts = getVendorDocRocDateParts(d.entryDate || d.documentDate);
   const amount = d.amount ? money(d.amount) : "";
+  const amountText = d.amountText || (d.amount ? numberToChineseAmount(d.amount) : "");
   const bankFullName = [d.bank, d.branch].filter(Boolean).join(" ");
   const showInvoiceCheck =
     d.relatedInvoice ||
