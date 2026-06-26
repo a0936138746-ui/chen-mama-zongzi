@@ -8,6 +8,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <style>
     .mobile-action-btn {
@@ -7897,7 +7898,7 @@ function updateVendorDocProfileSelect() {
   const profiles = getVendorDocProfiles()
     .sort((a, b) => String(b.savedAt || "").localeCompare(String(a.savedAt || "")));
 
-  select.innerHTML = `<option value="">選擇曾輸入資料</option>` + profiles.map(profile => `
+  select.innerHTML = `<option value="">選擇曾輸入資料（自動保留）</option>` + profiles.map(profile => `
     <option value="${profile.id}">${escapeHtml(getVendorDocProfileTitle(profile))}</option>
   `).join("");
 }
@@ -8123,9 +8124,10 @@ function renderVendorDocument(type = "payment") {
           <textarea id="vendorDocNote" class="border p-3 rounded-xl w-full" rows="2" placeholder="內部備註，不會印在原稿上" oninput="renderVendorDocPreview()"></textarea>
         </div>
 
-        <div class="grid sm:grid-cols-3 gap-3 mt-4">
+        <div class="grid sm:grid-cols-4 gap-3 mt-4">
           <button type="button" onclick="printVendorDoc()" class="bg-blue-700 text-white px-4 py-3 rounded-xl font-bold">列印</button>
-          <button type="button" onclick="downloadVendorDocImage()" class="bg-purple-700 text-white px-4 py-3 rounded-xl font-bold">下載圖片</button>
+          <button type="button" onclick="downloadVendorDocWord()" class="bg-indigo-700 text-white px-4 py-3 rounded-xl font-bold">下載 Word</button>
+          <button type="button" onclick="downloadVendorDocPdf()" class="bg-purple-700 text-white px-4 py-3 rounded-xl font-bold">下載 PDF</button>
           <button type="button" onclick="copyVendorDocText()" class="bg-green-700 text-white px-4 py-3 rounded-xl font-bold">複製資料</button>
         </div>
       </section>
@@ -8471,9 +8473,10 @@ function renderVendorDocument(type = "payment") {
           <textarea id="vendorDocNote" class="border p-3 rounded-xl w-full" rows="2" placeholder="內部備註，不會印在原稿上" oninput="renderVendorDocPreview()"></textarea>
         </div>
 
-        <div class="grid sm:grid-cols-3 gap-3 mt-4">
+        <div class="grid sm:grid-cols-4 gap-3 mt-4">
           <button type="button" onclick="printVendorDoc()" class="bg-blue-700 text-white px-4 py-3 rounded-xl font-bold">列印</button>
-          <button type="button" onclick="downloadVendorDocImage()" class="bg-purple-700 text-white px-4 py-3 rounded-xl font-bold">下載圖片</button>
+          <button type="button" onclick="downloadVendorDocWord()" class="bg-indigo-700 text-white px-4 py-3 rounded-xl font-bold">下載 Word</button>
+          <button type="button" onclick="downloadVendorDocPdf()" class="bg-purple-700 text-white px-4 py-3 rounded-xl font-bold">下載 PDF</button>
           <button type="button" onclick="copyVendorDocText()" class="bg-green-700 text-white px-4 py-3 rounded-xl font-bold">複製資料</button>
         </div>
       </section>
@@ -8863,9 +8866,10 @@ function renderVendorDocument(type = "payment") {
           `}
         </div>
 
-        <div class="grid sm:grid-cols-3 gap-3 mt-4">
+        <div class="grid sm:grid-cols-4 gap-3 mt-4">
           <button type="button" onclick="printVendorDoc()" class="bg-blue-700 text-white px-4 py-3 rounded-xl font-bold">列印</button>
-          <button type="button" onclick="downloadVendorDocImage()" class="bg-purple-700 text-white px-4 py-3 rounded-xl font-bold">下載圖片</button>
+          <button type="button" onclick="downloadVendorDocWord()" class="bg-indigo-700 text-white px-4 py-3 rounded-xl font-bold">下載 Word</button>
+          <button type="button" onclick="downloadVendorDocPdf()" class="bg-purple-700 text-white px-4 py-3 rounded-xl font-bold">下載 PDF</button>
           <button type="button" onclick="copyVendorDocText()" class="bg-green-700 text-white px-4 py-3 rounded-xl font-bold">複製資料</button>
         </div>
       </section>
@@ -9228,6 +9232,7 @@ async function downloadVendorDocWord() {
   if (!d.amountText && d.amount) {
     d.amountText = numberToChineseAmount(d.amount);
   }
+  autoSaveVendorDocProfile(d);
 
   try {
     const response = await fetch(getVendorDocTemplateDocxPath(d.type));
@@ -9250,6 +9255,119 @@ async function downloadVendorDocWord() {
   } catch (error) {
     alert("Word 下載失敗：" + error.message);
   }
+}
+
+function autoSaveVendorDocProfile(d = getVendorDocData()) {
+  if (!d.companyName && !d.phone && !d.accountNumber && !d.taxId) return;
+
+  const profiles = getVendorDocProfiles();
+  const key = [
+    d.companyName || "",
+    d.phone || "",
+    d.accountNumber || "",
+    d.taxId || ""
+  ].join("__");
+
+  const profile = {
+    id: "vendor-profile-" + Date.now(),
+    savedAt: new Date().toISOString(),
+    companyName: d.companyName,
+    taxId: d.taxId,
+    responsible: d.responsible,
+    contact: d.contact,
+    phone: d.phone,
+    address: d.address,
+    bank: d.bank,
+    branch: d.branch,
+    bankCode: d.bankCode,
+    accountName: d.accountName,
+    accountNumber: d.accountNumber,
+    entrustedUnitName: d.entrustedUnitName,
+    entrustedTaxId: d.entrustedTaxId,
+    email: d.email,
+    fax: d.fax
+  };
+
+  const index = profiles.findIndex(x =>
+    [
+      x.companyName || "",
+      x.phone || "",
+      x.accountNumber || "",
+      x.taxId || ""
+    ].join("__") === key
+  );
+
+  if (index >= 0) {
+    profiles[index] = { ...profiles[index], ...profile, id: profiles[index].id };
+  } else {
+    profiles.push(profile);
+  }
+
+  setVendorDocProfiles(profiles.slice(-80));
+  updateVendorDocProfileSelect();
+}
+
+async function downloadVendorDocPdf() {
+  if (!window.html2canvas || !window.jspdf?.jsPDF) {
+    alert("PDF 匯出套件尚未載入，請重新整理後再試一次");
+    return;
+  }
+
+  const target = document.querySelector("#docPreview .vendor-doc-sheet") || document.querySelector("#docPreview .quote-a4-page");
+  if (!target) {
+    alert("找不到文件預覽畫面");
+    return;
+  }
+
+  const d = getVendorDocData();
+  if (!d.amountText && d.amount) {
+    d.amountText = numberToChineseAmount(d.amount);
+  }
+  autoSaveVendorDocProfile(d);
+
+  const canvas = await html2canvas(target, {
+    scale: 2,
+    backgroundColor: "#ffffff",
+    useCORS: true
+  });
+
+  const pdf = new window.jspdf.jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: "a4"
+  });
+
+  pdf.addImage(canvas.toDataURL("image/jpeg", 0.96), "JPEG", 0, 0, 210, 297);
+  pdf.save(`${getVendorDocFileName(d)}.pdf`);
+}
+
+async function copyVendorDocText() {
+  const d = getVendorDocData();
+  autoSaveVendorDocProfile(d);
+  await navigator.clipboard.writeText(getVendorDocText(d));
+  alert("已複製文件資料，並保存到曾輸入資料");
+}
+
+function newVendorDocDraft(type) {
+  const id = createVendorDocDraftId();
+  const current = typeof getVendorDocData === "function" ? getVendorDocData() : {};
+
+  autoSaveVendorDocProfile(current);
+  setActiveVendorDocDraftId(id);
+
+  vendorDocDraftLoading = true;
+  fillVendorDocForm({
+    ...getVendorDocDefaultData(type),
+    ...current,
+    id,
+    type,
+    documentDate: current.documentDate || todayStr(),
+    entryDate: current.entryDate || current.documentDate || todayStr()
+  });
+  vendorDocDraftLoading = false;
+
+  updateVendorDocDraftSelector(type, id);
+  renderVendorDocPreview();
 }
 
 function addQuoteRow(item = null) {
