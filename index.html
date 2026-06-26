@@ -7343,12 +7343,27 @@ function updateVendorDocDraftSelector(type, activeId = "") {
     : `<option value="">目前沒有暫存文件</option>`;
 }
 
+function isLegacyVendorPaymentDraft(draft) {
+  return draft?.type === "vendorPayment" &&
+    draft.companyName === "陳媽媽肉粽店" &&
+    draft.taxId === "01257909" &&
+    draft.accountName === "陳媽媽肉粽店" &&
+    draft.accountNumber === "0613940029136" &&
+    draft.bank === "玉山銀行";
+}
+
 function loadVendorDocDraft(id = "", type = "payment") {
   const drafts = getVendorDocDrafts().filter(draft => draft.type === type);
   const targetId = id || getActiveVendorDocDraftId() || drafts[0]?.id || "";
   const draft = drafts.find(x => x.id === targetId);
 
   if (!draft) return false;
+  if (isLegacyVendorPaymentDraft(draft)) {
+    setVendorDocDrafts(getVendorDocDrafts().filter(x => x.id !== draft.id));
+    setActiveVendorDocDraftId("");
+    updateVendorDocDraftSelector(type, "");
+    return false;
+  }
 
   vendorDocDraftLoading = true;
   setActiveVendorDocDraftId(draft.id);
@@ -8769,18 +8784,35 @@ async function copyVendorDocText() {
 
 // Final override: keep this vendor document implementation last so older drafts above cannot override it.
 function getVendorDocDefaultData(type = "payment") {
-  return {
+  const base = {
     id: createVendorDocDraftId(),
     type,
     documentDate: todayStr(),
     entryDate: todayStr(),
+    entrustedUnitName: "財團法人台北高爾夫俱樂部",
+    entrustedTaxId: ""
+  };
+
+  if (type === "vendorPayment") {
+    return {
+      ...base,
+      bank: "",
+      branch: "",
+      bankCode: "",
+      accountName: "",
+      accountNumber: "",
+      email: "",
+      fax: ""
+    };
+  }
+
+  return {
+    ...base,
     bank: "玉山銀行",
     branch: "",
     bankCode: "808",
     accountName: "陳媽媽肉粽店",
-    accountNumber: "0613940029136",
-    entrustedUnitName: "財團法人台北高爾夫俱樂部",
-    entrustedTaxId: ""
+    accountNumber: "0613940029136"
   };
 }
 
@@ -8989,32 +9021,39 @@ function renderVendorDocPreview() {
   const amount = d.amount ? money(d.amount) : "";
   const amountText = d.amountText || (d.amount ? numberToChineseAmount(d.amount) : "");
   const bankFullName = [d.bank, d.branch].filter(Boolean).join(" ");
+  const amountChars = getVendorPaymentAmountDigitChars(d.amount);
   const showInvoiceCheck =
     d.relatedInvoice ||
     (!d.relatedContract && !d.relatedRemittance && !d.relatedOther);
-  const template = d.type === "vendorPayment" ? "assets/vendor-payment-authorization-template.jpg" : "assets/payment-authorization-template.jpg";
+  const template = d.type === "vendorPayment" ? "assets/vendor-payment-authorization-template.jpg?v=20260626b" : "assets/payment-authorization-template.jpg?v=20260626b";
   const fields = d.type === "vendorPayment"
     ? [
-        renderVendorDocField(d.companyName, 15.5, 8.5, 36),
-        renderVendorDocField(d.taxId, 78, 8.5, 16),
-        renderVendorDocField(d.responsible, 15.5, 11.6, 24),
-        renderVendorDocField(d.contact, 49.5, 11.6, 22),
-        renderVendorDocField(d.phone, 83, 11.6, 14),
-        renderVendorDocField(d.address, 15.5, 14.0, 74),
-        renderVendorDocField(d.accountName, 28, 17.3, 58),
-        renderVendorDocField(bankFullName, 28, 20.1, 38),
-        renderVendorDocField(d.bankCode, 82.5, 20.1, 10),
-        renderVendorDocField(d.accountNumber, 73, 24.8, 21),
-        renderVendorDocField(d.email, 15.5, 26.8, 42),
-        renderVendorDocField(d.fax, 74, 26.8, 20),
-        renderVendorDocField(d.amountText, 23, 30.0, 40),
-        renderVendorDocField(amount, 88, 30.0, 10, "text-align:right;"),
-        renderVendorDocField(d.purpose, 15.5, 32.9, 74),
-        renderVendorDocField(d.companyName, 15.5, 45.0, 38),
-        renderVendorDocField(d.responsible || d.contact, 15.5, 49.0, 34),
-        renderVendorDocField(parts.year, 62, 53.7, 6, "text-align:center;"),
-        renderVendorDocField(parts.month, 76, 53.7, 5, "text-align:center;"),
-        renderVendorDocField(parts.day, 89, 53.7, 5, "text-align:center;")
+        renderVendorDocField(d.companyName, 17.94, 7.61, 36),
+        renderVendorDocField(d.taxId, 80.01, 7.61, 16, "text-align:center;"),
+        renderVendorDocField(d.responsible, 20.96, 10.06, 24),
+        renderVendorDocField(d.contact, 51.35, 10.18, 22),
+        renderVendorDocField(d.phone, 79.48, 10.18, 14),
+        renderVendorDocField(d.address, 17.44, 12.22, 74),
+        renderVendorDocField(d.accountName, 28.0, 14.50, 58),
+        renderVendorDocField(d.bank, 27.25, 17.60, 23),
+        renderVendorDocField(d.bankCode, 75.86, 17.54, 10, "text-align:center;"),
+        renderVendorDocField(d.branch, 27.25, 20.79, 27),
+        renderVendorDocField(d.accountNumber, 75.27, 20.76, 21),
+        renderVendorDocField(d.email, 15.76, 23.17, 42),
+        renderVendorDocField(amountChars[6], 61.06, 25.42, 3.1, "text-align:center;color:#2563eb;"),
+        renderVendorDocField(amountChars[5], 53.80, 25.42, 3.1, "text-align:center;color:#2563eb;"),
+        renderVendorDocField(amountChars[4], 46.78, 25.42, 3.1, "text-align:center;color:#2563eb;"),
+        renderVendorDocField(amountChars[3], 39.79, 25.42, 3.9, "text-align:center;color:#2563eb;"),
+        renderVendorDocField(amountChars[2], 32.59, 25.48, 3.1, "text-align:center;color:#2563eb;"),
+        renderVendorDocField(amountChars[1], 25.62, 25.42, 3.1, "text-align:center;color:#2563eb;"),
+        renderVendorDocField(amountChars[0], 18.39, 25.54, 3.1, "text-align:center;color:#2563eb;"),
+        renderVendorDocField(amount, 74.05, 25.48, 10, "text-align:right;"),
+        renderVendorDocField(d.purpose, 18.70, 27.78, 74),
+        renderVendorDocField(d.companyName, 19.45, 39.60, 38),
+        renderVendorDocField(d.responsible || d.contact, 20.71, 43.41, 34),
+        renderVendorDocField(parts.year, 46.97, 46.93, 7, "text-align:center;"),
+        renderVendorDocField(parts.month, 60.10, 46.93, 5, "text-align:center;"),
+        renderVendorDocField(parts.day, 72.03, 46.87, 5, "text-align:center;")
       ].join("")
     : [
         renderVendorDocField(d.companyName, 35.16, 10.07, 34),
@@ -9072,8 +9111,8 @@ async function downloadVendorDocImage() {
 
 function getVendorDocTemplateDocxPath(type) {
   return type === "vendorPayment"
-    ? "assets/廠商匯款入帳委託書_套印調整版.docx"
-    : "assets/入帳委託書_套印調整版.docx";
+    ? "assets/廠商匯款入帳委託書_套印調整版.docx?v=20260626b"
+    : "assets/入帳委託書_套印調整版.docx?v=20260626b";
 }
 
 function escapeXmlText(value) {
@@ -9279,6 +9318,7 @@ function setDocxShapeTextColor(shape, color) {
 }
 
 function getVendorPaymentAmountDigitChars(amount) {
+  if (!Number(amount || 0)) return ["", "", "", "", "", "", ""];
   const digits = ["零", "壹", "貳", "參", "肆", "伍", "陸", "柒", "捌", "玖"];
   const numericText = String(Math.max(0, Math.floor(Number(amount || 0))))
     .replace(/[^\d]/g, "")
