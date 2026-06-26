@@ -161,6 +161,29 @@
         min-height: 297mm;
         padding: 10mm;
       }
+
+      body.doc-print-mode * {
+        visibility: hidden;
+      }
+
+      body.doc-print-mode #docPreview,
+      body.doc-print-mode #docPreview * {
+        visibility: visible;
+      }
+
+      body.doc-print-mode #docPreview {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 210mm;
+        min-height: 297mm;
+        max-width: none;
+        margin: 0;
+        padding: 0;
+        box-shadow: none;
+        border: 0;
+        overflow: visible;
+      }
     }
   </style>
 </head>
@@ -6997,6 +7020,12 @@ function renderQuoteOrder() {
   document.getElementById("adminPanel").innerHTML = `
     <h2 class="text-2xl font-bold mb-4">報價單</h2>
 
+    <div class="flex gap-2 flex-wrap mb-5">
+      <button type="button" onclick="renderQuoteOrder()" class="bg-emerald-700 text-white px-4 py-3 rounded-xl font-bold">報價單</button>
+      <button type="button" onclick="renderVendorDocument('payment')" class="bg-blue-700 text-white px-4 py-3 rounded-xl font-bold">入帳委託書</button>
+      <button type="button" onclick="renderVendorDocument('vendorPayment')" class="bg-indigo-700 text-white px-4 py-3 rounded-xl font-bold">廠商匯款入帳委託書</button>
+    </div>
+
     <div class="grid xl:grid-cols-[420px_1fr] gap-5 items-start">
       <section class="bg-white p-5 rounded-2xl shadow border print:hidden">
         <div class="flex justify-between items-start gap-3 mb-4">
@@ -7081,6 +7110,416 @@ function renderQuoteOrder() {
     addQuoteRow();
     renderQuotePreview();
   }
+}
+
+const VENDOR_DOC_DRAFTS_KEY = "chenMamaVendorDocumentDrafts";
+const VENDOR_DOC_ACTIVE_KEY = "chenMamaActiveVendorDocumentDraft";
+let vendorDocDraftLoading = false;
+
+function getVendorDocTitle(type) {
+  return type === "vendorPayment"
+    ? "廠商匯款入帳委託書"
+    : "入帳委託書";
+}
+
+function createVendorDocDraftId() {
+  return "vendor-doc-" + Date.now() + "-" + Math.random().toString(16).slice(2);
+}
+
+function getVendorDocDrafts() {
+  try {
+    const drafts = JSON.parse(localStorage.getItem(VENDOR_DOC_DRAFTS_KEY) || "[]");
+    return Array.isArray(drafts) ? drafts : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function setVendorDocDrafts(drafts) {
+  localStorage.setItem(VENDOR_DOC_DRAFTS_KEY, JSON.stringify(drafts));
+}
+
+function setActiveVendorDocDraftId(id) {
+  if (id) {
+    localStorage.setItem(VENDOR_DOC_ACTIVE_KEY, id);
+  } else {
+    localStorage.removeItem(VENDOR_DOC_ACTIVE_KEY);
+  }
+}
+
+function getActiveVendorDocDraftId() {
+  return localStorage.getItem(VENDOR_DOC_ACTIVE_KEY) || "";
+}
+
+function getVendorDocDraftTitle(draft) {
+  const title = getVendorDocTitle(draft.type);
+  const target = draft.vendorName || draft.companyName || draft.accountName || "未命名";
+  const date = draft.documentDate || "";
+  const amount = Number(draft.amount || 0) ? `｜NT$ ${money(draft.amount)}` : "";
+
+  return `${title}｜${target}${date ? "｜" + date : ""}${amount}`;
+}
+
+function renderVendorDocument(type = "payment") {
+  document.getElementById("adminPanel").innerHTML = `
+    <h2 class="text-2xl font-bold mb-4">報價 / 文件</h2>
+
+    <div class="flex gap-2 flex-wrap mb-5">
+      <button type="button" onclick="renderQuoteOrder()" class="bg-emerald-700 text-white px-4 py-3 rounded-xl font-bold">報價單</button>
+      <button type="button" onclick="renderVendorDocument('payment')" class="${type === "payment" ? "bg-blue-900" : "bg-blue-700"} text-white px-4 py-3 rounded-xl font-bold">入帳委託書</button>
+      <button type="button" onclick="renderVendorDocument('vendorPayment')" class="${type === "vendorPayment" ? "bg-indigo-900" : "bg-indigo-700"} text-white px-4 py-3 rounded-xl font-bold">廠商匯款入帳委託書</button>
+    </div>
+
+    <div class="grid xl:grid-cols-[430px_1fr] gap-5 items-start">
+      <section class="bg-white p-5 rounded-2xl shadow border print:hidden">
+        <div class="flex justify-between items-start gap-3 mb-4">
+          <div>
+            <h3 class="font-bold text-xl">${getVendorDocTitle(type)}</h3>
+            <div id="vendorDocStatus" class="text-sm text-green-700 mt-1">會自動暫存</div>
+          </div>
+        </div>
+
+        <div class="grid gap-2 mb-4">
+          <select id="vendorDocDraftSelect" class="border p-3 rounded-xl" onchange="switchVendorDocDraft(this.value)"></select>
+          <div class="grid grid-cols-2 gap-2">
+            <button type="button" onclick="newVendorDocDraft('${type}')" class="bg-blue-700 text-white px-3 py-2 rounded-xl font-bold">新增文件</button>
+            <button type="button" onclick="deleteCurrentVendorDocDraft('${type}')" class="bg-gray-700 text-white px-3 py-2 rounded-xl font-bold">刪除此暫存</button>
+          </div>
+        </div>
+
+        <input id="vendorDocType" type="hidden" value="${type}">
+
+        <div class="grid gap-3">
+          <label class="block">
+            <span class="text-sm font-bold text-gray-600">文件日期</span>
+            <input id="vendorDocDate" type="date" class="border p-3 rounded-xl w-full" value="${todayStr()}" oninput="renderVendorDocPreview()">
+          </label>
+
+          <label class="block">
+            <span class="text-sm font-bold text-gray-600">${type === "vendorPayment" ? "廠商 / 公司名稱" : "公司 / 對象名稱"}</span>
+            <input id="vendorDocCompany" class="border p-3 rounded-xl w-full" placeholder="例如：元大證券南崁分公司" oninput="renderVendorDocPreview()">
+          </label>
+
+          <div class="grid grid-cols-2 gap-3">
+            <input id="vendorDocContact" class="border p-3 rounded-xl" placeholder="聯絡人" oninput="renderVendorDocPreview()">
+            <input id="vendorDocPhone" class="border p-3 rounded-xl" placeholder="電話" oninput="renderVendorDocPreview()">
+          </div>
+
+          <input id="vendorDocTaxId" class="border p-3 rounded-xl" placeholder="統一編號 / 身分證字號（可留空）" oninput="renderVendorDocPreview()">
+          <input id="vendorDocPurpose" class="border p-3 rounded-xl" placeholder="款項用途，例如：貨款 / 採購款 / 活動餐點" oninput="renderVendorDocPreview()">
+
+          <div class="grid grid-cols-2 gap-3">
+            <input id="vendorDocAmount" type="number" inputmode="numeric" class="quick-number-input border p-3 rounded-xl font-bold" placeholder="金額"
+              data-keypad-title="輸入金額" onfocus="openNumberKeypad(this)" onclick="openNumberKeypad(this)" oninput="renderVendorDocPreview()">
+            <input id="vendorDocAmountText" class="border p-3 rounded-xl" placeholder="中文大寫金額，可手填" oninput="renderVendorDocPreview()">
+          </div>
+
+          <div class="bg-blue-50 border border-blue-100 rounded-2xl p-3">
+            <div class="font-bold text-blue-900 mb-2">入帳帳戶資料</div>
+            <input id="vendorDocBank" class="border p-3 rounded-xl w-full mb-2" placeholder="銀行，例如：玉山銀行" oninput="renderVendorDocPreview()">
+            <input id="vendorDocBranch" class="border p-3 rounded-xl w-full mb-2" placeholder="分行，例如：南崁分行" oninput="renderVendorDocPreview()">
+            <input id="vendorDocAccountName" class="border p-3 rounded-xl w-full mb-2" placeholder="戶名" oninput="renderVendorDocPreview()">
+            <input id="vendorDocAccountNumber" class="border p-3 rounded-xl w-full" placeholder="帳號" oninput="renderVendorDocPreview()">
+          </div>
+
+          <textarea id="vendorDocNote" class="border p-3 rounded-xl w-full" rows="3" placeholder="備註 / 補充說明" oninput="renderVendorDocPreview()"></textarea>
+        </div>
+
+        <div class="grid sm:grid-cols-3 gap-3 mt-4">
+          <button type="button" onclick="printVendorDoc()" class="bg-blue-700 text-white px-4 py-3 rounded-xl font-bold">列印</button>
+          <button type="button" onclick="downloadVendorDocImage()" class="bg-purple-700 text-white px-4 py-3 rounded-xl font-bold">下載圖檔</button>
+          <button type="button" onclick="copyVendorDocText()" class="bg-green-700 text-white px-4 py-3 rounded-xl font-bold">複製文字</button>
+        </div>
+      </section>
+
+      <section id="docPreview" class="overflow-auto xl:max-h-[calc(100vh-120px)] pb-4"></section>
+    </div>
+  `;
+
+  updateVendorDocDraftSelector(type, getActiveVendorDocDraftId());
+
+  if (!loadVendorDocDraft(getActiveVendorDocDraftId(), type)) {
+    fillVendorDocForm({
+      id: createVendorDocDraftId(),
+      type,
+      documentDate: todayStr(),
+      bank: "玉山銀行",
+      accountName: "陳媽媽肉粽店",
+      accountNumber: "0613940029136"
+    });
+    renderVendorDocPreview();
+  }
+}
+
+function getVendorDocData() {
+  return {
+    type: document.getElementById("vendorDocType")?.value || "payment",
+    documentDate: document.getElementById("vendorDocDate")?.value || todayStr(),
+    companyName: document.getElementById("vendorDocCompany")?.value.trim() || "",
+    contact: document.getElementById("vendorDocContact")?.value.trim() || "",
+    phone: document.getElementById("vendorDocPhone")?.value.trim() || "",
+    taxId: document.getElementById("vendorDocTaxId")?.value.trim() || "",
+    purpose: document.getElementById("vendorDocPurpose")?.value.trim() || "",
+    amount: Number(document.getElementById("vendorDocAmount")?.value || 0),
+    amountText: document.getElementById("vendorDocAmountText")?.value.trim() || "",
+    bank: document.getElementById("vendorDocBank")?.value.trim() || "",
+    branch: document.getElementById("vendorDocBranch")?.value.trim() || "",
+    accountName: document.getElementById("vendorDocAccountName")?.value.trim() || "",
+    accountNumber: document.getElementById("vendorDocAccountNumber")?.value.trim() || "",
+    note: document.getElementById("vendorDocNote")?.value.trim() || ""
+  };
+}
+
+function fillVendorDocForm(draft) {
+  const setValue = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.value = value || "";
+  };
+
+  setValue("vendorDocType", draft.type || "payment");
+  setValue("vendorDocDate", draft.documentDate || todayStr());
+  setValue("vendorDocCompany", draft.companyName || "");
+  setValue("vendorDocContact", draft.contact || "");
+  setValue("vendorDocPhone", draft.phone || "");
+  setValue("vendorDocTaxId", draft.taxId || "");
+  setValue("vendorDocPurpose", draft.purpose || "");
+  setValue("vendorDocAmount", draft.amount || "");
+  setValue("vendorDocAmountText", draft.amountText || "");
+  setValue("vendorDocBank", draft.bank || "");
+  setValue("vendorDocBranch", draft.branch || "");
+  setValue("vendorDocAccountName", draft.accountName || "");
+  setValue("vendorDocAccountNumber", draft.accountNumber || "");
+  setValue("vendorDocNote", draft.note || "");
+}
+
+function saveVendorDocDraft(d = null) {
+  if (vendorDocDraftLoading) return;
+
+  const draft = d || getVendorDocData();
+  const activeId = getActiveVendorDocDraftId() || createVendorDocDraftId();
+  const drafts = getVendorDocDrafts();
+  const draftData = { ...draft, id: activeId, savedAt: new Date().toISOString() };
+  const index = drafts.findIndex(x => x.id === activeId);
+
+  if (index >= 0) drafts[index] = draftData;
+  else drafts.push(draftData);
+
+  setVendorDocDrafts(drafts);
+  setActiveVendorDocDraftId(activeId);
+  updateVendorDocDraftSelector(draft.type, activeId);
+
+  const status = document.getElementById("vendorDocStatus");
+  if (status) {
+    status.textContent = `已自動暫存：${getVendorDocDraftTitle(draftData)}`;
+    status.className = "text-sm text-green-700 mt-1";
+  }
+}
+
+function updateVendorDocDraftSelector(type, activeId = "") {
+  const select = document.getElementById("vendorDocDraftSelect");
+  if (!select) return;
+
+  const drafts = getVendorDocDrafts()
+    .filter(draft => draft.type === type)
+    .sort((a, b) => String(b.savedAt || "").localeCompare(String(a.savedAt || "")));
+
+  select.innerHTML = drafts.length
+    ? drafts.map(draft => `
+        <option value="${draft.id}" ${draft.id === activeId ? "selected" : ""}>
+          ${escapeHtml(getVendorDocDraftTitle(draft))}
+        </option>
+      `).join("")
+    : `<option value="">目前沒有暫存文件</option>`;
+}
+
+function loadVendorDocDraft(id = "", type = "payment") {
+  const drafts = getVendorDocDrafts().filter(draft => draft.type === type);
+  const targetId = id || getActiveVendorDocDraftId() || drafts[0]?.id || "";
+  const draft = drafts.find(x => x.id === targetId);
+
+  if (!draft) return false;
+
+  vendorDocDraftLoading = true;
+  setActiveVendorDocDraftId(draft.id);
+  fillVendorDocForm(draft);
+  vendorDocDraftLoading = false;
+  updateVendorDocDraftSelector(type, draft.id);
+  renderVendorDocPreview();
+  return true;
+}
+
+function switchVendorDocDraft(id) {
+  if (!id) return;
+  saveVendorDocDraft();
+  const type = document.getElementById("vendorDocType")?.value || "payment";
+  loadVendorDocDraft(id, type);
+}
+
+function newVendorDocDraft(type) {
+  const id = createVendorDocDraftId();
+  setActiveVendorDocDraftId(id);
+
+  vendorDocDraftLoading = true;
+  fillVendorDocForm({
+    id,
+    type,
+    documentDate: todayStr(),
+    bank: "玉山銀行",
+    accountName: "陳媽媽肉粽店",
+    accountNumber: "0613940029136"
+  });
+  vendorDocDraftLoading = false;
+  renderVendorDocPreview();
+}
+
+function deleteCurrentVendorDocDraft(type) {
+  const activeId = getActiveVendorDocDraftId();
+  if (!activeId) return newVendorDocDraft(type);
+  if (!confirm("確定刪除目前這份文件暫存？")) return;
+
+  const drafts = getVendorDocDrafts().filter(x => x.id !== activeId);
+  setVendorDocDrafts(drafts);
+  setActiveVendorDocDraftId("");
+  renderVendorDocument(type);
+}
+
+function getVendorDocText(d) {
+  return [
+    getVendorDocTitle(d.type),
+    `日期：${d.documentDate}`,
+    `對象：${d.companyName || "未填"}`,
+    `聯絡人：${d.contact || "未填"}`,
+    `電話：${d.phone || "未填"}`,
+    d.taxId ? `統一編號/證號：${d.taxId}` : "",
+    `款項用途：${d.purpose || "未填"}`,
+    `金額：NT$ ${money(d.amount)}${d.amountText ? "（" + d.amountText + "）" : ""}`,
+    `銀行：${d.bank || "未填"} ${d.branch || ""}`,
+    `戶名：${d.accountName || "未填"}`,
+    `帳號：${d.accountNumber || "未填"}`,
+    d.note ? `備註：${d.note}` : ""
+  ].filter(Boolean).join("\n");
+}
+
+function renderVendorDocPreview() {
+  const box = document.getElementById("docPreview");
+  if (!box) return;
+
+  const d = getVendorDocData();
+  const title = getVendorDocTitle(d.type);
+  const amountDisplay = d.amountText
+    ? `${d.amountText}（NT$ ${money(d.amount)}）`
+    : `NT$ ${money(d.amount)}`;
+
+  box.innerHTML = `
+    <div class="quote-a4-page rounded-2xl shadow border border-slate-200 overflow-hidden bg-white">
+      <div class="quote-a4-inner text-stone-950">
+        <div class="text-center border-b-4 border-slate-900 pb-5 mb-6">
+          <div class="text-[32px] font-bold tracking-wide">陳媽媽肉粽店</div>
+          <div class="text-[30px] font-bold mt-2">${title}</div>
+          <div class="text-right font-bold mt-2">日期：${d.documentDate}</div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mb-6 text-[16px]">
+          <div class="border rounded-xl p-4">
+            <div class="text-sm text-gray-500 mb-1">${d.type === "vendorPayment" ? "廠商 / 公司" : "對象名稱"}</div>
+            <div class="font-bold text-xl">${escapeHtml(d.companyName || "未填")}</div>
+          </div>
+          <div class="border rounded-xl p-4">
+            <div class="text-sm text-gray-500 mb-1">聯絡資訊</div>
+            <div>${escapeHtml(d.contact || "未填")}｜${escapeHtml(d.phone || "未填")}</div>
+          </div>
+          <div class="border rounded-xl p-4">
+            <div class="text-sm text-gray-500 mb-1">統一編號 / 證號</div>
+            <div>${escapeHtml(d.taxId || "未填")}</div>
+          </div>
+          <div class="border rounded-xl p-4">
+            <div class="text-sm text-gray-500 mb-1">款項用途</div>
+            <div>${escapeHtml(d.purpose || "未填")}</div>
+          </div>
+        </div>
+
+        <div class="border-2 border-slate-900 rounded-xl overflow-hidden mb-6">
+          <div class="bg-slate-900 text-white font-bold text-center py-3 text-xl">委託入帳 / 匯款資料</div>
+          <div class="grid grid-cols-[42mm_1fr] text-[18px]">
+            <div class="bg-slate-100 p-3 border-t font-bold">金額</div>
+            <div class="p-3 border-t font-bold text-2xl">${escapeHtml(amountDisplay)}</div>
+            <div class="bg-slate-100 p-3 border-t font-bold">銀行</div>
+            <div class="p-3 border-t">${escapeHtml(d.bank || "未填")} ${escapeHtml(d.branch || "")}</div>
+            <div class="bg-slate-100 p-3 border-t font-bold">戶名</div>
+            <div class="p-3 border-t">${escapeHtml(d.accountName || "未填")}</div>
+            <div class="bg-slate-100 p-3 border-t font-bold">帳號</div>
+            <div class="p-3 border-t font-bold">${escapeHtml(d.accountNumber || "未填")}</div>
+          </div>
+        </div>
+
+        <div class="leading-8 text-[16px] mb-8">
+          <div class="font-bold mb-2">委託說明</div>
+          <div>
+            本人 / 本公司確認上述資料無誤，請依本文件所載帳戶及金額辦理入帳或匯款作業。
+            若因提供資料有誤造成入帳延誤，願配合補正資料。
+          </div>
+          ${d.note ? `<div class="mt-3 bg-amber-50 border border-amber-200 rounded-xl p-3 whitespace-pre-line">備註：${escapeHtml(d.note)}</div>` : ""}
+        </div>
+
+        <div class="grid grid-cols-2 gap-8 mt-10">
+          <div class="border-t-2 border-stone-900 pt-3 text-center">
+            委託人 / 公司章
+          </div>
+          <div class="border-t-2 border-stone-900 pt-3 text-center">
+            經辦 / 確認人
+          </div>
+        </div>
+
+        <div class="mt-12 border rounded-xl p-4 text-sm leading-7">
+          <div class="font-bold">陳媽媽肉粽店資料</div>
+          <div>免用發票專用章｜統一編號：01257909</div>
+          <div>負責人：謝春桃｜電話：03-3224609</div>
+          <div>地址：桃園市蘆竹區錦興里聯福街76巷8號</div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  saveVendorDocDraft(d);
+}
+
+function getVendorDocFileName(d) {
+  const target = (d.companyName || d.contact || d.accountName || "未命名")
+    .replace(/[\\/:*?"<>|]/g, "")
+    .trim() || "未命名";
+  return `${getVendorDocTitle(d.type)}_${target}_${d.documentDate || todayStr()}`;
+}
+
+function printVendorDoc() {
+  document.body.classList.add("doc-print-mode");
+  window.print();
+  setTimeout(() => document.body.classList.remove("doc-print-mode"), 500);
+}
+
+async function downloadVendorDocImage() {
+  if (!window.html2canvas) {
+    alert("圖檔匯出套件尚未載入，請重新整理後再試一次");
+    return;
+  }
+
+  const target = document.querySelector("#docPreview .quote-a4-page") || document.getElementById("docPreview");
+  const d = getVendorDocData();
+  const canvas = await html2canvas(target, {
+    scale: 2,
+    backgroundColor: "#ffffff",
+    useCORS: true
+  });
+
+  const link = document.createElement("a");
+  link.download = `${getVendorDocFileName(d)}.png`;
+  link.href = canvas.toDataURL("image/png");
+  link.click();
+}
+
+async function copyVendorDocText() {
+  const text = getVendorDocText(getVendorDocData());
+  await navigator.clipboard.writeText(text);
+  alert("已複製文件文字，可直接貼給廠商使用");
 }
 
 function addQuoteRow(item = null) {
