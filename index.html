@@ -7029,10 +7029,11 @@ let quoteDraftLoading = false;
 
 function renderQuoteOrder() {
   document.getElementById("adminPanel").innerHTML = `
-    <h2 class="text-2xl font-bold mb-4">報價單</h2>
+    <h2 class="text-2xl font-bold mb-4">報價 / 文件</h2>
 
     <div class="flex gap-2 flex-wrap mb-5">
       <button type="button" onclick="renderQuoteOrder()" class="bg-emerald-700 text-white px-4 py-3 rounded-xl font-bold">報價單</button>
+      <button type="button" onclick="renderEstimateOrder()" class="bg-orange-700 text-white px-4 py-3 rounded-xl font-bold">估價單</button>
       <button type="button" onclick="renderVendorDocument('payment')" class="bg-blue-700 text-white px-4 py-3 rounded-xl font-bold">入帳委託書</button>
       <button type="button" onclick="renderVendorDocument('vendorPayment')" class="bg-indigo-700 text-white px-4 py-3 rounded-xl font-bold">廠商匯款入帳委託書</button>
     </div>
@@ -7177,6 +7178,7 @@ function renderVendorDocument(type = "payment") {
 
     <div class="flex gap-2 flex-wrap mb-5">
       <button type="button" onclick="renderQuoteOrder()" class="bg-emerald-700 text-white px-4 py-3 rounded-xl font-bold">報價單</button>
+      <button type="button" onclick="renderEstimateOrder()" class="bg-orange-700 text-white px-4 py-3 rounded-xl font-bold">估價單</button>
       <button type="button" onclick="renderVendorDocument('payment')" class="${type === "payment" ? "bg-blue-900" : "bg-blue-700"} text-white px-4 py-3 rounded-xl font-bold">入帳委託書</button>
       <button type="button" onclick="renderVendorDocument('vendorPayment')" class="${type === "vendorPayment" ? "bg-indigo-900" : "bg-indigo-700"} text-white px-4 py-3 rounded-xl font-bold">廠商匯款入帳委託書</button>
     </div>
@@ -7567,6 +7569,7 @@ function renderVendorDocument(type = "payment") {
 
     <div class="flex gap-2 flex-wrap mb-5">
       <button onclick="renderQuoteOrder()" class="bg-green-700 text-white px-4 py-2 rounded-xl font-bold">報價單</button>
+      <button onclick="renderEstimateOrder()" class="bg-orange-700 text-white px-4 py-2 rounded-xl font-bold">估價單</button>
       <button onclick="renderVendorDocument('payment')" class="${type === "payment" ? "bg-blue-800" : "bg-blue-600"} text-white px-4 py-2 rounded-xl font-bold">入帳委託書</button>
       <button onclick="renderVendorDocument('vendorPayment')" class="${type === "vendorPayment" ? "bg-blue-800" : "bg-blue-600"} text-white px-4 py-2 rounded-xl font-bold">廠商匯款入帳委託書</button>
     </div>
@@ -8043,6 +8046,7 @@ function renderVendorDocument(type = "payment") {
 
     <div class="flex gap-2 flex-wrap mb-5">
       <button onclick="renderQuoteOrder()" class="bg-green-700 text-white px-4 py-2 rounded-xl font-bold">報價單</button>
+      <button onclick="renderEstimateOrder()" class="bg-orange-700 text-white px-4 py-2 rounded-xl font-bold">估價單</button>
       <button onclick="renderVendorDocument('payment')" class="${isPayment ? "bg-blue-800" : "bg-blue-600"} text-white px-4 py-2 rounded-xl font-bold">入帳委託書</button>
       <button onclick="renderVendorDocument('vendorPayment')" class="${type === "vendorPayment" ? "bg-blue-800" : "bg-blue-600"} text-white px-4 py-2 rounded-xl font-bold">廠商匯款入帳委託書</button>
     </div>
@@ -8404,6 +8408,7 @@ function renderVendorDocument(type = "payment") {
 
     <div class="flex gap-2 flex-wrap mb-5">
       <button onclick="renderQuoteOrder()" class="bg-green-700 text-white px-4 py-2 rounded-xl font-bold">報價單</button>
+      <button onclick="renderEstimateOrder()" class="bg-orange-700 text-white px-4 py-2 rounded-xl font-bold">估價單</button>
       <button onclick="renderVendorDocument('payment')" class="${isPayment ? "bg-blue-800" : "bg-blue-600"} text-white px-4 py-2 rounded-xl font-bold">入帳委託書</button>
       <button onclick="renderVendorDocument('vendorPayment')" class="${type === "vendorPayment" ? "bg-blue-800" : "bg-blue-600"} text-white px-4 py-2 rounded-xl font-bold">廠商匯款入帳委託書</button>
     </div>
@@ -8824,6 +8829,7 @@ function renderVendorDocument(type = "payment") {
 
     <div class="flex gap-2 flex-wrap mb-5">
       <button onclick="renderQuoteOrder()" class="bg-green-700 text-white px-4 py-2 rounded-xl font-bold">報價單</button>
+      <button onclick="renderEstimateOrder()" class="bg-orange-700 text-white px-4 py-2 rounded-xl font-bold">估價單</button>
       <button onclick="renderVendorDocument('payment')" class="${isPayment ? "bg-blue-800" : "bg-blue-600"} text-white px-4 py-2 rounded-xl font-bold">入帳委託書</button>
       <button onclick="renderVendorDocument('vendorPayment')" class="${type === "vendorPayment" ? "bg-blue-800" : "bg-blue-600"} text-white px-4 py-2 rounded-xl font-bold">廠商匯款入帳委託書</button>
     </div>
@@ -10205,6 +10211,566 @@ async function saveQuoteAsOrder() {
   }
   await refreshAdmin();
   showAdminTab("orders");
+}
+
+const ESTIMATE_DRAFTS_KEY = "chenMamaEstimateDrafts";
+const ESTIMATE_ACTIVE_DRAFT_KEY = "chenMamaActiveEstimateDraft";
+const ESTIMATE_PRODUCTS = [
+  { name: "碗粿", unit: "個", price: 40 },
+  { name: "南部粽", unit: "顆", price: 50 },
+  { name: "肉燥", unit: "斤", price: 170 },
+  { name: "調理包", unit: "包", price: 80 }
+];
+let estimateDraftLoading = false;
+
+function renderEstimateOrder() {
+  document.getElementById("adminPanel").innerHTML = `
+    <h2 class="text-2xl font-bold mb-4">報價 / 文件</h2>
+
+    <div class="flex gap-2 flex-wrap mb-5">
+      <button type="button" onclick="renderQuoteOrder()" class="bg-emerald-700 text-white px-4 py-3 rounded-xl font-bold">報價單</button>
+      <button type="button" onclick="renderEstimateOrder()" class="bg-orange-800 text-white px-4 py-3 rounded-xl font-bold">估價單</button>
+      <button type="button" onclick="renderVendorDocument('payment')" class="bg-blue-700 text-white px-4 py-3 rounded-xl font-bold">入帳委託書</button>
+      <button type="button" onclick="renderVendorDocument('vendorPayment')" class="bg-indigo-700 text-white px-4 py-3 rounded-xl font-bold">廠商匯款入帳委託書</button>
+    </div>
+
+    <div class="grid xl:grid-cols-[440px_1fr] gap-5 items-start">
+      <section class="bg-white p-5 rounded-2xl shadow border print:hidden">
+        <div class="flex justify-between items-start gap-3 mb-4">
+          <div>
+            <h3 class="font-bold text-xl">估價資料</h3>
+            <div id="estimateDraftStatus" class="text-sm text-green-700 mt-1">會自動暫存</div>
+          </div>
+        </div>
+
+        <div class="grid gap-2 mb-4">
+          <select id="estimateDraftSelect" class="border p-3 rounded-xl" onchange="switchEstimateDraft(this.value)"></select>
+          <div class="grid grid-cols-2 gap-2">
+            <button type="button" onclick="newEstimateDraft()" class="bg-orange-700 text-white px-3 py-2 rounded-xl font-bold">
+              新增估價
+            </button>
+            <button type="button" onclick="deleteCurrentEstimateDraft()" class="bg-gray-700 text-white px-3 py-2 rounded-xl font-bold">
+              刪除此暫存
+            </button>
+          </div>
+        </div>
+
+        <div class="grid gap-3">
+          <input id="estimateNumber" class="border p-3 rounded-xl font-bold" placeholder="流水編號" oninput="renderEstimatePreview()">
+          <input id="estimateStoreUnit" class="border p-3 rounded-xl" placeholder="店家單位" value="陳媽媽肉粽店" oninput="renderEstimatePreview()">
+          <input id="estimateVendor" class="border p-3 rounded-xl" placeholder="廠商 / 客戶名稱" oninput="renderEstimatePreview()">
+          <input id="estimateDate" type="date" class="border p-3 rounded-xl" value="${todayStr()}" oninput="renderEstimatePreview()">
+          <div class="grid grid-cols-2 gap-3">
+            <input id="estimateContact" class="border p-3 rounded-xl" placeholder="聯絡人" oninput="renderEstimatePreview()">
+            <input id="estimatePhone" class="border p-3 rounded-xl" placeholder="電話" oninput="renderEstimatePreview()">
+          </div>
+        </div>
+
+        <div class="mt-5 flex justify-between items-center">
+          <h3 class="font-bold text-xl">商品明細</h3>
+          <button type="button" onclick="addEstimateRow()" class="bg-amber-700 text-white px-4 py-2 rounded-xl font-bold">
+            新增品項
+          </button>
+        </div>
+
+        <div id="estimateRows" class="space-y-3 mt-3"></div>
+
+        <textarea id="estimateNote" class="border p-3 rounded-xl w-full mt-4" rows="3"
+          placeholder="備註，例如交期、付款方式、特殊說明" oninput="renderEstimatePreview()"></textarea>
+
+        <div class="grid sm:grid-cols-2 gap-3 mt-4">
+          <button type="button" onclick="printEstimate()" class="bg-blue-700 text-white px-4 py-3 rounded-xl font-bold">
+            列印估價單
+          </button>
+          <button type="button" onclick="downloadEstimateImage()" class="bg-purple-700 text-white px-4 py-3 rounded-xl font-bold">
+            下載估價圖檔
+          </button>
+        </div>
+      </section>
+
+      <section id="quotePreview" class="overflow-auto xl:max-h-[calc(100vh-120px)] pb-4"></section>
+    </div>
+  `;
+
+  updateEstimateDraftSelector(getActiveEstimateDraftId());
+
+  if (!loadEstimateDraft(getActiveEstimateDraftId())) {
+    newEstimateDraft();
+  }
+}
+
+function findEstimateProduct(name) {
+  return ESTIMATE_PRODUCTS.find(item => item.name === name);
+}
+
+function createEstimateDraftId() {
+  return "estimate-draft-" + Date.now() + "-" + Math.random().toString(16).slice(2);
+}
+
+function generateEstimateNumber() {
+  const dateKey = todayStr().replace(/-/g, "");
+  const seqKey = "chenMamaEstimateSeq-" + dateKey;
+  const nextSeq = Number(localStorage.getItem(seqKey) || 0) + 1;
+  localStorage.setItem(seqKey, String(nextSeq));
+  return `EST${dateKey}-${String(nextSeq).padStart(3, "0")}`;
+}
+
+function getDefaultEstimateRows() {
+  return ESTIMATE_PRODUCTS.map(product => ({
+    name: product.name,
+    unit: product.unit,
+    price: product.price,
+    qty: "",
+    note: ""
+  }));
+}
+
+function addEstimateRow(item = null) {
+  const row = document.createElement("div");
+  row.className = "estimateRow grid gap-2 bg-gray-50 p-3 rounded-xl";
+  row.innerHTML = `
+    <select class="estimateProduct border p-3 rounded-xl w-full" onchange="onEstimateProductChange(this)">
+      ${ESTIMATE_PRODUCTS.map(product => `
+        <option value="${product.name}">${product.name}</option>
+      `).join("")}
+      <option value="__custom__">其他品項</option>
+    </select>
+    <input class="estimateCustomName hidden border p-3 rounded-xl w-full" placeholder="其他品項名稱" oninput="renderEstimatePreview()">
+    <div class="grid grid-cols-3 gap-2">
+      <input class="estimateQty quick-number-input border p-3 rounded-xl" type="number" inputmode="decimal"
+        min="0" step="0.1" placeholder="數量" data-keypad-title="輸入數量"
+        onfocus="openNumberKeypad(this)" onclick="openNumberKeypad(this)" oninput="renderEstimatePreview()">
+      <input class="estimateUnit border p-3 rounded-xl" placeholder="單位" oninput="renderEstimatePreview()">
+      <input class="estimatePrice quick-number-input border p-3 rounded-xl" type="number" inputmode="numeric"
+        min="0" placeholder="單價" data-keypad-title="輸入單價"
+        onfocus="openNumberKeypad(this)" onclick="openNumberKeypad(this)" oninput="renderEstimatePreview()">
+    </div>
+    <input class="estimateItemNote border p-3 rounded-xl w-full" placeholder="備註" oninput="renderEstimatePreview()">
+    <button type="button" onclick="this.parentElement.remove(); renderEstimatePreview();"
+      class="bg-red-600 text-white px-3 py-2 rounded-xl font-bold">刪除此品項</button>
+  `;
+
+  document.getElementById("estimateRows").appendChild(row);
+
+  const select = row.querySelector(".estimateProduct");
+  const product = item ? findEstimateProduct(item.name) : ESTIMATE_PRODUCTS[0];
+  const isCustom = item && !product;
+
+  select.value = isCustom ? "__custom__" : (product?.name || ESTIMATE_PRODUCTS[0].name);
+  row.querySelector(".estimateCustomName").value = isCustom ? (item.name || "") : "";
+  row.querySelector(".estimateQty").value = item?.qty ?? "";
+  row.querySelector(".estimateUnit").value = item?.unit || product?.unit || "";
+  row.querySelector(".estimatePrice").value = item?.price ?? product?.price ?? "";
+  row.querySelector(".estimateItemNote").value = item?.note || "";
+
+  onEstimateProductChange(select, Boolean(item));
+}
+
+function onEstimateProductChange(select, keepCurrentValues = false) {
+  const row = select.closest(".estimateRow");
+  const product = findEstimateProduct(select.value);
+  const isCustom = select.value === "__custom__";
+  const customInput = row?.querySelector(".estimateCustomName");
+  const unitInput = row?.querySelector(".estimateUnit");
+  const priceInput = row?.querySelector(".estimatePrice");
+
+  if (customInput) {
+    customInput.classList.toggle("hidden", !isCustom);
+  }
+
+  if (product && !keepCurrentValues) {
+    unitInput.value = product.unit;
+    priceInput.value = product.price;
+  }
+
+  if (isCustom && !keepCurrentValues) {
+    unitInput.value = "";
+    priceInput.value = "";
+  }
+
+  renderEstimatePreview();
+}
+
+function getEstimateItems() {
+  return [...document.querySelectorAll("#estimateRows > .estimateRow")]
+    .map(row => {
+      const select = row.querySelector(".estimateProduct");
+      const product = findEstimateProduct(select.value);
+      const isCustom = select.value === "__custom__";
+      const customName = row.querySelector(".estimateCustomName")?.value.trim() || "";
+      const qty = Number(row.querySelector(".estimateQty")?.value || 0);
+      const unit = row.querySelector(".estimateUnit")?.value.trim() || product?.unit || "";
+      const price = Number(row.querySelector(".estimatePrice")?.value || product?.price || 0);
+      const note = row.querySelector(".estimateItemNote")?.value.trim() || "";
+
+      return {
+        name: isCustom ? customName : (product?.name || ""),
+        qty,
+        unit,
+        price,
+        note
+      };
+    })
+    .filter(item => item.name && item.qty > 0);
+}
+
+function getEstimateData() {
+  const items = getEstimateItems();
+  const total = items.reduce((sum, item) => sum + item.qty * item.price, 0);
+
+  return {
+    estimateNo: document.getElementById("estimateNumber")?.value.trim() || "",
+    storeUnit: document.getElementById("estimateStoreUnit")?.value.trim() || "陳媽媽肉粽店",
+    vendor: document.getElementById("estimateVendor")?.value.trim() || "",
+    estimateDate: document.getElementById("estimateDate")?.value || todayStr(),
+    contact: document.getElementById("estimateContact")?.value.trim() || "",
+    phone: document.getElementById("estimatePhone")?.value.trim() || "",
+    note: document.getElementById("estimateNote")?.value.trim() || "",
+    items,
+    total
+  };
+}
+
+function getEstimateDrafts() {
+  try {
+    const drafts = JSON.parse(localStorage.getItem(ESTIMATE_DRAFTS_KEY) || "[]");
+    return Array.isArray(drafts) ? drafts : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function setEstimateDrafts(drafts) {
+  localStorage.setItem(ESTIMATE_DRAFTS_KEY, JSON.stringify(drafts));
+}
+
+function getActiveEstimateDraftId() {
+  return localStorage.getItem(ESTIMATE_ACTIVE_DRAFT_KEY) || "";
+}
+
+function setActiveEstimateDraftId(id) {
+  if (id) {
+    localStorage.setItem(ESTIMATE_ACTIVE_DRAFT_KEY, id);
+  } else {
+    localStorage.removeItem(ESTIMATE_ACTIVE_DRAFT_KEY);
+  }
+}
+
+function getEstimateDraftTitle(draft) {
+  const name = draft.vendor || draft.contact || "未命名估價";
+  const amount = Number(draft.total || 0) ? `｜NT$ ${money(draft.total)}` : "";
+  return `${draft.estimateNo || "未編號"}｜${name}${amount}`;
+}
+
+function updateEstimateDraftSelector(activeId = "") {
+  const select = document.getElementById("estimateDraftSelect");
+  if (!select) return;
+
+  const drafts = getEstimateDrafts()
+    .sort((a, b) => String(b.savedAt || "").localeCompare(String(a.savedAt || "")));
+
+  select.innerHTML = drafts.length
+    ? drafts.map(draft => `
+        <option value="${draft.id}" ${draft.id === activeId ? "selected" : ""}>
+          ${escapeHtml(getEstimateDraftTitle(draft))}
+        </option>
+      `).join("")
+    : `<option value="">目前沒有暫存估價單</option>`;
+}
+
+function saveEstimateDraft(data = null) {
+  if (estimateDraftLoading) return;
+
+  try {
+    const draft = data || getEstimateData();
+    const activeId = getActiveEstimateDraftId() || createEstimateDraftId();
+    const drafts = getEstimateDrafts();
+    const draftData = {
+      ...draft,
+      id: activeId,
+      savedAt: new Date().toISOString()
+    };
+
+    const index = drafts.findIndex(x => x.id === activeId);
+    if (index >= 0) {
+      drafts[index] = draftData;
+    } else {
+      drafts.push(draftData);
+    }
+
+    setEstimateDrafts(drafts);
+    setActiveEstimateDraftId(activeId);
+    updateEstimateDraftSelector(activeId);
+
+    const status = document.getElementById("estimateDraftStatus");
+    if (status) {
+      status.textContent = `已自動暫存：${getEstimateDraftTitle(draftData)}`;
+      status.className = "text-sm text-green-700 mt-1";
+    }
+  } catch (error) {
+    const status = document.getElementById("estimateDraftStatus");
+    if (status) {
+      status.textContent = "暫存失敗，請先不要關閉頁面";
+      status.className = "text-sm text-red-700 mt-1";
+    }
+  }
+}
+
+function fillEstimateForm(draft = {}) {
+  document.getElementById("estimateNumber").value = draft.estimateNo || generateEstimateNumber();
+  document.getElementById("estimateStoreUnit").value = draft.storeUnit || "陳媽媽肉粽店";
+  document.getElementById("estimateVendor").value = draft.vendor || "";
+  document.getElementById("estimateDate").value = draft.estimateDate || todayStr();
+  document.getElementById("estimateContact").value = draft.contact || "";
+  document.getElementById("estimatePhone").value = draft.phone || "";
+  document.getElementById("estimateNote").value = draft.note || "";
+
+  const rows = document.getElementById("estimateRows");
+  rows.innerHTML = "";
+
+  const rowsToUse = Array.isArray(draft.items) && draft.items.length
+    ? draft.items
+    : getDefaultEstimateRows();
+
+  rowsToUse.forEach(item => addEstimateRow(item));
+}
+
+function loadEstimateDraft(id = "") {
+  const drafts = getEstimateDrafts();
+  const targetId = id || getActiveEstimateDraftId() || drafts[0]?.id || "";
+  const draft = drafts.find(x => x.id === targetId);
+
+  if (!draft) return false;
+
+  estimateDraftLoading = true;
+  setActiveEstimateDraftId(draft.id);
+  fillEstimateForm(draft);
+  estimateDraftLoading = false;
+
+  updateEstimateDraftSelector(draft.id);
+
+  const status = document.getElementById("estimateDraftStatus");
+  if (status) {
+    status.textContent = `已載入暫存：${getEstimateDraftTitle(draft)}`;
+    status.className = "text-sm text-amber-700 mt-1";
+  }
+
+  renderEstimatePreview();
+  return true;
+}
+
+function switchEstimateDraft(id) {
+  if (!id) return;
+  saveEstimateDraft();
+  loadEstimateDraft(id);
+}
+
+function newEstimateDraft() {
+  const id = createEstimateDraftId();
+  setActiveEstimateDraftId(id);
+
+  estimateDraftLoading = true;
+  fillEstimateForm({
+    id,
+    estimateNo: generateEstimateNumber(),
+    estimateDate: todayStr(),
+    items: getDefaultEstimateRows()
+  });
+  estimateDraftLoading = false;
+
+  const status = document.getElementById("estimateDraftStatus");
+  if (status) {
+    status.textContent = "已建立新估價單暫存";
+    status.className = "text-sm text-green-700 mt-1";
+  }
+
+  renderEstimatePreview();
+}
+
+function deleteCurrentEstimateDraft() {
+  const activeId = getActiveEstimateDraftId();
+  if (!activeId) {
+    newEstimateDraft();
+    return;
+  }
+
+  if (!confirm("確定刪除目前這份估價單暫存？")) return;
+
+  const drafts = getEstimateDrafts().filter(x => x.id !== activeId);
+  setEstimateDrafts(drafts);
+
+  const nextId = drafts[0]?.id || "";
+  setActiveEstimateDraftId(nextId);
+
+  if (nextId) {
+    loadEstimateDraft(nextId);
+  } else {
+    renderEstimateOrder();
+  }
+}
+
+function renderEstimatePreview() {
+  const box = document.getElementById("quotePreview");
+  if (!box) return;
+
+  const data = getEstimateData();
+  const displayItems = data.items.length
+    ? data.items
+    : [{ name: "尚未填寫品項", unit: "", qty: "", price: 0, note: "" }];
+
+  const emptyRows = Math.max(0, 8 - displayItems.length);
+
+  box.innerHTML = `
+    <div class="estimate-a4-page quote-a4-page rounded-2xl shadow border border-orange-900/20 overflow-hidden">
+      <div class="quote-a4-inner text-stone-900 text-[15px] leading-relaxed bg-[#fffaf0]">
+        <div class="border-b-4 border-[#7a3f10] pb-4 mb-5">
+          <div class="flex justify-between gap-4 items-start">
+            <div class="text-[16px] leading-7">
+              <div class="font-bold text-[#7a3f10]">店家單位</div>
+              <div class="text-[22px] font-bold">${escapeHtml(data.storeUnit)}</div>
+            </div>
+            <div class="text-center">
+              <div class="text-[38px] font-bold tracking-[0.35em] text-[#3f260f]">估價單</div>
+              <div class="text-sm text-stone-500 mt-1">Estimate Sheet</div>
+            </div>
+            <div class="text-right text-[15px] leading-7">
+              <div>流水編號：<span class="font-bold">${escapeHtml(data.estimateNo || "未編號")}</span></div>
+              <div>估價日期：${escapeHtml(data.estimateDate)}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mb-5">
+          <div class="border-2 border-[#7a3f10] rounded-xl bg-white overflow-hidden">
+            <div class="bg-[#7a3f10] text-white font-bold px-4 py-2">廠商 / 客戶</div>
+            <div class="p-4 space-y-2 text-[17px]">
+              <div>名稱：${escapeHtml(data.vendor || "未填")}</div>
+              <div>聯絡人：${escapeHtml(data.contact || "未填")}</div>
+              <div>電話：${escapeHtml(data.phone || "未填")}</div>
+            </div>
+          </div>
+
+          <div class="border-2 border-[#1f5b34] rounded-xl bg-white overflow-hidden">
+            <div class="bg-[#1f5b34] text-white font-bold px-4 py-2">估價說明</div>
+            <div class="p-4 text-[15px] leading-7">
+              <div>本估價單以雙方確認數量與交期後為準。</div>
+              <div>若品項、數量或交付方式異動，金額將重新確認。</div>
+              <div>有效期限：7 天。</div>
+            </div>
+          </div>
+        </div>
+
+        <table class="w-full border-2 border-[#7a3f10] text-[15px] table-fixed bg-white">
+          <colgroup>
+            <col style="width: 8%">
+            <col style="width: 24%">
+            <col style="width: 10%">
+            <col style="width: 12%">
+            <col style="width: 14%">
+            <col style="width: 16%">
+            <col style="width: 16%">
+          </colgroup>
+          <thead class="bg-[#7a3f10] text-white">
+            <tr>
+              <th class="p-2 border">序</th>
+              <th class="p-2 border">品名</th>
+              <th class="p-2 border">單位</th>
+              <th class="p-2 border">數量</th>
+              <th class="p-2 border">單價</th>
+              <th class="p-2 border">金額</th>
+              <th class="p-2 border">備註</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${displayItems.map((item, index) => `
+              <tr>
+                <td class="p-2 border text-center">${index + 1}</td>
+                <td class="p-2 border font-bold break-words">${escapeHtml(item.name)}</td>
+                <td class="p-2 border text-center">${escapeHtml(item.unit || "")}</td>
+                <td class="p-2 border text-right">${item.qty || ""}</td>
+                <td class="p-2 border text-right">${item.price ? money(item.price) : ""}</td>
+                <td class="p-2 border text-right font-bold">${item.qty ? money(item.qty * item.price) : ""}</td>
+                <td class="p-2 border break-words">${escapeHtml(item.note || "")}</td>
+              </tr>
+            `).join("")}
+            ${Array.from({ length: emptyRows }).map((_, index) => `
+              <tr>
+                <td class="p-2 border text-center">${displayItems.length + index + 1}</td>
+                <td class="p-2 border">&nbsp;</td>
+                <td class="p-2 border">&nbsp;</td>
+                <td class="p-2 border">&nbsp;</td>
+                <td class="p-2 border">&nbsp;</td>
+                <td class="p-2 border">&nbsp;</td>
+                <td class="p-2 border">&nbsp;</td>
+              </tr>
+            `).join("")}
+            <tr class="bg-[#f3e7d4]">
+              <td class="p-3 border text-center font-bold text-[22px]" colspan="5">總計</td>
+              <td class="p-3 border text-right font-bold text-[28px]" colspan="2">NT$ ${money(data.total)}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="grid grid-cols-2 gap-5 mt-5">
+          <div class="border border-stone-300 rounded-xl bg-white p-4 min-h-[34mm]">
+            <div class="font-bold text-[#7a3f10] mb-2">備註</div>
+            <div class="whitespace-pre-wrap leading-7">${escapeHtml(data.note || "無")}</div>
+          </div>
+          <div class="border border-stone-300 rounded-xl bg-white p-4">
+            <div class="font-bold text-[#7a3f10] mb-4">簽名確認</div>
+            <div class="grid grid-cols-[28mm_1fr] gap-y-5 items-end">
+              <div>客戶簽名</div>
+              <div class="border-b border-stone-700 h-8"></div>
+              <div>店家確認</div>
+              <div class="border-b border-stone-700 h-8"></div>
+              <div>確認日期</div>
+              <div class="border-b border-stone-700 h-8"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-5 text-center text-stone-600 text-[13px]">
+          陳媽媽肉粽店｜桃園市蘆竹區錦興里聯福街76巷8號｜0936-138-746
+        </div>
+      </div>
+    </div>
+  `;
+
+  saveEstimateDraft(data);
+}
+
+async function downloadEstimateImage() {
+  if (!window.html2canvas) {
+    alert("圖檔匯出套件尚未載入，請重新整理後再試一次");
+    return;
+  }
+
+  const target = document.querySelector("#quotePreview .estimate-a4-page") || document.getElementById("quotePreview");
+  if (!target) return;
+
+  const data = getEstimateData();
+  const fileNameBase = (data.vendor || data.contact || "客戶")
+    .replace(/[\\/:*?"<>|]/g, "")
+    .trim() || "客戶";
+
+  const canvas = await html2canvas(target, {
+    scale: 2,
+    backgroundColor: "#fffaf0",
+    useCORS: true
+  });
+
+  const link = document.createElement("a");
+  link.download = `陳媽媽估價單_${fileNameBase}_${data.estimateNo || todayStr()}.png`;
+  link.href = canvas.toDataURL("image/png");
+  link.click();
+}
+
+function printEstimate() {
+  document.body.classList.add("quote-print-mode");
+  window.print();
+  setTimeout(() => {
+    document.body.classList.remove("quote-print-mode");
+  }, 500);
 }
 
 function renderProjectOrder() {
