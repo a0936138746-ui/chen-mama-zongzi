@@ -8137,7 +8137,7 @@ function deleteCurrentVendorDocDraft(type) {
 
 function renderVendorDocField(text, left, top, width, options = "") {
   return `
-    <div style="position:absolute;left:${left}%;top:${top}%;width:${width}%;font-size:10.5px;font-weight:700;line-height:1.25;white-space:nowrap;overflow:hidden;color:#111;${options}">
+    <div style="position:absolute;left:${left}%;top:${top}%;width:${width}%;font-size:14px;font-weight:700;line-height:1.15;white-space:nowrap;overflow:hidden;color:#111;${options}">
       ${escapeHtml(text || "")}
     </div>
   `;
@@ -8147,7 +8147,7 @@ function renderVendorDocCheck(checked, left, top) {
   if (!checked) return "";
   return `
     <div style="position:absolute;left:${left}%;top:${top}%;font-size:15px;font-weight:900;line-height:1;color:#111;">
-      ✓
+      V
     </div>
   `;
 }
@@ -8190,34 +8190,34 @@ function renderVendorDocPreview() {
         renderVendorDocField(parts.day, 89, 53.7, 5, "text-align:center;")
       ].join("")
     : [
-        renderVendorDocField(d.companyName, 35.5, 13.35, 32),
-        renderVendorDocField(d.taxId, 37.0, 16.05, 32),
-        renderVendorDocField(d.responsible, 22.2, 18.75, 21),
-        renderVendorDocField(d.contact, 51.0, 18.75, 22),
-        renderVendorDocField(d.phone, 24.5, 21.25, 24),
-        renderVendorDocField(d.address, 24.5, 23.95, 48),
-        renderVendorDocField(bankFullName, 43.0, 29.0, 39),
-        renderVendorDocField(d.bankCode, 27.5, 32.1, 36),
-        renderVendorDocField(d.accountName, 20.0, 34.85, 34),
-        renderVendorDocField(d.accountNumber, 55.5, 34.85, 31),
-        renderVendorDocField(d.purpose, 29.0, 40.15, 35),
-        renderVendorDocField(d.amountText, 31.0, 42.65, 22),
-        renderVendorDocField(amount, 64.0, 42.65, 12, "text-align:right;"),
-        renderVendorDocField(entryParts.year, 24.2, 45.35, 5, "text-align:center;"),
-        renderVendorDocField(entryParts.month, 35.5, 45.35, 5, "text-align:center;"),
-        renderVendorDocField(entryParts.day, 45.0, 45.35, 5, "text-align:center;"),
-        renderVendorDocCheck(d.relatedContract, 16.8, 50.0),
-        renderVendorDocCheck(d.relatedInvoice, 28.2, 50.0),
-        renderVendorDocCheck(d.relatedRemittance, 46.0, 50.0),
-        renderVendorDocCheck(d.relatedOther, 58.0, 50.0),
-        renderVendorDocField(d.relatedOtherText, 67.8, 49.8, 14),
-        renderVendorDocField(d.entrustedUnitName, 23.5, 55.3, 40),
-        renderVendorDocField(d.entrustedTaxId, 24.5, 58.5, 40),
-        renderVendorDocField(d.companyName, 17.8, 82.0, 30),
-        renderVendorDocField(d.responsible || d.contact, 17.8, 85.9, 28),
-        renderVendorDocField(parts.year, 62.0, 93.1, 6, "text-align:center;"),
-        renderVendorDocField(parts.month, 74.5, 93.1, 5, "text-align:center;"),
-        renderVendorDocField(parts.day, 85.5, 93.1, 5, "text-align:center;")
+        renderVendorDocField(d.companyName, 39.5, 12.65, 30),
+        renderVendorDocField(d.taxId, 43.0, 15.10, 27),
+        renderVendorDocField(d.responsible, 27.0, 17.75, 17),
+        renderVendorDocField(d.contact, 58.0, 17.75, 18),
+        renderVendorDocField(d.phone, 28.5, 20.30, 20),
+        renderVendorDocField(d.address, 28.0, 22.70, 42, "font-size:12.5px;"),
+        renderVendorDocField(bankFullName, 49.0, 27.80, 34, "font-size:12.5px;"),
+        renderVendorDocField(d.bankCode, 30.0, 30.95, 34),
+        renderVendorDocField(d.accountName, 22.0, 33.70, 30),
+        renderVendorDocField(d.accountNumber, 57.0, 33.70, 30),
+        renderVendorDocField(d.purpose, 33.0, 38.80, 31),
+        renderVendorDocField(d.amountText, 36.5, 41.35, 18),
+        renderVendorDocField(amount, 67.5, 41.35, 10, "text-align:center;"),
+        renderVendorDocField(entryParts.year, 26.5, 44.10, 4, "text-align:center;"),
+        renderVendorDocField(entryParts.month, 36.3, 44.10, 4, "text-align:center;"),
+        renderVendorDocField(entryParts.day, 46.2, 44.10, 4, "text-align:center;"),
+        renderVendorDocCheck(d.relatedContract, 16.2, 48.65),
+        renderVendorDocCheck(d.relatedInvoice, 29.4, 48.65),
+        renderVendorDocCheck(d.relatedRemittance, 47.0, 48.65),
+        renderVendorDocCheck(d.relatedOther, 59.0, 48.65),
+        renderVendorDocField(d.relatedOtherText, 68.5, 48.45, 12),
+        renderVendorDocField(d.entrustedUnitName, 25.0, 54.00, 38),
+        renderVendorDocField(d.entrustedTaxId, 25.0, 56.90, 36),
+        renderVendorDocField(d.companyName, 18.5, 80.25, 28),
+        renderVendorDocField(d.responsible || d.contact, 18.5, 84.20, 26),
+        renderVendorDocField(parts.year, 63.0, 91.70, 5, "text-align:center;"),
+        renderVendorDocField(parts.month, 75.0, 91.70, 4, "text-align:center;"),
+        renderVendorDocField(parts.day, 86.0, 91.70, 4, "text-align:center;")
       ].join("");
 
   box.innerHTML = `
