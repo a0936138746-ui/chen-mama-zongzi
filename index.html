@@ -7034,8 +7034,10 @@ function renderQuoteOrder() {
     <div class="flex gap-2 flex-wrap mb-5">
       <button type="button" onclick="renderQuoteOrder()" class="bg-emerald-700 text-white px-4 py-3 rounded-xl font-bold">報價單</button>
       <button type="button" onclick="renderEstimateOrder()" class="bg-orange-700 text-white px-4 py-3 rounded-xl font-bold">估價單</button>
+      <button type="button" onclick="renderReceiptOrder()" class="bg-rose-700 text-white px-4 py-3 rounded-xl font-bold">免用發票收據</button>
       <button type="button" onclick="renderVendorDocument('payment')" class="bg-blue-700 text-white px-4 py-3 rounded-xl font-bold">入帳委託書</button>
       <button type="button" onclick="renderVendorDocument('vendorPayment')" class="bg-indigo-700 text-white px-4 py-3 rounded-xl font-bold">廠商匯款入帳委託書</button>
+      <button type="button" onclick="renderDocumentRecords()" class="bg-slate-700 text-white px-4 py-3 rounded-xl font-bold">文件紀錄</button>
     </div>
 
     <div class="grid xl:grid-cols-[420px_1fr] gap-5 items-start">
@@ -7097,7 +7099,7 @@ function renderQuoteOrder() {
         <textarea id="quoteNote" class="border p-3 rounded-xl w-full mt-4" rows="3"
           placeholder="注意事項 / 客戶備註，例如優惠、贈送、公益不收費、需加熱" oninput="renderQuotePreview()"></textarea>
 
-        <div class="grid sm:grid-cols-3 gap-3 mt-4">
+        <div class="grid sm:grid-cols-4 gap-3 mt-4">
           <button type="button" onclick="printQuote()" class="bg-blue-700 text-white px-4 py-3 rounded-xl font-bold">
             列印報價單
           </button>
@@ -7106,6 +7108,9 @@ function renderQuoteOrder() {
           </button>
           <button type="button" onclick="saveQuoteAsOrder()" class="bg-green-700 text-white px-4 py-3 rounded-xl font-bold">
             確認儲存成訂單
+          </button>
+          <button type="button" onclick="saveQuoteToDocumentRecord()" class="bg-slate-700 text-white px-4 py-3 rounded-xl font-bold">
+            存到文件紀錄
           </button>
         </div>
       </section>
@@ -8047,8 +8052,10 @@ function renderVendorDocument(type = "payment") {
     <div class="flex gap-2 flex-wrap mb-5">
       <button onclick="renderQuoteOrder()" class="bg-green-700 text-white px-4 py-2 rounded-xl font-bold">報價單</button>
       <button onclick="renderEstimateOrder()" class="bg-orange-700 text-white px-4 py-2 rounded-xl font-bold">估價單</button>
+      <button onclick="renderReceiptOrder()" class="bg-rose-700 text-white px-4 py-2 rounded-xl font-bold">免用發票收據</button>
       <button onclick="renderVendorDocument('payment')" class="${isPayment ? "bg-blue-800" : "bg-blue-600"} text-white px-4 py-2 rounded-xl font-bold">入帳委託書</button>
       <button onclick="renderVendorDocument('vendorPayment')" class="${type === "vendorPayment" ? "bg-blue-800" : "bg-blue-600"} text-white px-4 py-2 rounded-xl font-bold">廠商匯款入帳委託書</button>
+      <button onclick="renderDocumentRecords()" class="bg-slate-700 text-white px-4 py-2 rounded-xl font-bold">文件紀錄</button>
     </div>
 
     <div class="grid xl:grid-cols-[440px_1fr] gap-6 items-start">
@@ -8142,10 +8149,11 @@ function renderVendorDocument(type = "payment") {
           <textarea id="vendorDocNote" class="border p-3 rounded-xl w-full" rows="2" placeholder="內部備註，不會印在原稿上" oninput="renderVendorDocPreview()"></textarea>
         </div>
 
-        <div class="grid sm:grid-cols-3 gap-3 mt-4">
+        <div class="grid sm:grid-cols-4 gap-3 mt-4">
           <button type="button" onclick="printVendorDoc()" class="bg-blue-700 text-white px-4 py-3 rounded-xl font-bold">列印</button>
           <button type="button" onclick="downloadVendorDocWord()" class="bg-indigo-700 text-white px-4 py-3 rounded-xl font-bold">下載 Word</button>
           <button type="button" onclick="copyVendorDocText()" class="bg-green-700 text-white px-4 py-3 rounded-xl font-bold">複製資料</button>
+          <button type="button" onclick="saveVendorDocToDocumentRecord()" class="bg-slate-700 text-white px-4 py-3 rounded-xl font-bold">存到紀錄</button>
         </div>
       </section>
 
@@ -8409,8 +8417,10 @@ function renderVendorDocument(type = "payment") {
     <div class="flex gap-2 flex-wrap mb-5">
       <button onclick="renderQuoteOrder()" class="bg-green-700 text-white px-4 py-2 rounded-xl font-bold">報價單</button>
       <button onclick="renderEstimateOrder()" class="bg-orange-700 text-white px-4 py-2 rounded-xl font-bold">估價單</button>
+      <button onclick="renderReceiptOrder()" class="bg-rose-700 text-white px-4 py-2 rounded-xl font-bold">免用發票收據</button>
       <button onclick="renderVendorDocument('payment')" class="${isPayment ? "bg-blue-800" : "bg-blue-600"} text-white px-4 py-2 rounded-xl font-bold">入帳委託書</button>
       <button onclick="renderVendorDocument('vendorPayment')" class="${type === "vendorPayment" ? "bg-blue-800" : "bg-blue-600"} text-white px-4 py-2 rounded-xl font-bold">廠商匯款入帳委託書</button>
+      <button onclick="renderDocumentRecords()" class="bg-slate-700 text-white px-4 py-2 rounded-xl font-bold">文件紀錄</button>
     </div>
 
     <div class="grid xl:grid-cols-[440px_1fr] gap-6 items-start">
@@ -8509,10 +8519,11 @@ function renderVendorDocument(type = "payment") {
           <textarea id="vendorDocNote" class="border p-3 rounded-xl w-full" rows="2" placeholder="內部備註，不會印在原稿上" oninput="renderVendorDocPreview()"></textarea>
         </div>
 
-        <div class="grid sm:grid-cols-3 gap-3 mt-4">
+        <div class="grid sm:grid-cols-4 gap-3 mt-4">
           <button type="button" onclick="printVendorDoc()" class="bg-blue-700 text-white px-4 py-3 rounded-xl font-bold">列印</button>
           <button type="button" onclick="downloadVendorDocWord()" class="bg-indigo-700 text-white px-4 py-3 rounded-xl font-bold">下載 Word</button>
           <button type="button" onclick="copyVendorDocText()" class="bg-green-700 text-white px-4 py-3 rounded-xl font-bold">複製資料</button>
+          <button type="button" onclick="saveVendorDocToDocumentRecord()" class="bg-slate-700 text-white px-4 py-3 rounded-xl font-bold">存到紀錄</button>
         </div>
       </section>
 
@@ -8830,8 +8841,10 @@ function renderVendorDocument(type = "payment") {
     <div class="flex gap-2 flex-wrap mb-5">
       <button onclick="renderQuoteOrder()" class="bg-green-700 text-white px-4 py-2 rounded-xl font-bold">報價單</button>
       <button onclick="renderEstimateOrder()" class="bg-orange-700 text-white px-4 py-2 rounded-xl font-bold">估價單</button>
+      <button onclick="renderReceiptOrder()" class="bg-rose-700 text-white px-4 py-2 rounded-xl font-bold">免用發票收據</button>
       <button onclick="renderVendorDocument('payment')" class="${isPayment ? "bg-blue-800" : "bg-blue-600"} text-white px-4 py-2 rounded-xl font-bold">入帳委託書</button>
       <button onclick="renderVendorDocument('vendorPayment')" class="${type === "vendorPayment" ? "bg-blue-800" : "bg-blue-600"} text-white px-4 py-2 rounded-xl font-bold">廠商匯款入帳委託書</button>
+      <button onclick="renderDocumentRecords()" class="bg-slate-700 text-white px-4 py-2 rounded-xl font-bold">文件紀錄</button>
     </div>
 
     <div class="grid xl:grid-cols-[440px_1fr] gap-6 items-start">
@@ -8920,10 +8933,11 @@ function renderVendorDocument(type = "payment") {
           `}
         </div>
 
-        <div class="grid sm:grid-cols-3 gap-3 mt-4">
+        <div class="grid sm:grid-cols-4 gap-3 mt-4">
           <button type="button" onclick="printVendorDoc()" class="bg-blue-700 text-white px-4 py-3 rounded-xl font-bold">列印</button>
           <button type="button" onclick="downloadVendorDocWord()" class="bg-indigo-700 text-white px-4 py-3 rounded-xl font-bold">下載 Word</button>
           <button type="button" onclick="copyVendorDocText()" class="bg-green-700 text-white px-4 py-3 rounded-xl font-bold">複製資料</button>
+          <button type="button" onclick="saveVendorDocToDocumentRecord()" class="bg-slate-700 text-white px-4 py-3 rounded-xl font-bold">存到紀錄</button>
         </div>
       </section>
 
@@ -10230,8 +10244,10 @@ function renderEstimateOrder() {
     <div class="flex gap-2 flex-wrap mb-5">
       <button type="button" onclick="renderQuoteOrder()" class="bg-emerald-700 text-white px-4 py-3 rounded-xl font-bold">報價單</button>
       <button type="button" onclick="renderEstimateOrder()" class="bg-orange-800 text-white px-4 py-3 rounded-xl font-bold">估價單</button>
+      <button type="button" onclick="renderReceiptOrder()" class="bg-rose-700 text-white px-4 py-3 rounded-xl font-bold">免用發票收據</button>
       <button type="button" onclick="renderVendorDocument('payment')" class="bg-blue-700 text-white px-4 py-3 rounded-xl font-bold">入帳委託書</button>
       <button type="button" onclick="renderVendorDocument('vendorPayment')" class="bg-indigo-700 text-white px-4 py-3 rounded-xl font-bold">廠商匯款入帳委託書</button>
+      <button type="button" onclick="renderDocumentRecords()" class="bg-slate-700 text-white px-4 py-3 rounded-xl font-bold">文件紀錄</button>
     </div>
 
     <div class="grid xl:grid-cols-[440px_1fr] gap-5 items-start">
@@ -10278,12 +10294,15 @@ function renderEstimateOrder() {
         <textarea id="estimateNote" class="border p-3 rounded-xl w-full mt-4" rows="3"
           placeholder="備註，例如交期、付款方式、特殊說明" oninput="renderEstimatePreview()"></textarea>
 
-        <div class="grid sm:grid-cols-2 gap-3 mt-4">
+        <div class="grid sm:grid-cols-3 gap-3 mt-4">
           <button type="button" onclick="printEstimate()" class="bg-blue-700 text-white px-4 py-3 rounded-xl font-bold">
             列印估價單
           </button>
           <button type="button" onclick="downloadEstimateImage()" class="bg-purple-700 text-white px-4 py-3 rounded-xl font-bold">
             下載估價圖檔
+          </button>
+          <button type="button" onclick="saveEstimateToDocumentRecord()" class="bg-slate-700 text-white px-4 py-3 rounded-xl font-bold">
+            存到文件紀錄
           </button>
         </div>
       </section>
@@ -10771,6 +10790,582 @@ function printEstimate() {
   setTimeout(() => {
     document.body.classList.remove("quote-print-mode");
   }, 500);
+}
+
+const RECEIPT_DRAFT_KEY = "chenMamaReceiptDraft";
+const DOCUMENT_RECORDS_KEY = "chenMamaDocumentRecords";
+
+function renderReceiptOrder() {
+  document.getElementById("adminPanel").innerHTML = `
+    <h2 class="text-2xl font-bold mb-4">報價 / 文件</h2>
+
+    <div class="flex gap-2 flex-wrap mb-5">
+      <button type="button" onclick="renderQuoteOrder()" class="bg-emerald-700 text-white px-4 py-3 rounded-xl font-bold">報價單</button>
+      <button type="button" onclick="renderEstimateOrder()" class="bg-orange-700 text-white px-4 py-3 rounded-xl font-bold">估價單</button>
+      <button type="button" onclick="renderReceiptOrder()" class="bg-rose-800 text-white px-4 py-3 rounded-xl font-bold">免用發票收據</button>
+      <button type="button" onclick="renderVendorDocument('payment')" class="bg-blue-700 text-white px-4 py-3 rounded-xl font-bold">入帳委託書</button>
+      <button type="button" onclick="renderVendorDocument('vendorPayment')" class="bg-indigo-700 text-white px-4 py-3 rounded-xl font-bold">廠商匯款入帳委託書</button>
+      <button type="button" onclick="renderDocumentRecords()" class="bg-slate-700 text-white px-4 py-3 rounded-xl font-bold">文件紀錄</button>
+    </div>
+
+    <div class="grid xl:grid-cols-[440px_1fr] gap-5 items-start">
+      <section class="bg-white p-5 rounded-2xl shadow border print:hidden">
+        <div class="flex justify-between items-start gap-3 mb-4">
+          <div>
+            <h3 class="font-bold text-xl">免用統一發票收據</h3>
+            <div id="receiptDraftStatus" class="text-sm text-green-700 mt-1">會自動保留目前填寫內容</div>
+          </div>
+        </div>
+
+        <div class="grid gap-3">
+          <input id="receiptNumber" class="border p-3 rounded-xl font-bold" placeholder="收據編號" oninput="renderReceiptPreview()">
+          <input id="receiptStoreUnit" class="border p-3 rounded-xl" placeholder="店家單位" value="陳媽媽肉粽店" oninput="renderReceiptPreview()">
+          <input id="receiptBuyer" class="border p-3 rounded-xl" placeholder="買受人 / 廠商名稱" oninput="renderReceiptPreview()">
+          <input id="receiptTaxId" class="border p-3 rounded-xl" placeholder="統一編號，可留空" oninput="renderReceiptPreview()">
+          <input id="receiptAddress" class="border p-3 rounded-xl" placeholder="地址，可留空" oninput="renderReceiptPreview()">
+          <input id="receiptDate" type="date" class="border p-3 rounded-xl" value="${todayStr()}" oninput="renderReceiptPreview()">
+        </div>
+
+        <div class="mt-5 flex justify-between items-center">
+          <h3 class="font-bold text-xl">品項</h3>
+          <button type="button" onclick="addReceiptRow()" class="bg-amber-700 text-white px-4 py-2 rounded-xl font-bold">
+            新增品項
+          </button>
+        </div>
+
+        <div id="receiptRows" class="space-y-3 mt-3"></div>
+
+        <textarea id="receiptNote" class="border p-3 rounded-xl w-full mt-4" rows="2"
+          placeholder="備註，例如已收現金、匯款、公益不收費" oninput="renderReceiptPreview()"></textarea>
+
+        <div class="grid sm:grid-cols-3 gap-3 mt-4">
+          <button type="button" onclick="newReceiptDraft()" class="bg-amber-700 text-white px-4 py-3 rounded-xl font-bold">
+            新增收據
+          </button>
+          <button type="button" onclick="printReceipt()" class="bg-blue-700 text-white px-4 py-3 rounded-xl font-bold">
+            列印收據
+          </button>
+          <button type="button" onclick="saveReceiptToDocumentRecord()" class="bg-slate-700 text-white px-4 py-3 rounded-xl font-bold">
+            存到文件紀錄
+          </button>
+        </div>
+      </section>
+
+      <section id="quotePreview" class="overflow-auto xl:max-h-[calc(100vh-120px)] pb-4"></section>
+    </div>
+  `;
+
+  const draft = getReceiptDraft();
+  if (draft) {
+    fillReceiptForm(draft);
+  } else {
+    newReceiptDraft();
+  }
+  renderReceiptPreview();
+}
+
+function generateReceiptNumber() {
+  const dateKey = todayStr().replace(/-/g, "");
+  const seqKey = "chenMamaReceiptSeq-" + dateKey;
+  const nextSeq = Number(localStorage.getItem(seqKey) || 0) + 1;
+  localStorage.setItem(seqKey, String(nextSeq));
+  return `REC${dateKey}-${String(nextSeq).padStart(3, "0")}`;
+}
+
+function getReceiptDraft() {
+  try {
+    return JSON.parse(localStorage.getItem(RECEIPT_DRAFT_KEY) || "null");
+  } catch (error) {
+    return null;
+  }
+}
+
+function saveReceiptDraft(data = null) {
+  try {
+    const draft = data || getReceiptData();
+    localStorage.setItem(RECEIPT_DRAFT_KEY, JSON.stringify({
+      ...draft,
+      savedAt: new Date().toISOString()
+    }));
+
+    const status = document.getElementById("receiptDraftStatus");
+    if (status) {
+      status.textContent = `已保留：${draft.receiptNo || "未編號"}｜${draft.buyer || "未填買受人"}`;
+      status.className = "text-sm text-green-700 mt-1";
+    }
+  } catch (error) {
+    const status = document.getElementById("receiptDraftStatus");
+    if (status) {
+      status.textContent = "保留失敗，請先不要關閉頁面";
+      status.className = "text-sm text-red-700 mt-1";
+    }
+  }
+}
+
+function newReceiptDraft() {
+  fillReceiptForm({
+    receiptNo: generateReceiptNumber(),
+    receiptDate: todayStr(),
+    storeUnit: "陳媽媽肉粽店",
+    items: getDefaultEstimateRows()
+  });
+  renderReceiptPreview();
+}
+
+function addReceiptRow(item = null) {
+  const row = document.createElement("div");
+  row.className = "receiptRow grid gap-2 bg-gray-50 p-3 rounded-xl";
+  row.innerHTML = `
+    <select class="receiptProduct border p-3 rounded-xl w-full" onchange="onReceiptProductChange(this)">
+      ${ESTIMATE_PRODUCTS.map(product => `
+        <option value="${product.name}">${product.name}</option>
+      `).join("")}
+      <option value="__custom__">其他品項</option>
+    </select>
+    <input class="receiptCustomName hidden border p-3 rounded-xl w-full" placeholder="其他品項名稱" oninput="renderReceiptPreview()">
+    <div class="grid grid-cols-3 gap-2">
+      <input class="receiptQty quick-number-input border p-3 rounded-xl" type="number" inputmode="decimal"
+        min="0" step="0.1" placeholder="數量" data-keypad-title="輸入數量"
+        onfocus="openNumberKeypad(this)" onclick="openNumberKeypad(this)" oninput="renderReceiptPreview()">
+      <input class="receiptUnit border p-3 rounded-xl" placeholder="單位" oninput="renderReceiptPreview()">
+      <input class="receiptPrice quick-number-input border p-3 rounded-xl" type="number" inputmode="numeric"
+        min="0" placeholder="單價" data-keypad-title="輸入單價"
+        onfocus="openNumberKeypad(this)" onclick="openNumberKeypad(this)" oninput="renderReceiptPreview()">
+    </div>
+    <input class="receiptItemNote border p-3 rounded-xl w-full" placeholder="備註" oninput="renderReceiptPreview()">
+    <button type="button" onclick="this.parentElement.remove(); renderReceiptPreview();"
+      class="bg-red-600 text-white px-3 py-2 rounded-xl font-bold">刪除此品項</button>
+  `;
+
+  document.getElementById("receiptRows").appendChild(row);
+
+  const select = row.querySelector(".receiptProduct");
+  const product = item ? findEstimateProduct(item.name) : ESTIMATE_PRODUCTS[0];
+  const isCustom = item && !product;
+
+  select.value = isCustom ? "__custom__" : (product?.name || ESTIMATE_PRODUCTS[0].name);
+  row.querySelector(".receiptCustomName").value = isCustom ? (item.name || "") : "";
+  row.querySelector(".receiptQty").value = item?.qty ?? "";
+  row.querySelector(".receiptUnit").value = item?.unit || product?.unit || "";
+  row.querySelector(".receiptPrice").value = item?.price ?? product?.price ?? "";
+  row.querySelector(".receiptItemNote").value = item?.note || "";
+
+  onReceiptProductChange(select, Boolean(item));
+}
+
+function onReceiptProductChange(select, keepCurrentValues = false) {
+  const row = select.closest(".receiptRow");
+  const product = findEstimateProduct(select.value);
+  const isCustom = select.value === "__custom__";
+  const customInput = row?.querySelector(".receiptCustomName");
+  const unitInput = row?.querySelector(".receiptUnit");
+  const priceInput = row?.querySelector(".receiptPrice");
+
+  if (customInput) {
+    customInput.classList.toggle("hidden", !isCustom);
+  }
+
+  if (product && !keepCurrentValues) {
+    unitInput.value = product.unit;
+    priceInput.value = product.price;
+  }
+
+  if (isCustom && !keepCurrentValues) {
+    unitInput.value = "";
+    priceInput.value = "";
+  }
+
+  renderReceiptPreview();
+}
+
+function getReceiptItems() {
+  return [...document.querySelectorAll("#receiptRows > .receiptRow")]
+    .map(row => {
+      const select = row.querySelector(".receiptProduct");
+      const product = findEstimateProduct(select.value);
+      const isCustom = select.value === "__custom__";
+      const customName = row.querySelector(".receiptCustomName")?.value.trim() || "";
+      const qty = Number(row.querySelector(".receiptQty")?.value || 0);
+      const unit = row.querySelector(".receiptUnit")?.value.trim() || product?.unit || "";
+      const price = Number(row.querySelector(".receiptPrice")?.value || product?.price || 0);
+      const note = row.querySelector(".receiptItemNote")?.value.trim() || "";
+
+      return {
+        name: isCustom ? customName : (product?.name || ""),
+        qty,
+        unit,
+        price,
+        note
+      };
+    })
+    .filter(item => item.name && item.qty > 0);
+}
+
+function getReceiptData() {
+  const items = getReceiptItems();
+  const total = items.reduce((sum, item) => sum + item.qty * item.price, 0);
+
+  return {
+    receiptNo: document.getElementById("receiptNumber")?.value.trim() || "",
+    storeUnit: document.getElementById("receiptStoreUnit")?.value.trim() || "陳媽媽肉粽店",
+    buyer: document.getElementById("receiptBuyer")?.value.trim() || "",
+    taxId: document.getElementById("receiptTaxId")?.value.trim() || "",
+    address: document.getElementById("receiptAddress")?.value.trim() || "",
+    receiptDate: document.getElementById("receiptDate")?.value || todayStr(),
+    note: document.getElementById("receiptNote")?.value.trim() || "",
+    items,
+    total
+  };
+}
+
+function fillReceiptForm(draft = {}) {
+  document.getElementById("receiptNumber").value = draft.receiptNo || generateReceiptNumber();
+  document.getElementById("receiptStoreUnit").value = draft.storeUnit || "陳媽媽肉粽店";
+  document.getElementById("receiptBuyer").value = draft.buyer || "";
+  document.getElementById("receiptTaxId").value = draft.taxId || "";
+  document.getElementById("receiptAddress").value = draft.address || "";
+  document.getElementById("receiptDate").value = draft.receiptDate || todayStr();
+  document.getElementById("receiptNote").value = draft.note || "";
+
+  const rows = document.getElementById("receiptRows");
+  rows.innerHTML = "";
+
+  const rowsToUse = Array.isArray(draft.items) && draft.items.length
+    ? draft.items
+    : getDefaultEstimateRows();
+
+  rowsToUse.forEach(item => addReceiptRow(item));
+}
+
+function renderReceiptPreview() {
+  const box = document.getElementById("quotePreview");
+  if (!box) return;
+
+  const data = getReceiptData();
+  const dateParts = getVendorDocRocDateParts(data.receiptDate);
+  const amountText = data.total ? numberToChineseAmount(data.total) : "";
+  const displayItems = data.items.length
+    ? data.items
+    : [{ name: "尚未填寫品項", unit: "", qty: "", price: 0, note: "" }];
+  const emptyRows = Math.max(0, 8 - displayItems.length);
+
+  box.innerHTML = `
+    <div class="receipt-a4-page quote-a4-page rounded-2xl shadow border border-blue-900/20 overflow-hidden">
+      <div class="quote-a4-inner text-stone-900 text-[15px] leading-relaxed bg-white">
+        <div class="grid grid-cols-[1fr_62mm] gap-5 border-b-4 border-blue-900 pb-4 mb-4">
+          <div>
+            <div class="flex justify-between items-start gap-4">
+              <div>
+                <div class="text-[34px] font-bold text-blue-950 tracking-[0.12em]">免用統一發票收據</div>
+                <div class="text-[18px] font-bold mt-2">${escapeHtml(data.storeUnit)}</div>
+              </div>
+              <div class="text-right leading-7">
+                <div>收據編號：<span class="font-bold">${escapeHtml(data.receiptNo || "未編號")}</span></div>
+                <div>中華民國 ${dateParts.year} 年 ${dateParts.month} 月 ${dateParts.day} 日</div>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-[24mm_1fr] gap-y-2 mt-5 text-[17px]">
+              <div class="font-bold">買受人</div>
+              <div class="border-b border-blue-900">${escapeHtml(data.buyer || "未填")}</div>
+              <div class="font-bold">統一編號</div>
+              <div class="border-b border-blue-900">${escapeHtml(data.taxId || "")}</div>
+              <div class="font-bold">地址</div>
+              <div class="border-b border-blue-900">${escapeHtml(data.address || "")}</div>
+            </div>
+          </div>
+
+          <div class="border-2 border-blue-900 rounded-xl p-3 text-center">
+            <div class="font-bold text-blue-900 mb-2">店章 / 收據專用章</div>
+            <img src="assets/quote-stamp.jpg" class="mx-auto h-[34mm] object-contain mb-2" alt="免用發票店章">
+            <div class="flex justify-center items-end gap-3">
+              <img src="assets/receipt-red-seal.png" class="h-[17mm] w-[17mm] object-contain" alt="店章小印">
+              <div class="border-2 border-blue-900 px-4 py-1 text-[18px] font-bold text-blue-900">銀貨兩訖</div>
+            </div>
+          </div>
+        </div>
+
+        <table class="w-full border-2 border-blue-900 text-[15px] table-fixed">
+          <colgroup>
+            <col style="width: 8%">
+            <col style="width: 26%">
+            <col style="width: 10%">
+            <col style="width: 12%">
+            <col style="width: 14%">
+            <col style="width: 16%">
+            <col style="width: 14%">
+          </colgroup>
+          <thead class="bg-blue-900 text-white">
+            <tr>
+              <th class="p-2 border">序</th>
+              <th class="p-2 border">品名</th>
+              <th class="p-2 border">單位</th>
+              <th class="p-2 border">數量</th>
+              <th class="p-2 border">單價</th>
+              <th class="p-2 border">金額</th>
+              <th class="p-2 border">備註</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${displayItems.map((item, index) => `
+              <tr>
+                <td class="p-2 border text-center">${index + 1}</td>
+                <td class="p-2 border font-bold break-words">${escapeHtml(item.name)}</td>
+                <td class="p-2 border text-center">${escapeHtml(item.unit || "")}</td>
+                <td class="p-2 border text-right">${item.qty || ""}</td>
+                <td class="p-2 border text-right">${item.price ? money(item.price) : ""}</td>
+                <td class="p-2 border text-right font-bold">${item.qty ? money(item.qty * item.price) : ""}</td>
+                <td class="p-2 border break-words">${escapeHtml(item.note || "")}</td>
+              </tr>
+            `).join("")}
+            ${Array.from({ length: emptyRows }).map((_, index) => `
+              <tr>
+                <td class="p-2 border text-center">${displayItems.length + index + 1}</td>
+                <td class="p-2 border">&nbsp;</td>
+                <td class="p-2 border">&nbsp;</td>
+                <td class="p-2 border">&nbsp;</td>
+                <td class="p-2 border">&nbsp;</td>
+                <td class="p-2 border">&nbsp;</td>
+                <td class="p-2 border">&nbsp;</td>
+              </tr>
+            `).join("")}
+            <tr class="bg-blue-50">
+              <td class="p-3 border text-center font-bold text-[20px]" colspan="4">合計新台幣</td>
+              <td class="p-3 border font-bold text-blue-900" colspan="2">${escapeHtml(amountText)}</td>
+              <td class="p-3 border text-right font-bold text-[22px]">NT$ ${money(data.total)}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="grid grid-cols-[1fr_72mm] gap-5 mt-5">
+          <div class="border border-blue-200 rounded-xl p-4 min-h-[26mm]">
+            <div class="font-bold text-blue-900 mb-2">備註</div>
+            <div class="whitespace-pre-wrap">${escapeHtml(data.note || "無")}</div>
+          </div>
+          <div class="border border-blue-200 rounded-xl p-4">
+            <div class="grid grid-cols-[24mm_1fr] gap-y-5 items-end">
+              <div class="font-bold">經手人</div>
+              <div class="border-b border-stone-700 h-8"></div>
+              <div class="font-bold">收款人</div>
+              <div class="border-b border-stone-700 h-8"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-5 text-center text-stone-600 text-[13px]">
+          陳媽媽肉粽店｜統一編號 01257909｜桃園市蘆竹區錦興里聯福街76巷8號｜0936-138-746
+        </div>
+      </div>
+    </div>
+  `;
+
+  saveReceiptDraft(data);
+}
+
+function printReceipt() {
+  document.body.classList.add("quote-print-mode");
+  window.print();
+  setTimeout(() => {
+    document.body.classList.remove("quote-print-mode");
+  }, 500);
+}
+
+function getDocumentRecords() {
+  try {
+    const records = JSON.parse(localStorage.getItem(DOCUMENT_RECORDS_KEY) || "[]");
+    return Array.isArray(records) ? records : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function setDocumentRecords(records) {
+  localStorage.setItem(DOCUMENT_RECORDS_KEY, JSON.stringify(records));
+}
+
+function createDocumentRecordId() {
+  return "doc-record-" + Date.now() + "-" + Math.random().toString(16).slice(2);
+}
+
+function getDocumentTypeLabel(type) {
+  const labels = {
+    quote: "報價單",
+    estimate: "估價單",
+    payment: "入帳委託書",
+    vendorPayment: "廠商匯款入帳委託書",
+    receipt: "免用統一發票收據"
+  };
+  return labels[type] || "文件";
+}
+
+function getDocumentRecordTitle(type, data) {
+  if (type === "quote") return `${getDocumentTypeLabel(type)}｜${data.company || data.contact || "未填客戶"}`;
+  if (type === "estimate") return `${getDocumentTypeLabel(type)}｜${data.estimateNo || "未編號"}｜${data.vendor || "未填廠商"}`;
+  if (type === "receipt") return `${getDocumentTypeLabel(type)}｜${data.receiptNo || "未編號"}｜${data.buyer || "未填買受人"}`;
+  return `${getDocumentTypeLabel(type)}｜${data.companyName || "未填廠商"}`;
+}
+
+function getDocumentRecordAmount(type, data) {
+  if (type === "quote" || type === "estimate" || type === "receipt") return Number(data.total || 0);
+  return Number(data.amount || 0);
+}
+
+function getDocumentRecordDate(type, data) {
+  if (type === "quote") return data.quoteDate || todayStr();
+  if (type === "estimate") return data.estimateDate || todayStr();
+  if (type === "receipt") return data.receiptDate || todayStr();
+  return data.documentDate || todayStr();
+}
+
+function getDocumentRecordKey(type, data) {
+  if (type === "estimate") return `${type}-${data.estimateNo || ""}`;
+  if (type === "receipt") return `${type}-${data.receiptNo || ""}`;
+  if (type === "quote") return `${type}-${data.company || data.contact || ""}-${data.quoteDate || ""}-${data.total || 0}`;
+  return `${type}-${data.companyName || ""}-${data.documentDate || ""}-${data.amount || 0}`;
+}
+
+function saveDocumentRecord(type, data, options = {}) {
+  const recordKey = getDocumentRecordKey(type, data);
+  const records = getDocumentRecords();
+  const existingIndex = records.findIndex(record => record.recordKey === recordKey && recordKey.replace(/-/g, "") !== type);
+  const record = {
+    id: existingIndex >= 0 ? records[existingIndex].id : createDocumentRecordId(),
+    recordKey,
+    type,
+    title: getDocumentRecordTitle(type, data),
+    date: getDocumentRecordDate(type, data),
+    amount: getDocumentRecordAmount(type, data),
+    data: JSON.parse(JSON.stringify(data)),
+    savedAt: new Date().toISOString()
+  };
+
+  if (existingIndex >= 0) {
+    records[existingIndex] = record;
+  } else {
+    records.push(record);
+  }
+
+  setDocumentRecords(records);
+
+  if (options.silent !== true) {
+    alert("已存到文件紀錄");
+  }
+}
+
+function saveQuoteToDocumentRecord() {
+  saveDocumentRecord("quote", getQuoteData());
+}
+
+function saveEstimateToDocumentRecord() {
+  saveDocumentRecord("estimate", getEstimateData());
+}
+
+function saveReceiptToDocumentRecord() {
+  saveDocumentRecord("receipt", getReceiptData());
+}
+
+function saveVendorDocToDocumentRecord() {
+  const data = getVendorDocData();
+  saveDocumentRecord(data.type || "payment", data);
+}
+
+function renderDocumentRecords() {
+  const records = getDocumentRecords()
+    .sort((a, b) => String(b.savedAt || "").localeCompare(String(a.savedAt || "")));
+
+  document.getElementById("adminPanel").innerHTML = `
+    <h2 class="text-2xl font-bold mb-4">文件紀錄</h2>
+
+    <div class="flex gap-2 flex-wrap mb-5">
+      <button type="button" onclick="renderQuoteOrder()" class="bg-emerald-700 text-white px-4 py-3 rounded-xl font-bold">報價單</button>
+      <button type="button" onclick="renderEstimateOrder()" class="bg-orange-700 text-white px-4 py-3 rounded-xl font-bold">估價單</button>
+      <button type="button" onclick="renderReceiptOrder()" class="bg-rose-700 text-white px-4 py-3 rounded-xl font-bold">免用發票收據</button>
+      <button type="button" onclick="renderVendorDocument('payment')" class="bg-blue-700 text-white px-4 py-3 rounded-xl font-bold">入帳委託書</button>
+      <button type="button" onclick="renderVendorDocument('vendorPayment')" class="bg-indigo-700 text-white px-4 py-3 rounded-xl font-bold">廠商匯款入帳委託書</button>
+    </div>
+
+    <section class="bg-white rounded-2xl shadow border p-5">
+      <div class="flex justify-between items-center gap-3 mb-4">
+        <div>
+          <h3 class="text-xl font-bold">已保存文件</h3>
+          <div class="text-sm text-gray-500 mt-1">從這裡載入舊資料、直接列印，或刪除不需要的紀錄。</div>
+        </div>
+        <div class="bg-slate-100 text-slate-700 px-3 py-2 rounded-xl font-bold">${records.length} 筆</div>
+      </div>
+
+      <div class="space-y-3">
+        ${
+          records.length
+            ? records.map(record => `
+              <div class="border rounded-2xl p-4 flex flex-wrap justify-between gap-3">
+                <div>
+                  <div class="font-bold text-lg">${escapeHtml(record.title)}</div>
+                  <div class="text-sm text-gray-500 mt-1">
+                    ${escapeHtml(getDocumentTypeLabel(record.type))}｜日期 ${escapeHtml(record.date || "")}｜金額 NT$ ${money(record.amount || 0)}
+                  </div>
+                  <div class="text-xs text-gray-400 mt-1">保存時間：${new Date(record.savedAt).toLocaleString("zh-TW")}</div>
+                </div>
+                <div class="flex flex-wrap gap-2 items-center">
+                  <button type="button" onclick="openDocumentRecord('${record.id}', false)"
+                    class="bg-blue-700 text-white px-4 py-2 rounded-xl font-bold">載入</button>
+                  <button type="button" onclick="openDocumentRecord('${record.id}', true)"
+                    class="bg-green-700 text-white px-4 py-2 rounded-xl font-bold">列印</button>
+                  <button type="button" onclick="deleteDocumentRecord('${record.id}')"
+                    class="bg-red-600 text-white px-4 py-2 rounded-xl font-bold">刪除</button>
+                </div>
+              </div>
+            `).join("")
+            : `<div class="bg-gray-50 rounded-xl p-5 text-gray-500">尚未保存文件。請先到報價單、估價單、收據或委託書按「存到文件紀錄」。</div>`
+        }
+      </div>
+    </section>
+  `;
+}
+
+function openDocumentRecord(id, shouldPrint = false) {
+  const record = getDocumentRecords().find(item => item.id === id);
+  if (!record) return alert("找不到這筆文件紀錄");
+
+  if (record.type === "quote") {
+    renderQuoteOrder();
+    quoteDraftLoading = true;
+    fillQuoteForm(record.data);
+    quoteDraftLoading = false;
+    renderQuotePreview();
+    if (shouldPrint) setTimeout(printQuote, 300);
+    return;
+  }
+
+  if (record.type === "estimate") {
+    renderEstimateOrder();
+    estimateDraftLoading = true;
+    fillEstimateForm(record.data);
+    estimateDraftLoading = false;
+    renderEstimatePreview();
+    if (shouldPrint) setTimeout(printEstimate, 300);
+    return;
+  }
+
+  if (record.type === "receipt") {
+    renderReceiptOrder();
+    fillReceiptForm(record.data);
+    renderReceiptPreview();
+    if (shouldPrint) setTimeout(printReceipt, 300);
+    return;
+  }
+
+  renderVendorDocument(record.type === "vendorPayment" ? "vendorPayment" : "payment");
+  vendorDocDraftLoading = true;
+  fillVendorDocForm(record.data);
+  vendorDocDraftLoading = false;
+  renderVendorDocPreview();
+  if (shouldPrint) setTimeout(printVendorDoc, 300);
+}
+
+function deleteDocumentRecord(id) {
+  if (!confirm("確定刪除這筆文件紀錄？")) return;
+  setDocumentRecords(getDocumentRecords().filter(record => record.id !== id));
+  renderDocumentRecords();
 }
 
 function renderProjectOrder() {
