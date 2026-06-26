@@ -7296,7 +7296,7 @@ function fillVendorDocForm(draft) {
   setValue("vendorDocTaxId", draft.taxId || "");
   setValue("vendorDocPurpose", draft.purpose || "");
   setValue("vendorDocAmount", draft.amount || "");
-  setValue("vendorDocAmountText", draft.amountText || "");
+  setValue("vendorDocAmountText", draft.amountText || (draft.amount ? numberToChineseAmount(draft.amount) : ""));
   setValue("vendorDocBank", draft.bank || "");
   setValue("vendorDocBranch", draft.branch || "");
   setValue("vendorDocAccountName", draft.accountName || "");
@@ -8187,7 +8187,7 @@ function getVendorDocDefaultData(type = "payment") {
     entryDate: todayStr(),
     bank: "玉山銀行",
     branch: "",
-    bankCode: "808",
+    bankCode: "8080107",
     accountName: "陳媽媽肉粽店",
     accountNumber: "0613940029136",
     entrustedUnitName: "財團法人台北高爾夫俱樂部",
@@ -8257,6 +8257,7 @@ function renderVendorDocPreview() {
   const parts = getVendorDocRocDateParts(d.documentDate);
   const entryParts = getVendorDocRocDateParts(d.entryDate || d.documentDate);
   const amount = d.amount ? money(d.amount) : "";
+  const amountText = d.amountText || (d.amount ? numberToChineseAmount(d.amount) : "");
   const bankFullName = [d.bank, d.branch].filter(Boolean).join(" ");
   const template =
     d.type === "vendorPayment"
@@ -8277,7 +8278,7 @@ function renderVendorDocPreview() {
         renderVendorDocField(d.accountNumber, 73, 24.8, 21),
         renderVendorDocField(d.email, 15.5, 26.8, 42),
         renderVendorDocField(d.fax, 74, 26.8, 20),
-        renderVendorDocField(d.amountText, 23, 30.0, 40),
+        renderVendorDocField(amountText, 23, 30.0, 40),
         renderVendorDocField(amount, 88, 30.0, 10, "text-align:right;"),
         renderVendorDocField(d.purpose, 15.5, 32.9, 74),
         renderVendorDocField(d.companyName, 15.5, 45.0, 38),
@@ -8973,6 +8974,9 @@ function renderVendorDocPreview() {
   const entryParts = getVendorDocRocDateParts(d.entryDate || d.documentDate);
   const amount = d.amount ? money(d.amount) : "";
   const bankFullName = [d.bank, d.branch].filter(Boolean).join(" ");
+  const showInvoiceCheck =
+    d.relatedInvoice ||
+    (!d.relatedContract && !d.relatedRemittance && !d.relatedOther);
   const template = d.type === "vendorPayment" ? "assets/vendor-payment-authorization-template.jpg" : "assets/payment-authorization-template.jpg";
   const fields = d.type === "vendorPayment"
     ? [
@@ -8998,34 +9002,34 @@ function renderVendorDocPreview() {
         renderVendorDocField(parts.day, 89, 53.7, 5, "text-align:center;")
       ].join("")
     : [
-        renderVendorDocField(d.companyName, 35.0, 11.20, 34),
-        renderVendorDocField(d.taxId, 37.0, 13.35, 32),
-        renderVendorDocField(d.responsible, 22.5, 15.55, 22),
-        renderVendorDocField(d.contact, 50.6, 15.55, 25),
-        renderVendorDocField(d.phone, 24.4, 17.70, 24),
-        renderVendorDocField(d.address, 24.4, 19.85, 46, "font-size:11.5px;"),
-        renderVendorDocField(bankFullName, 43.2, 24.35, 39, "font-size:11.5px;"),
-        renderVendorDocField(d.bankCode, 29.0, 26.55, 34),
-        renderVendorDocField(d.accountName, 20.4, 28.70, 31),
-        renderVendorDocField(d.accountNumber, 56.8, 28.70, 31, "font-size:11.5px;"),
-        renderVendorDocField(d.purpose, 29.4, 33.20, 34),
-        renderVendorDocField(d.amountText, 31.2, 35.35, 23),
-        renderVendorDocField(amount, 61.8, 35.35, 14, "text-align:center;"),
-        renderVendorDocField(entryParts.year, 25.0, 37.45, 5, "text-align:center;"),
-        renderVendorDocField(entryParts.month, 35.5, 37.45, 5, "text-align:center;"),
-        renderVendorDocField(entryParts.day, 45.0, 37.45, 5, "text-align:center;"),
-        renderVendorDocCheck(d.relatedContract, 16.4, 41.45),
-        renderVendorDocCheck(d.relatedInvoice, 29.0, 41.45),
-        renderVendorDocCheck(d.relatedRemittance, 46.8, 41.45),
-        renderVendorDocCheck(d.relatedOther, 59.0, 41.45),
+        renderVendorDocField(d.companyName, 35.16, 10.07, 34),
+        renderVendorDocField(d.taxId, 37.09, 12.28, 32),
+        renderVendorDocField(d.responsible, 24.51, 14.60, 22),
+        renderVendorDocField(d.contact, 52.20, 14.60, 25),
+        renderVendorDocField(d.phone, 24.39, 16.87, 24),
+        renderVendorDocField(d.address, 24.39, 18.96, 46, "font-size:11.5px;"),
+        renderVendorDocField(bankFullName, 43.46, 23.52, 39, "font-size:11.5px;"),
+        renderVendorDocField(d.bankCode, 29.75, 25.66, 34),
+        renderVendorDocField(d.accountName, 20.48, 27.87, 31),
+        renderVendorDocField(d.accountNumber, 58.81, 27.92, 31, "font-size:11.5px;"),
+        renderVendorDocField(d.purpose, 29.82, 32.31, 34),
+        renderVendorDocField(amountText, 31.36, 34.58, 23),
+        renderVendorDocField(amount, 57.43, 34.58, 14, "text-align:center;"),
+        renderVendorDocField(entryParts.year, 23.99, 36.68, 5, "text-align:center;"),
+        renderVendorDocField(entryParts.month, 31.89, 36.68, 5, "text-align:center;"),
+        renderVendorDocField(entryParts.day, 39.88, 36.74, 5, "text-align:center;"),
+        renderVendorDocCheck(d.relatedContract, 16.4, 40.92),
+        renderVendorDocCheck(showInvoiceCheck, 29.58, 40.92),
+        renderVendorDocCheck(d.relatedRemittance, 46.8, 40.92),
+        renderVendorDocCheck(d.relatedOther, 59.0, 40.92),
         renderVendorDocField(d.relatedOtherText, 68.0, 41.15, 13),
-        renderVendorDocField(d.entrustedUnitName, 24.7, 48.60, 42),
-        renderVendorDocField(d.entrustedTaxId, 24.7, 51.70, 38),
-        renderVendorDocField(d.companyName, 19.0, 68.65, 30),
-        renderVendorDocField(d.responsible || d.contact, 19.0, 73.65, 28),
-        renderVendorDocField(parts.year, 58.0, 81.45, 7, "text-align:center;"),
-        renderVendorDocField(parts.month, 74.0, 81.45, 5, "text-align:center;"),
-        renderVendorDocField(parts.day, 87.0, 81.45, 5, "text-align:center;")
+        renderVendorDocField(d.entrustedUnitName, 24.7, 45.2, 42),
+        renderVendorDocField(d.entrustedTaxId, 24.69, 47.61, 38),
+        renderVendorDocField(d.companyName, 19.0, 67.11, 30),
+        renderVendorDocField(d.responsible || d.contact, 19.0, 70.81, 28),
+        renderVendorDocField(parts.year, 46.41, 76.76, 7, "text-align:center;"),
+        renderVendorDocField(parts.month, 62.99, 76.76, 5, "text-align:center;"),
+        renderVendorDocField(parts.day, 73.98, 76.53, 5, "text-align:center;")
       ].join("");
   box.innerHTML = `
     <div class="quote-a4-page rounded-2xl shadow border border-slate-200 overflow-hidden bg-white">
@@ -9054,7 +9058,7 @@ async function downloadVendorDocImage() {
 function getVendorDocTemplateDocxPath(type) {
   return type === "vendorPayment"
     ? "assets/廠商匯款入帳委託書_含大小章_調整版_可列印.docx"
-    : "assets/入帳委託書_含大小章_調整版_可列印.docx";
+    : "assets/入帳委託書_套印調整版.docx";
 }
 
 function escapeXmlText(value) {
@@ -9222,6 +9226,78 @@ function getVendorDocWordDocumentXml(d) {
 </w:document>`;
 }
 
+function getDocxTextNodes(shape) {
+  const wordNs = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+  let nodes = Array.from(shape.getElementsByTagNameNS(wordNs, "t"));
+  if (!nodes.length) nodes = Array.from(shape.getElementsByTagName("w:t"));
+  if (!nodes.length) nodes = Array.from(shape.getElementsByTagName("t"));
+  return nodes;
+}
+
+function setDocxShapeText(shape, value) {
+  const nodes = getDocxTextNodes(shape);
+  if (!nodes.length) return;
+  nodes[0].textContent = String(value || "");
+  nodes.slice(1).forEach(node => {
+    node.textContent = "";
+  });
+}
+
+function getAdjustedPaymentDocxValues(d) {
+  const documentParts = getVendorDocRocDateParts(d.documentDate);
+  const entryParts = getVendorDocRocDateParts(d.entryDate || d.documentDate);
+  const amountText = d.amountText || (d.amount ? numberToChineseAmount(d.amount) : "");
+  const amount = d.amount ? money(d.amount) : "";
+  const bankFullName = [d.bank, d.branch].filter(Boolean).join("");
+  const showInvoiceCheck =
+    d.relatedInvoice ||
+    (!d.relatedContract && !d.relatedRemittance && !d.relatedOther);
+
+  return [
+    showInvoiceCheck ? "V" : "",
+    entryParts.year,
+    entryParts.month,
+    entryParts.day,
+    documentParts.month,
+    documentParts.day,
+    documentParts.year,
+    d.responsible || "",
+    d.companyName || "",
+    d.entrustedTaxId || "",
+    amount,
+    amountText,
+    d.purpose || "",
+    d.accountNumber || "",
+    d.accountName || "",
+    d.bankCode || "",
+    bankFullName,
+    d.address || "",
+    d.phone || "",
+    d.responsible || "",
+    d.contact || "",
+    d.taxId || "",
+    d.companyName || ""
+  ];
+}
+
+function applyAdjustedPaymentDocxTemplate(xmlText, d) {
+  const parser = new DOMParser();
+  const xml = parser.parseFromString(xmlText, "application/xml");
+  const errorNode = xml.querySelector("parsererror");
+  if (errorNode) return xmlText;
+
+  const vmlNs = "urn:schemas-microsoft-com:vml";
+  let shapes = Array.from(xml.getElementsByTagNameNS(vmlNs, "shape"));
+  if (!shapes.length) shapes = Array.from(xml.getElementsByTagName("v:shape"));
+  const values = getAdjustedPaymentDocxValues(d);
+
+  shapes.forEach((shape, index) => {
+    if (index < values.length) setDocxShapeText(shape, values[index]);
+  });
+
+  return new XMLSerializer().serializeToString(xml);
+}
+
 async function downloadVendorDocWord() {
   if (!window.JSZip) {
     alert("Word 匯出套件尚未載入，請重新整理後再試一次");
@@ -9239,7 +9315,12 @@ async function downloadVendorDocWord() {
     if (!response.ok) throw new Error("找不到 Word 範本");
 
     const zip = await JSZip.loadAsync(await response.arrayBuffer());
-    zip.file("word/document.xml", getVendorDocWordDocumentXml(d));
+    if (d.type === "payment") {
+      const currentXml = await zip.file("word/document.xml").async("string");
+      zip.file("word/document.xml", applyAdjustedPaymentDocxTemplate(currentXml, d));
+    } else {
+      zip.file("word/document.xml", getVendorDocWordDocumentXml(d));
+    }
 
     const blob = await zip.generateAsync({
       type: "blob",
