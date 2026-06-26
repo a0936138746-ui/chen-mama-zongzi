@@ -8349,18 +8349,35 @@ async function downloadVendorDocImage() {
 }
 
 function getVendorDocDefaultData(type = "payment") {
-  return {
+  const base = {
     id: createVendorDocDraftId(),
     type,
     documentDate: todayStr(),
     entryDate: todayStr(),
+    entrustedUnitName: "財團法人台北高爾夫俱樂部",
+    entrustedTaxId: ""
+  };
+
+  if (type === "vendorPayment") {
+    return {
+      ...base,
+      bank: "",
+      branch: "",
+      bankCode: "",
+      accountName: "",
+      accountNumber: "",
+      email: "",
+      fax: ""
+    };
+  }
+
+  return {
+    ...base,
     bank: "玉山銀行",
     branch: "",
     bankCode: "808",
     accountName: "陳媽媽肉粽店",
-    accountNumber: "0613940029136",
-    entrustedUnitName: "財團法人台北高爾夫俱樂部",
-    entrustedTaxId: ""
+    accountNumber: "0613940029136"
   };
 }
 
@@ -9497,14 +9514,14 @@ async function copyVendorDocText() {
 function newVendorDocDraft(type) {
   const id = createVendorDocDraftId();
   const current = typeof getVendorDocData === "function" ? getVendorDocData() : {};
+  const nextDraft = getVendorDocDefaultData(type);
 
   autoSaveVendorDocProfile(current);
   setActiveVendorDocDraftId(id);
 
   vendorDocDraftLoading = true;
   fillVendorDocForm({
-    ...getVendorDocDefaultData(type),
-    ...current,
+    ...nextDraft,
     id,
     type,
     documentDate: current.documentDate || todayStr(),
