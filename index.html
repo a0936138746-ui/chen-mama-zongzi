@@ -8746,6 +8746,305 @@ async function copyVendorDocText() {
   alert("已複製文件資料");
 }
 
+// Final override: keep this vendor document implementation last so older drafts above cannot override it.
+function getVendorDocDefaultData(type = "payment") {
+  return {
+    id: createVendorDocDraftId(),
+    type,
+    documentDate: todayStr(),
+    entryDate: todayStr(),
+    bank: "玉山銀行",
+    branch: "",
+    bankCode: "808",
+    accountName: "陳媽媽肉粽店",
+    accountNumber: "0613940029136",
+    entrustedUnitName: "財團法人台北高爾夫俱樂部",
+    entrustedTaxId: ""
+  };
+}
+
+function renderVendorDocument(type = "payment") {
+  const isPayment = type === "payment";
+
+  document.getElementById("adminPanel").innerHTML = `
+    <h2 class="text-2xl font-bold mb-4">報價 / 文件</h2>
+
+    <div class="flex gap-2 flex-wrap mb-5">
+      <button onclick="renderQuoteOrder()" class="bg-green-700 text-white px-4 py-2 rounded-xl font-bold">報價單</button>
+      <button onclick="renderVendorDocument('payment')" class="${isPayment ? "bg-blue-800" : "bg-blue-600"} text-white px-4 py-2 rounded-xl font-bold">入帳委託書</button>
+      <button onclick="renderVendorDocument('vendorPayment')" class="${type === "vendorPayment" ? "bg-blue-800" : "bg-blue-600"} text-white px-4 py-2 rounded-xl font-bold">廠商匯款入帳委託書</button>
+    </div>
+
+    <div class="grid xl:grid-cols-[440px_1fr] gap-6 items-start">
+      <section class="bg-white p-5 rounded-2xl shadow">
+        <h3 class="text-xl font-bold">${getVendorDocTitle(type)}</h3>
+        <p class="text-sm text-gray-500 mt-1">依原稿套印，大小章已在底圖內。</p>
+        <div id="vendorDocStatus" class="text-sm text-gray-500 mt-1 mb-4">填寫後會自動暫存</div>
+        <input id="vendorDocType" type="hidden" value="${type}">
+
+        <div class="grid grid-cols-[1fr_auto] gap-2 mb-3">
+          <select id="vendorDocProfileSelect" class="border p-3 rounded-xl" onchange="loadVendorDocProfile(this.value)"></select>
+          <button onclick="saveVendorDocProfile()" class="bg-slate-700 text-white px-3 py-2 rounded-xl font-bold">保存常用資料</button>
+        </div>
+
+        <div class="flex gap-2 mb-4">
+          <select id="vendorDocDraftSelect" class="border p-3 rounded-xl flex-1" onchange="switchVendorDocDraft(this.value)"></select>
+          <button onclick="newVendorDocDraft('${type}')" class="bg-amber-700 text-white px-3 py-2 rounded-xl font-bold">新增文件</button>
+          <button onclick="deleteCurrentVendorDocDraft('${type}')" class="bg-red-600 text-white px-3 py-2 rounded-xl font-bold">刪除</button>
+        </div>
+
+        <div class="space-y-3">
+          <input id="vendorDocDate" type="date" class="border p-3 rounded-xl w-full" value="${todayStr()}" oninput="renderVendorDocPreview()">
+          <input id="vendorDocCompany" class="border p-3 rounded-xl w-full" placeholder="${isPayment ? "廠商名稱或姓名" : "廠商名稱"}" oninput="renderVendorDocPreview()">
+          <input id="vendorDocTaxId" class="border p-3 rounded-xl w-full" placeholder="統一編號 / 身分證字號" oninput="renderVendorDocPreview()">
+          <div class="grid grid-cols-2 gap-3">
+            <input id="vendorDocResponsible" class="border p-3 rounded-xl" placeholder="負責人" oninput="renderVendorDocPreview()">
+            <input id="vendorDocContact" class="border p-3 rounded-xl" placeholder="聯絡人" oninput="renderVendorDocPreview()">
+          </div>
+          <input id="vendorDocPhone" class="border p-3 rounded-xl w-full" placeholder="聯絡電話" oninput="renderVendorDocPreview()">
+          <input id="vendorDocAddress" class="border p-3 rounded-xl w-full" placeholder="公司地址" oninput="renderVendorDocPreview()">
+
+          <div class="grid grid-cols-2 gap-3">
+            <input id="vendorDocAmount" type="number" inputmode="numeric" class="quick-number-input border p-3 rounded-xl font-bold" placeholder="金額"
+              data-keypad-title="輸入金額" onfocus="openNumberKeypad(this)" onclick="openNumberKeypad(this)" oninput="syncVendorDocAmountText(); renderVendorDocPreview()">
+            <input id="vendorDocAmountText" class="border p-3 rounded-xl" placeholder="國字金額自動帶出" oninput="renderVendorDocPreview()">
+          </div>
+
+          <input id="vendorDocPurpose" class="border p-3 rounded-xl w-full" placeholder="${isPayment ? "交易 / 專案名稱" : "請領案件名稱"}" oninput="renderVendorDocPreview()">
+
+          ${isPayment ? `
+            <div class="bg-amber-50 border border-amber-100 rounded-2xl p-3 space-y-3">
+              <div class="font-bold text-amber-900">入帳內容說明</div>
+              <input id="vendorDocEntryDate" type="date" class="border p-3 rounded-xl w-full" value="${todayStr()}" oninput="renderVendorDocPreview()">
+              <div class="grid grid-cols-2 gap-2 text-sm">
+                <label class="flex items-center gap-2 bg-white rounded-xl p-3 border"><input id="vendorDocRelatedContract" type="checkbox" onchange="renderVendorDocPreview()"> 合約影本</label>
+                <label class="flex items-center gap-2 bg-white rounded-xl p-3 border"><input id="vendorDocRelatedInvoice" type="checkbox" onchange="renderVendorDocPreview()"> 發票/收據影本</label>
+                <label class="flex items-center gap-2 bg-white rounded-xl p-3 border"><input id="vendorDocRelatedRemittance" type="checkbox" onchange="renderVendorDocPreview()"> 匯款證明</label>
+                <label class="flex items-center gap-2 bg-white rounded-xl p-3 border"><input id="vendorDocRelatedOther" type="checkbox" onchange="renderVendorDocPreview()"> 其他</label>
+              </div>
+              <input id="vendorDocRelatedOtherText" class="border p-3 rounded-xl w-full" placeholder="其他單據文字" oninput="renderVendorDocPreview()">
+            </div>
+
+            <div class="bg-green-50 border border-green-100 rounded-2xl p-3 space-y-2">
+              <div class="font-bold text-green-900">受委託人帳單位</div>
+              <input id="vendorDocEntrustedUnit" class="border p-3 rounded-xl w-full" placeholder="單位名稱" oninput="renderVendorDocPreview()">
+              <input id="vendorDocEntrustedTaxId" class="border p-3 rounded-xl w-full" placeholder="受委託人帳單位統一編號" oninput="renderVendorDocPreview()">
+            </div>
+          ` : `
+            <input id="vendorDocEntryDate" type="hidden">
+            <input id="vendorDocRelatedContract" type="checkbox" class="hidden">
+            <input id="vendorDocRelatedInvoice" type="checkbox" class="hidden">
+            <input id="vendorDocRelatedRemittance" type="checkbox" class="hidden">
+            <input id="vendorDocRelatedOther" type="checkbox" class="hidden">
+            <input id="vendorDocRelatedOtherText" type="hidden">
+            <input id="vendorDocEntrustedUnit" type="hidden">
+            <input id="vendorDocEntrustedTaxId" type="hidden">
+          `}
+
+          <div class="bg-blue-50 border border-blue-100 rounded-2xl p-3">
+            <div class="font-bold text-blue-900 mb-2">銀行帳戶資料</div>
+            <input id="vendorDocBank" class="border p-3 rounded-xl w-full mb-2" placeholder="金融機構名稱" oninput="renderVendorDocPreview()">
+            <input id="vendorDocBranch" class="border p-3 rounded-xl w-full mb-2" placeholder="分行 / 分支機構" oninput="renderVendorDocPreview()">
+            <input id="vendorDocBankCode" class="border p-3 rounded-xl w-full mb-2" placeholder="金融機構代號" oninput="renderVendorDocPreview()">
+            <input id="vendorDocAccountName" class="border p-3 rounded-xl w-full mb-2" placeholder="戶名" oninput="renderVendorDocPreview()">
+            <input id="vendorDocAccountNumber" class="border p-3 rounded-xl w-full" placeholder="帳號" oninput="renderVendorDocPreview()">
+          </div>
+
+          ${type === "vendorPayment" ? `
+            <div class="grid grid-cols-2 gap-3">
+              <input id="vendorDocEmail" class="border p-3 rounded-xl" placeholder="電子郵件" oninput="renderVendorDocPreview()">
+              <input id="vendorDocFax" class="border p-3 rounded-xl" placeholder="傳真號碼" oninput="renderVendorDocPreview()">
+            </div>
+          ` : `
+            <input id="vendorDocEmail" type="hidden">
+            <input id="vendorDocFax" type="hidden">
+          `}
+        </div>
+
+        <div class="grid sm:grid-cols-3 gap-3 mt-4">
+          <button type="button" onclick="printVendorDoc()" class="bg-blue-700 text-white px-4 py-3 rounded-xl font-bold">列印</button>
+          <button type="button" onclick="downloadVendorDocImage()" class="bg-purple-700 text-white px-4 py-3 rounded-xl font-bold">下載圖片</button>
+          <button type="button" onclick="copyVendorDocText()" class="bg-green-700 text-white px-4 py-3 rounded-xl font-bold">複製資料</button>
+        </div>
+      </section>
+
+      <section id="docPreview" class="overflow-auto xl:max-h-[calc(100vh-120px)] pb-4"></section>
+    </div>
+  `;
+
+  updateVendorDocProfileSelect();
+  updateVendorDocDraftSelector(type, getActiveVendorDocDraftId());
+
+  if (!loadVendorDocDraft(getActiveVendorDocDraftId(), type)) {
+    fillVendorDocForm(getVendorDocDefaultData(type));
+    renderVendorDocPreview();
+  }
+}
+
+function getVendorDocData() {
+  const getChecked = (id) => Boolean(document.getElementById(id)?.checked);
+  return {
+    type: document.getElementById("vendorDocType")?.value || "payment",
+    documentDate: document.getElementById("vendorDocDate")?.value || todayStr(),
+    entryDate: document.getElementById("vendorDocEntryDate")?.value || document.getElementById("vendorDocDate")?.value || todayStr(),
+    companyName: document.getElementById("vendorDocCompany")?.value.trim() || "",
+    taxId: document.getElementById("vendorDocTaxId")?.value.trim() || "",
+    responsible: document.getElementById("vendorDocResponsible")?.value.trim() || "",
+    contact: document.getElementById("vendorDocContact")?.value.trim() || "",
+    phone: document.getElementById("vendorDocPhone")?.value.trim() || "",
+    address: document.getElementById("vendorDocAddress")?.value.trim() || "",
+    purpose: document.getElementById("vendorDocPurpose")?.value.trim() || "",
+    amount: Number(document.getElementById("vendorDocAmount")?.value || 0),
+    amountText: document.getElementById("vendorDocAmountText")?.value.trim() || "",
+    bank: document.getElementById("vendorDocBank")?.value.trim() || "",
+    branch: document.getElementById("vendorDocBranch")?.value.trim() || "",
+    bankCode: document.getElementById("vendorDocBankCode")?.value.trim() || "",
+    accountName: document.getElementById("vendorDocAccountName")?.value.trim() || "",
+    accountNumber: document.getElementById("vendorDocAccountNumber")?.value.trim() || "",
+    email: document.getElementById("vendorDocEmail")?.value.trim() || "",
+    fax: document.getElementById("vendorDocFax")?.value.trim() || "",
+    relatedContract: getChecked("vendorDocRelatedContract"),
+    relatedInvoice: getChecked("vendorDocRelatedInvoice"),
+    relatedRemittance: getChecked("vendorDocRelatedRemittance"),
+    relatedOther: getChecked("vendorDocRelatedOther"),
+    relatedOtherText: document.getElementById("vendorDocRelatedOtherText")?.value.trim() || "",
+    entrustedUnitName: document.getElementById("vendorDocEntrustedUnit")?.value.trim() || "",
+    entrustedTaxId: document.getElementById("vendorDocEntrustedTaxId")?.value.trim() || "",
+    note: document.getElementById("vendorDocNote")?.value.trim() || ""
+  };
+}
+
+function fillVendorDocForm(draft) {
+  const setValue = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.value = value || "";
+  };
+  const setChecked = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.checked = Boolean(value);
+  };
+  setValue("vendorDocType", draft.type || "payment");
+  setValue("vendorDocDate", draft.documentDate || todayStr());
+  setValue("vendorDocEntryDate", draft.entryDate || draft.documentDate || todayStr());
+  setValue("vendorDocCompany", draft.companyName || "");
+  setValue("vendorDocTaxId", draft.taxId || "");
+  setValue("vendorDocResponsible", draft.responsible || "");
+  setValue("vendorDocContact", draft.contact || "");
+  setValue("vendorDocPhone", draft.phone || "");
+  setValue("vendorDocAddress", draft.address || "");
+  setValue("vendorDocPurpose", draft.purpose || "");
+  setValue("vendorDocAmount", draft.amount || "");
+  setValue("vendorDocAmountText", draft.amountText || (draft.amount ? numberToChineseAmount(draft.amount) : ""));
+  setValue("vendorDocBank", draft.bank || "");
+  setValue("vendorDocBranch", draft.branch || "");
+  setValue("vendorDocBankCode", draft.bankCode || "");
+  setValue("vendorDocAccountName", draft.accountName || "");
+  setValue("vendorDocAccountNumber", draft.accountNumber || "");
+  setValue("vendorDocEmail", draft.email || "");
+  setValue("vendorDocFax", draft.fax || "");
+  setChecked("vendorDocRelatedContract", draft.relatedContract);
+  setChecked("vendorDocRelatedInvoice", draft.relatedInvoice);
+  setChecked("vendorDocRelatedRemittance", draft.relatedRemittance);
+  setChecked("vendorDocRelatedOther", draft.relatedOther);
+  setValue("vendorDocRelatedOtherText", draft.relatedOtherText || "");
+  setValue("vendorDocEntrustedUnit", draft.entrustedUnitName || draft.entrustedUnit || "財團法人台北高爾夫俱樂部");
+  setValue("vendorDocEntrustedTaxId", draft.entrustedTaxId || "");
+}
+
+function renderVendorDocField(text, left, top, width, options = "") {
+  return `<div style="position:absolute;left:${left}%;top:${top}%;width:${width}%;font-size:13px;font-weight:700;line-height:1.15;white-space:nowrap;overflow:hidden;color:#111;${options}">${escapeHtml(text || "")}</div>`;
+}
+
+function renderVendorDocCheck(checked, left, top) {
+  return checked ? `<div style="position:absolute;left:${left}%;top:${top}%;font-size:13px;font-weight:900;line-height:1;color:#111;">V</div>` : "";
+}
+
+function renderVendorDocPreview() {
+  const box = document.getElementById("docPreview");
+  if (!box) return;
+  const d = getVendorDocData();
+  const parts = getVendorDocRocDateParts(d.documentDate);
+  const entryParts = getVendorDocRocDateParts(d.entryDate || d.documentDate);
+  const amount = d.amount ? money(d.amount) : "";
+  const bankFullName = [d.bank, d.branch].filter(Boolean).join(" ");
+  const template = d.type === "vendorPayment" ? "assets/vendor-payment-authorization-template.jpg" : "assets/payment-authorization-template.jpg";
+  const fields = d.type === "vendorPayment"
+    ? [
+        renderVendorDocField(d.companyName, 15.5, 8.5, 36),
+        renderVendorDocField(d.taxId, 78, 8.5, 16),
+        renderVendorDocField(d.responsible, 15.5, 11.6, 24),
+        renderVendorDocField(d.contact, 49.5, 11.6, 22),
+        renderVendorDocField(d.phone, 83, 11.6, 14),
+        renderVendorDocField(d.address, 15.5, 14.0, 74),
+        renderVendorDocField(d.accountName, 28, 17.3, 58),
+        renderVendorDocField(bankFullName, 28, 20.1, 38),
+        renderVendorDocField(d.bankCode, 82.5, 20.1, 10),
+        renderVendorDocField(d.accountNumber, 73, 24.8, 21),
+        renderVendorDocField(d.email, 15.5, 26.8, 42),
+        renderVendorDocField(d.fax, 74, 26.8, 20),
+        renderVendorDocField(d.amountText, 23, 30.0, 40),
+        renderVendorDocField(amount, 88, 30.0, 10, "text-align:right;"),
+        renderVendorDocField(d.purpose, 15.5, 32.9, 74),
+        renderVendorDocField(d.companyName, 15.5, 45.0, 38),
+        renderVendorDocField(d.responsible || d.contact, 15.5, 49.0, 34),
+        renderVendorDocField(parts.year, 62, 53.7, 6, "text-align:center;"),
+        renderVendorDocField(parts.month, 76, 53.7, 5, "text-align:center;"),
+        renderVendorDocField(parts.day, 89, 53.7, 5, "text-align:center;")
+      ].join("")
+    : [
+        renderVendorDocField(d.companyName, 38.7, 12.1, 31),
+        renderVendorDocField(d.taxId, 40.2, 14.8, 29),
+        renderVendorDocField(d.responsible, 25.8, 17.45, 19),
+        renderVendorDocField(d.contact, 57.2, 17.45, 19),
+        renderVendorDocField(d.phone, 27.2, 20.05, 22),
+        renderVendorDocField(d.address, 27.0, 22.55, 45, "font-size:11.5px;"),
+        renderVendorDocField(bankFullName, 48.0, 27.45, 35, "font-size:11.5px;"),
+        renderVendorDocField(d.bankCode, 30.0, 30.55, 32),
+        renderVendorDocField(d.accountName, 21.0, 33.35, 30),
+        renderVendorDocField(d.accountNumber, 57.0, 33.35, 30, "font-size:11.5px;"),
+        renderVendorDocField(d.purpose, 32.5, 38.45, 31),
+        renderVendorDocField(d.amountText, 35.2, 41.05, 20),
+        renderVendorDocField(amount, 66.0, 41.05, 10, "text-align:center;"),
+        renderVendorDocField(entryParts.year, 25.4, 43.75, 4, "text-align:center;"),
+        renderVendorDocField(entryParts.month, 35.6, 43.75, 4, "text-align:center;"),
+        renderVendorDocField(entryParts.day, 45.3, 43.75, 4, "text-align:center;"),
+        renderVendorDocCheck(d.relatedContract, 16.4, 48.55),
+        renderVendorDocCheck(d.relatedInvoice, 29.0, 48.55),
+        renderVendorDocCheck(d.relatedRemittance, 46.8, 48.55),
+        renderVendorDocCheck(d.relatedOther, 59.0, 48.55),
+        renderVendorDocField(d.relatedOtherText, 68.0, 48.25, 13),
+        renderVendorDocField(d.entrustedUnitName, 24.7, 54.1, 42),
+        renderVendorDocField(d.entrustedTaxId, 24.7, 56.9, 38),
+        renderVendorDocField(d.companyName, 18.8, 80.2, 28),
+        renderVendorDocField(d.responsible || d.contact, 18.8, 84.2, 26),
+        renderVendorDocField(parts.year, 63.0, 91.65, 5, "text-align:center;"),
+        renderVendorDocField(parts.month, 75.0, 91.65, 4, "text-align:center;"),
+        renderVendorDocField(parts.day, 86.0, 91.65, 4, "text-align:center;")
+      ].join("");
+  box.innerHTML = `
+    <div class="quote-a4-page rounded-2xl shadow border border-slate-200 overflow-hidden bg-white">
+      <div class="vendor-doc-sheet" style="position:relative;width:210mm;height:297mm;background:#fff;">
+        <img src="${template}" alt="${getVendorDocTitle(d.type)}原稿" style="position:absolute;inset:0;width:100%;height:100%;object-fit:fill;">
+        ${fields}
+      </div>
+    </div>`;
+  saveVendorDocDraft(d);
+}
+
+async function downloadVendorDocImage() {
+  if (!window.html2canvas) {
+    alert("圖檔匯出套件尚未載入，請重新整理後再試一次");
+    return;
+  }
+  const target = document.querySelector("#docPreview .vendor-doc-sheet") || document.querySelector("#docPreview .quote-a4-page");
+  const d = getVendorDocData();
+  const canvas = await html2canvas(target, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
+  const link = document.createElement("a");
+  link.download = `${getVendorDocFileName(d)}.png`;
+  link.href = canvas.toDataURL("image/png");
+  link.click();
+}
+
 function addQuoteRow(item = null) {
   const row = document.createElement("div");
   row.className = "quoteRow grid grid-cols-1 gap-2 bg-gray-50 p-3 rounded-xl";
